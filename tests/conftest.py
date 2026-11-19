@@ -1,16 +1,25 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from kreafinity.i18n import set_language
 from kreafinity.tools import ToolContext
 
 
 @pytest.fixture(autouse=True)
-def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep tests away from the real user's configuration and data."""
+def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keep tests away from the real user's configuration and data.
+
+    Each test starts in French, the default language (a test changing the
+    settings may switch the process to English).
+    """
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    set_language("fr")
+    yield
+    set_language("fr")
 
 
 @pytest.fixture

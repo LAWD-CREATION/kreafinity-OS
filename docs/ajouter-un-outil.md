@@ -95,8 +95,11 @@ entier. Sans réponse, l'action est refusée.
 - **Suppression** : jamais de `rm` ; envoi à la corbeille avec
   `kreafinity.system.trash.move_to_trash()` (spécification freedesktop).
 - **Lancer un programme** : `kreafinity.system.desktop.launch()` (détaché, erreurs
-  immédiates détectées), jamais via un shell.
-- **Root** : jamais de `sudo` ; passez par `pkexec`/polkit.
+  immédiates détectées), jamais via un shell. Pour attendre son résultat :
+  `kreafinity.system.process.run_captured()` (sans terminal ni entrée, délai maximal, sortie
+  bornée, tout le groupe de processus arrêté si la requête est annulée).
+- **Root** : jamais de `sudo` ; passez par `pkexec`/polkit (voir `system/packages.py`).
+- **D-Bus** : bibliothèque `dbus-fast` (voir `system/brightness.py`).
 - Chaque appel est inscrit dans le journal `~/.local/share/kreafinity/actions.log`.
 
 ## Outil externe (plugin)

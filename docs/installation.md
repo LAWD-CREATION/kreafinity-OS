@@ -17,7 +17,8 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 Lancez cette commande **sans** `sudo`. Le script :
 
 1. installe les paquets système manquants, après votre accord : `python3-venv`, `xdg-utils` et
-   `libglib2.0-bin` (ouvrir des applications, la corbeille), plus GTK et WebKitGTK pour la bulle ;
+   `libglib2.0-bin` (ouvrir des applications, la corbeille), `pkexec` (fenêtre de mot de passe
+   pour installer des logiciels), plus GTK et WebKitGTK pour la bulle ;
 2. crée un environnement Python dédié dans `~/.local/share/kreafinity/venv` et y installe
    Kreafinity ;
 3. ajoute les commandes `kreafinity` et `kreafinity-core` dans `~/.local/bin` ;

@@ -36,6 +36,7 @@ dependencies = [
     "uvicorn>=0.30",
     "websockets>=13",
     "keyring>=25",
+    "dbus-fast>=5.0",  # screen brightness via systemd-logind (D-Bus)
 ]
 
 [project.optional-dependencies]

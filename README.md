@@ -73,9 +73,11 @@ kreafinity provider list                  # fournisseurs, clés, IA par défaut 
 Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, choisissez une IA
 de secours dans les réglages (ou `fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`).
 
-Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la corbeille…) vous est
-d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
-`~/.local/share/kreafinity/actions.log`. API locale du démon : [docs/api.md](docs/api.md).
+Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, régler le volume ou la luminosité,
+mettre à la corbeille, exécuter une commande, installer un logiciel…) vous est d'abord présentée
+et ne s'exécute qu'avec votre accord. Liste des outils et garde-fous : [docs/outils.md](docs/outils.md).
+Journal des actions : `~/.local/share/kreafinity/actions.log`. API locale du démon :
+[docs/api.md](docs/api.md).
 
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.

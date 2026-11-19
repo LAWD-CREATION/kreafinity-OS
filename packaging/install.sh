@@ -122,6 +122,14 @@ elif ! "$python" -c 'import ensurepip, venv' 2>/dev/null; then
   packages+=("python$version-venv")
 fi
 packages+=(libglib2.0-bin xdg-utils)
+# Administrator rights for software installation, through polkit's password dialog.
+if ! command -v pkexec >/dev/null; then
+  if command -v apt-cache >/dev/null && ! available pkexec; then
+    packages+=(policykit-1) # Ubuntu 22.04, Debian 11
+  else
+    packages+=(pkexec)
+  fi
+fi
 if ((bubble)); then
   packages+=(python3-gi python3-gi-cairo gir1.2-gtk-3.0)
   if command -v apt-cache >/dev/null && ! available gir1.2-webkit2-4.1 && available gir1.2-webkit2-4.0; then
