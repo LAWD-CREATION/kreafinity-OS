@@ -92,5 +92,22 @@
   "bubble.no_gui": "The bubble needs GTK and WebKitGTK: sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1",
   "bubble.autostart_on": "The bubble will be shown at every login ({path}).",
   "bubble.autostart_off": "The bubble will no longer be shown at login.",
-  "bubble.autostart_comment": "Kreafinity assistant bubble"
+  "bubble.autostart_comment": "Kreafinity assistant bubble",
+  "setup.service_file": "systemd service: {path}",
+  "setup.service_enabled": "Automatic start enabled: the daemon starts with your session.",
+  "setup.service_started": "Daemon started.",
+  "setup.service_next_login": "The daemon will start at your next login.",
+  "setup.no_systemd": "systemd is not available for your session: the daemon will be started on demand (bubble, kreafinity ui).",
+  "setup.menu_entry": "\"Kreafinity\" added to the applications menu ({path}).",
+  "setup.bubble_autostart": "The bubble will be shown at every login ({path}).",
+  "setup.bubble_unavailable": "Bubble not enabled: GTK and WebKitGTK are missing (sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1).",
+  "setup.removed": "Removed: {path}",
+  "setup.done": "Kreafinity is integrated into your session.",
+  "setup.uninstalled": "Integration removed. Your settings, keys and conversations are kept.",
+  "uninstall.confirm": "Uninstall Kreafinity? Your settings, keys and conversations will be kept.",
+  "uninstall.confirm_purge": "Uninstall Kreafinity and permanently erase your settings, API keys and conversations?",
+  "uninstall.stopped": "Kreafinity process stopped (PID {pid}).",
+  "uninstall.purged": "Settings, API keys, conversations and logs erased.",
+  "uninstall.done": "Kreafinity is uninstalled. Your data stays in ~/.config/kreafinity and ~/.local/share/kreafinity.",
+  "uninstall.done_purge": "Kreafinity is completely uninstalled."
 }

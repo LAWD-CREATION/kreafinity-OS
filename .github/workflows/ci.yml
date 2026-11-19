@@ -35,6 +35,7 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
+          shellcheck packaging/install.sh
       - name: Type check
         run: mypy
       - name: Tests

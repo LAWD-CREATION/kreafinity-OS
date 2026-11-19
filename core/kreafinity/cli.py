@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -55,7 +56,7 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language, t
-from kreafinity.paths import data_dir, xdg_config_home
+from kreafinity.paths import config_dir, data_dir
 from kreafinity.providers import (
     LLMProvider,
     ProviderAuthError,
@@ -67,6 +68,7 @@ from kreafinity.providers import (
     get_provider_class,
     parse_model_spec,
 )
+from kreafinity.system import integration
 from kreafinity.tools import RiskLevel, ToolContext, ToolRegistry, printable
 
 app = typer.Typer(
@@ -392,19 +394,28 @@ def _running_daemon_url(settings: Settings) -> str | None:
 
 
 def _start_daemon(settings: Settings) -> str:
-    """Start the daemon in the background and wait until it answers."""
+    """Start the daemon in the background and wait until it answers.
+
+    Through its systemd user service when it is installed, so that it stays
+    managed by systemd; otherwise as a detached process.
+    """
     log_path = data_dir() / "daemon.log"
     log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     console.print(Text(t("ui.starting"), style="dim"))
-    fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-    with os.fdopen(fd, "ab") as log:
-        subprocess.Popen(
-            [sys.executable, "-m", "kreafinity.api.server"],
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=log,
-            start_new_session=True,
-        )
+    started = False
+    if integration.service_installed() and integration.systemd_available():
+        integration.import_session_environment()
+        started = integration.systemctl("start", integration.SERVICE_NAME)
+    if not started:
+        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "ab") as log:
+            subprocess.Popen(
+                [sys.executable, "-m", "kreafinity.api.server"],
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+                start_new_session=True,
+            )
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         url = _running_daemon_url(settings)
@@ -425,7 +436,6 @@ except ValueError:
     gi.require_version("WebKit2", "4.0")
 from gi.repository import WebKit2
 """
-AUTOSTART_FILE = "kreafinity-bubble.desktop"
 
 
 @app.command()
@@ -441,10 +451,14 @@ def bubble(
     """Affiche la bulle Kreafinity en bas à droite du bureau."""
     settings = _load_settings()
     if autostart is not None:
-        path = xdg_config_home() / "autostart" / AUTOSTART_FILE
+        path = integration.autostart_path()
         if autostart:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(_autostart_entry(), encoding="utf-8")
+            command = integration.python_command("kreafinity.cli", "bubble")
+            path.write_text(
+                integration.autostart_entry(command, t("bubble.autostart_comment")),
+                encoding="utf-8",
+            )
             console.print(t("bubble.autostart_on", path=path))
         else:
             path.unlink(missing_ok=True)
@@ -502,29 +516,84 @@ def _gui_python() -> str | None:
     return None
 
 
-def _autostart_entry() -> str:
-    """The freedesktop autostart entry showing the bubble at login."""
-    command = " ".join(
-        _desktop_quote(part) for part in (sys.executable, "-m", "kreafinity.cli", "bubble")
+@app.command()
+def setup(
+    uninstall: Annotated[
+        bool,
+        typer.Option("--uninstall", "--desinstaller", help="Retirer l'intégration au bureau."),
+    ] = False,
+    bubble: Annotated[
+        bool,
+        typer.Option("--bubble/--no-bubble", help="Afficher la bulle à l'ouverture de session."),
+    ] = True,
+) -> None:
+    """Intègre Kreafinity à votre session : démarrage automatique, menu, bulle."""
+    _load_settings()
+    if uninstall:
+        report = integration.uninstall()
+        for key, values in report.done:
+            console.print(t(key, **values))
+        console.print(Text(t("setup.uninstalled"), style="green"))
+        return
+
+    from kreafinity.api.web import web_root
+
+    gui = bubble and _gui_python() is not None
+    if bubble and not gui:
+        err_console.print(Text(t("setup.bubble_unavailable"), style="yellow"))
+    root = web_root()
+    report = integration.install(
+        bubble=gui,
+        icon_source=root / "img" / "logo.svg" if root else None,
+        autostart_comment=t("bubble.autostart_comment"),
     )
-    comment = t("bubble.autostart_comment")
-    return (
-        "[Desktop Entry]\n"
-        "Type=Application\n"
-        "Name=Kreafinity\n"
-        f"Comment={comment}\n"
-        f"Exec={command}\n"
-        "Terminal=false\n"
-        "X-GNOME-Autostart-enabled=true\n"
-    )
+    for key, values in report.done:
+        console.print(t(key, **values))
+    console.print(Text(t("setup.done"), style="green"))
 
 
-def _desktop_quote(argument: str) -> str:
-    """Quote an argument for the Exec key of a desktop entry."""
-    if argument and not any(char in argument for char in " \t\n\"'\\<>~|&;$*?#()`"):
-        return argument
-    escaped = "".join("\\" + char if char in '"`$\\' else char for char in argument)
-    return f'"{escaped}"'
+@app.command()
+def uninstall(
+    purge: Annotated[
+        bool,
+        typer.Option(
+            "--purge", help="Effacer aussi réglages, clés API, conversations et journaux."
+        ),
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+) -> None:
+    """Désinstalle Kreafinity (vos données sont gardées, sauf avec --purge)."""
+    _load_settings()
+    question = "uninstall.confirm_purge" if purge else "uninstall.confirm"
+    if not yes and not typer.confirm(t(question), default=False):
+        raise typer.Exit(1)
+
+    for key, values in integration.uninstall().done:
+        console.print(t(key, **values))
+    venv = data_dir() / "venv"
+    for process in integration.processes_running_from(venv):  # bubble, on-demand daemon
+        with contextlib.suppress(Exception):
+            process.terminate()
+            console.print(t("uninstall.stopped", pid=process.pid))
+    for name in ("kreafinity", "kreafinity-core"):
+        link = Path.home() / ".local" / "bin" / name
+        if link.is_symlink() and Path(os.readlink(link)).is_relative_to(venv):
+            link.unlink()
+            console.print(t("setup.removed", path=link))
+    if purge:
+        for name in available_providers():
+            if get_provider_class(name).requires_api_key:
+                with contextlib.suppress(SecretStoreError):
+                    delete_api_key(name)
+        shutil.rmtree(config_dir(), ignore_errors=True)
+        shutil.rmtree(data_dir(), ignore_errors=True)  # includes the environment itself
+        console.print(t("uninstall.purged"))
+    elif venv.is_dir():
+        shutil.rmtree(venv, ignore_errors=True)
+        console.print(t("setup.removed", path=venv))
+    console.print(Text(t("uninstall.done" if not purge else "uninstall.done_purge"), style="green"))
 
 
 @app.command()

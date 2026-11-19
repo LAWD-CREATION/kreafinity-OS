@@ -24,13 +24,20 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - [ ] **Étape 2** — Bureau façon Windows avec IA intégrée
 - [ ] **Étape 3** — Distribution bootable (ISO, clé USB live, installateur)
 
-### Essayer (version de développement)
+### Installer
+Sur Debian, Ubuntu et dérivées, une seule commande (sans `sudo`) :
 ```bash
-git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
-python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/packaging/install.sh | bash
+```
+Kreafinity s'installe dans votre dossier personnel, démarre avec votre session, s'ajoute au menu
+des applications et vous demande quelle IA utiliser : Ollama (sur l'ordinateur, gratuit et privé),
+Claude, GPT ou Mistral. Options, emplacements, mise à jour et dépannage :
+[docs/installation.md](docs/installation.md). Pour désinstaller : `kreafinity uninstall`
+(`--purge` efface aussi vos réglages et conversations).
 
-ollama pull llama3.1      # un modèle local (https://ollama.com), ou une IA en ligne : voir plus bas
-kreafinity ui             # ouvre l'interface web dans votre navigateur
+### Utiliser
+```bash
+kreafinity ui             # ouvre l'interface web dans votre navigateur (ou « Kreafinity » dans le menu)
 ```
 
 ![Interface web de Kreafinity : une action sensible attend votre validation](docs/img/interface-validation.png)
@@ -43,6 +50,7 @@ votre propre navigateur.
 Sur le bureau, une **bulle** reste en bas à droite de l'écran : un clic ouvre un petit panneau
 pour poser une question, un nouveau clic le referme. Une pastille orange signale une action qui
 attend votre accord.
+L'installation l'affiche à chaque ouverture de session ; sinon :
 ```bash
 kreafinity bubble                         # affiche la bulle (kreafinity bulle marche aussi)
 kreafinity bubble --autostart             # l'afficher à chaque ouverture de session
@@ -71,6 +79,14 @@ d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
 
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
+Version de développement :
+```bash
+git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
+python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+pytest
+```
+Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
+[ajouter un outil](docs/ajouter-un-outil.md), [interface web](docs/interface-web.md).
 
 ---
 
@@ -91,11 +107,17 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - [ ] **Step 2** — Windows-like desktop shell with built-in AI
 - [ ] **Step 3** — Bootable distribution (ISO, live USB, installer)
 
-### Try it (development version)
+### Install
+On Debian, Ubuntu and derivatives, one command (without `sudo`):
 ```bash
-git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
-python3 -m venv .venv && source .venv/bin/activate && pip install -e .
-ollama pull llama3.1                      # local model, see https://ollama.com
+curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/packaging/install.sh | bash
+```
+Kreafinity installs in your home folder, starts with your session, adds itself to the applications
+menu and asks which AI to use. Details (in French): [docs/installation.md](docs/installation.md).
+Uninstall with `kreafinity uninstall` (`--purge` also erases settings and conversations).
+
+### Use
+```bash
 kreafinity ui                             # opens the web interface in your browser
 kreafinity ask "What are the 5 largest files in my Downloads folder?"
 kreafinity provider key anthropic         # store an API key in the system keyring

@@ -92,5 +92,22 @@
   "bubble.no_gui": "La bulle a besoin de GTK et WebKitGTK : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1",
   "bubble.autostart_on": "La bulle s'affichera à chaque ouverture de session ({path}).",
   "bubble.autostart_off": "La bulle ne s'affichera plus à l'ouverture de session.",
-  "bubble.autostart_comment": "Bulle de l'assistant Kreafinity"
+  "bubble.autostart_comment": "Bulle de l'assistant Kreafinity",
+  "setup.service_file": "Service systemd : {path}",
+  "setup.service_enabled": "Démarrage automatique activé : le démon démarre avec votre session.",
+  "setup.service_started": "Démon démarré.",
+  "setup.service_next_login": "Le démon démarrera à la prochaine ouverture de session.",
+  "setup.no_systemd": "systemd n'est pas disponible pour votre session : le démon sera lancé à la demande (bulle, kreafinity ui).",
+  "setup.menu_entry": "Entrée « Kreafinity » ajoutée au menu des applications ({path}).",
+  "setup.bubble_autostart": "La bulle s'affichera à chaque ouverture de session ({path}).",
+  "setup.bubble_unavailable": "Bulle non activée : il manque GTK et WebKitGTK (sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1).",
+  "setup.removed": "Supprimé : {path}",
+  "setup.done": "Kreafinity est intégré à votre session.",
+  "setup.uninstalled": "Intégration retirée. Vos réglages, clés et conversations sont conservés.",
+  "uninstall.confirm": "Désinstaller Kreafinity ? Vos réglages, clés et conversations seront conservés.",
+  "uninstall.confirm_purge": "Désinstaller Kreafinity et effacer définitivement vos réglages, clés API et conversations ?",
+  "uninstall.stopped": "Processus Kreafinity arrêté (PID {pid}).",
+  "uninstall.purged": "Réglages, clés API, conversations et journaux effacés.",
+  "uninstall.done": "Kreafinity est désinstallé. Vos données restent dans ~/.config/kreafinity et ~/.local/share/kreafinity.",
+  "uninstall.done_purge": "Kreafinity est entièrement désinstallé."
 }

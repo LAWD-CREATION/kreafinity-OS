@@ -155,8 +155,8 @@ def test_second_daemon_leaves_the_first_alone(daemon: Daemon, tmp_path: Path) ->
         text=True,
         timeout=30,
     )
-    assert second.returncode == 1
-    assert "already in use" in second.stderr
+    assert second.returncode == 0  # nothing to do: Kreafinity already runs there
+    assert "already running" in second.stderr
     info = json.loads((daemon.data / "kreafinity" / "daemon.json").read_text())
     assert info["pid"] == daemon.process.pid
     assert daemon.get("/api/health").status_code == 200
@@ -195,3 +195,24 @@ def test_ui_command_starts_the_daemon(tmp_path: Path, home: Path) -> None:
             deadline = time.monotonic() + 10
             while info_file.exists() and time.monotonic() < deadline:
                 time.sleep(0.1)
+
+
+def test_port_taken_by_another_program(tmp_path: Path) -> None:
+    with socket.socket() as other:
+        other.bind(("127.0.0.1", 0))
+        other.listen()
+        port = other.getsockname()[1]
+        env = {
+            **os.environ,
+            "XDG_CONFIG_HOME": str(tmp_path / "xdg-config"),
+            "XDG_DATA_HOME": str(tmp_path / "xdg-data"),
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", SERVE, "--port", str(port)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    assert result.returncode == 1
+    assert "already in use" in result.stderr

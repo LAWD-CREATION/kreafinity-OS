@@ -161,9 +161,11 @@ def test_bubble_at_login(tmp_path: Path) -> None:
 
 
 def test_desktop_entry_quoting() -> None:
-    assert cli._desktop_quote("/usr/bin/python3") == "/usr/bin/python3"
-    assert cli._desktop_quote("/opt/my apps/python") == '"/opt/my apps/python"'
-    assert cli._desktop_quote('a"b$c') == '"a\\"b\\$c"'
+    from kreafinity.system.integration import desktop_quote
+
+    assert desktop_quote("/usr/bin/python3") == "/usr/bin/python3"
+    assert desktop_quote("/opt/my apps/python") == '"/opt/my apps/python"'
+    assert desktop_quote('a"b$c') == '"a\\"b\\$c"'
 
 
 # --- A real bubble on a virtual screen ----------------------------------------------------------

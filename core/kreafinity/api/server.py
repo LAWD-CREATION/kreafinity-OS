@@ -8,6 +8,7 @@ import logging
 import os
 import signal
 import socket
+import urllib.request
 from pathlib import Path
 from types import FrameType
 from typing import Any
@@ -114,10 +115,24 @@ def main() -> None:
         prog="kreafinity-core", description="Démon de l'assistant Kreafinity (127.0.0.1)."
     )
     parser.add_argument("--port", type=int, help="port d'écoute (par défaut : réglage « port »)")
+    port = parser.parse_args().port
     try:
-        serve(parser.parse_args().port)
+        serve(port)
     except DaemonError as exc:
+        url = f"http://{HOST}:{port or load_settings().port}"
+        if _is_kreafinity(url):
+            # Already running (e.g. started on demand before systemd): nothing to do.
+            parser.exit(0, f"kreafinity-core: Kreafinity is already running on {url}\n")
         parser.exit(1, f"kreafinity-core: {exc}\n")
+
+
+def _is_kreafinity(url: str) -> bool:
+    """Whether a Kreafinity daemon answers at `url`."""
+    try:
+        with urllib.request.urlopen(f"{url}/api/health", timeout=2) as response:
+            return bool(json.load(response).get("name") == "kreafinity")
+    except (OSError, ValueError):
+        return False
 
 
 if __name__ == "__main__":
