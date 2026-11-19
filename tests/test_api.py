@@ -195,6 +195,7 @@ def test_message_streamed_over_websocket(
         run_id = response.json()["run_id"]
         events = receive_until(socket, "run_finished")
 
+    events = [e for e in events if e["type"] != "conversation_updated"]
     kinds = [e["type"] for e in events]
     assert kinds[-3:] == ["run_started", "text_delta", "run_finished"]
     assert all(e.get("run_id") == run_id for e in events if e["type"] != "conversation_updated")

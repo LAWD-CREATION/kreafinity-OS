@@ -17,6 +17,7 @@ import uvicorn
 from kreafinity.agent import ConversationStore
 from kreafinity.api.app import create_app
 from kreafinity.api.auth import load_or_create_token
+from kreafinity.api.web import web_root
 from kreafinity.config import load_settings
 from kreafinity.paths import data_dir
 from kreafinity.service import AssistantService
@@ -68,7 +69,7 @@ def serve(port: int | None = None) -> None:
         ) from exc
     token = load_or_create_token()
     store = ConversationStore()
-    app = create_app(lambda: AssistantService(store), token, port=port)
+    app = create_app(lambda: AssistantService(store), token, port=port, web_dir=web_root())
     config = uvicorn.Config(
         app,
         host=HOST,
@@ -117,3 +118,7 @@ def main() -> None:
         serve(parser.parse_args().port)
     except DaemonError as exc:
         parser.exit(1, f"kreafinity-core: {exc}\n")
+
+
+if __name__ == "__main__":
+    main()

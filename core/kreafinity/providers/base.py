@@ -198,6 +198,10 @@ class LLMProvider(ABC):
     display_name: ClassVar[str]
     #: Whether the models run on this machine (usable without Internet access).
     is_local: ClassVar[bool] = False
+    #: Whether an API key is needed (it is then passed as ``api_key``).
+    requires_api_key: ClassVar[bool] = False
+    #: Environment variable that may hold the API key.
+    api_key_env_var: ClassVar[str | None] = None
 
     def __init__(self, *, default_model: str) -> None:
         self.default_model = default_model

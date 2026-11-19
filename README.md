@@ -29,37 +29,37 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 
-# Avec un modèle local (https://ollama.com) :
-ollama pull llama3.1
-kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
-
-# Avec une IA en ligne (clés bientôt stockées dans le trousseau système) :
-export ANTHROPIC_API_KEY=...   # Claude      → kreafinity chat -p anthropic
-export OPENAI_API_KEY=...      # GPT         → kreafinity chat -p openai
-export MISTRAL_API_KEY=...     # Mistral AI  → kreafinity chat -p mistral
+ollama pull llama3.1      # un modèle local (https://ollama.com), ou une IA en ligne : voir plus bas
+kreafinity ui             # ouvre l'interface web dans votre navigateur
 ```
 
-Changer d'IA :
+![Interface web de Kreafinity : une action sensible attend votre validation](docs/img/interface-validation.png)
+
+L'interface web montre les réponses en direct, vous laisse choisir l'IA et vous présente chaque
+action sur l'ordinateur avant qu'elle ne soit faite : une suppression demande de cocher une case
+puis de confirmer. Elle fonctionne sans connexion Internet et sans jeton : le démon reconnaît
+votre propre navigateur.
+
+En ligne de commande :
 ```bash
-kreafinity provider list                  # fournisseurs disponibles
-kreafinity provider models mistral        # modèles d'un fournisseur
-kreafinity provider use mistral/mistral-large-latest   # fournisseur par défaut
+kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
+kreafinity chat                           # conversation ; /fournisseur anthropic pour changer d'IA
+kreafinity history                        # vos conversations ; chat --reprendre <id> pour continuer
 ```
-Dans `kreafinity chat`, tapez `/fournisseur anthropic` pour changer d'IA **sans perdre la conversation**.
-Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, ajoutez
-`fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`.
+
+Avec une IA en ligne, enregistrez votre clé dans le **trousseau système** (jamais dans un fichier),
+depuis les réglages de l'interface ou ainsi :
+```bash
+kreafinity provider key anthropic         # Claude (ou openai, mistral)
+kreafinity provider use anthropic         # IA par défaut
+kreafinity provider list                  # fournisseurs, clés, IA par défaut et de secours
+```
+Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, choisissez une IA
+de secours dans les réglages (ou `fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`).
 
 Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la corbeille…) vous est
 d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
-`~/.local/share/kreafinity/actions.log`.
-
-Historique : `kreafinity history` liste vos conversations, `kreafinity chat --reprendre <id>`
-en reprend une.
-
-Démon (API locale pour l'interface web, sur 127.0.0.1 uniquement, protégée par un jeton) :
-```bash
-kreafinity daemon      # voir docs/api.md
-```
+`~/.local/share/kreafinity/actions.log`. API locale du démon : [docs/api.md](docs/api.md).
 
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
@@ -88,15 +88,15 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 ollama pull llama3.1                      # local model, see https://ollama.com
+kreafinity ui                             # opens the web interface in your browser
 kreafinity ask "What are the 5 largest files in my Downloads folder?"
-kreafinity chat --provider anthropic      # with ANTHROPIC_API_KEY set (or openai, mistral)
-kreafinity provider use mistral           # change the default provider
+kreafinity provider key anthropic         # store an API key in the system keyring
+kreafinity chat --provider anthropic      # or openai, mistral
 ```
-In `kreafinity chat`, `/provider openai` switches AI without losing the conversation.
-`kreafinity history` lists past conversations, `kreafinity chat --resume <id>` resumes one, and
-`kreafinity daemon` starts the local API used by the web interface (see `docs/api.md`).
-Set `language: en` in `~/.config/kreafinity/config.yaml` for English answers, and
-`fallback: ollama/llama3.1` to switch to a local model when offline.
+The web interface streams answers, lets you pick the AI and shows every action on the computer
+before it happens. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
+resumes one. Set `language: en` in `~/.config/kreafinity/config.yaml` (or in the settings) for
+English. The daemon's local API is described in `docs/api.md`.
 
 ---
 

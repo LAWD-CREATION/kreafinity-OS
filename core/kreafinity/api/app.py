@@ -1,14 +1,20 @@
-"""The daemon's HTTP API: REST for actions, a WebSocket for live events.
+"""The daemon's HTTP API: REST for actions, a WebSocket for live events, and the web UI.
 
-Every route except ``GET /api/health`` needs the local token:
+Every ``/api`` route except ``GET /api/health`` requires one of:
 
-- REST: ``Authorization: Bearer <token>`` header;
-- WebSocket ``/api/events``: the first message must be
-  ``{"type": "auth", "token": "<token>"}``.
+- the **local token**: ``Authorization: Bearer <token>`` header (REST), or
+  ``{"type": "auth", "token": "<token>"}`` as first WebSocket message;
+- a request from **the user's own browser**: the connection comes from a
+  process of the same user (checked with the kernel, see `peer`), sends
+  the ``X-Kreafinity-Client: web`` header and comes from the daemon's own
+  origin. Other websites cannot meet these conditions: the custom header
+  forces a CORS preflight that the daemon never grants, and their
+  ``Origin`` is refused. This lets the web interface work without any
+  secret, while other users of the machine still need the token.
 
-No cookie is used, so other websites cannot make the browser act on the
-daemon (no CSRF), and requests whose ``Host`` is not the local address are
-refused (DNS rebinding).
+No cookie is used (no CSRF), requests whose ``Host`` is not the local
+address are refused (DNS rebinding), and every response carries a strict
+Content Security Policy.
 """
 
 from __future__ import annotations
@@ -16,25 +22,31 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, FastAPI, Query, Request, WebSocket, status
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StrictBool
-from starlette.datastructures import Headers
+from starlette.datastructures import Headers, MutableHeaders
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 from kreafinity import __version__
 from kreafinity.api.auth import token_matches
+from kreafinity.api.peer import Address, peer_uid
 from kreafinity.service import AssistantService, ErrorCode, ServiceError
 
 #: Seconds a WebSocket client has to authenticate.
 AUTH_TIMEOUT = 10.0
 WS_POLICY_VIOLATION = 1008
+#: Header the web interface adds to every API request.
+CLIENT_HEADER = "x-kreafinity-client"
 
 STATUS_BY_CODE: dict[ErrorCode, int] = {
     "not_found": status.HTTP_404_NOT_FOUND,
@@ -44,7 +56,10 @@ STATUS_BY_CODE: dict[ErrorCode, int] = {
     "provider_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "provider_auth": status.HTTP_502_BAD_GATEWAY,
     "provider_error": status.HTTP_502_BAD_GATEWAY,
+    "keyring_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
+
+PeerLookup = Callable[[Address | None, Address | None], int | None]
 
 
 def get_service(request: Request) -> AssistantService:
@@ -78,22 +93,53 @@ class DefaultProvider(BaseModel):
     provider: str = Field(min_length=1, max_length=200)
 
 
+class ApiKey(BaseModel):
+    api_key: str = Field(min_length=1, max_length=1000)
+
+
 def create_app(
     service_factory: Callable[[], AssistantService],
     token: str,
     *,
     port: int,
     allowed_hosts: Sequence[str] = ("127.0.0.1", "localhost"),
+    web_dir: Path | None = None,
+    uid: int | None = None,
+    peer_lookup: PeerLookup = peer_uid,
 ) -> FastAPI:
-    """Build the API application.
+    """Build the application.
 
     Args:
         service_factory: Creates the service when the application starts
             (inside its event loop).
-        token: Secret every client must present.
-        port: Port the daemon listens on (for the allowed WebSocket origins).
+        token: Secret accepted from any local client.
+        port: Port the daemon listens on (for the allowed origins).
         allowed_hosts: Accepted values of the ``Host`` header.
+        web_dir: Folder of the web interface, served at ``/`` (none: API only).
+        uid: User whose browser is let in without the token (default: ours).
+        peer_lookup: Finds the user behind a connection (replaced in tests).
     """
+    owner = os.getuid() if uid is None else uid
+    allowed_origins = frozenset(f"http://{host}:{port}" for host in allowed_hosts)
+
+    def from_own_user(scope: Scope) -> bool:
+        return peer_lookup(scope.get("client"), scope.get("server")) == owner
+
+    def is_own_browser(scope: Scope) -> bool:
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+        return (
+            headers.get(CLIENT_HEADER) == "web"
+            and (origin is None or origin in allowed_origins)
+            and headers.get("sec-fetch-site") in (None, "same-origin", "none")
+            and from_own_user(scope)
+        )
+
+    def is_authorized(scope: Scope) -> bool:
+        scheme, _, credentials = Headers(scope=scope).get("authorization", "").partition(" ")
+        if scheme.lower() == "bearer" and token_matches(credentials.strip(), token):
+            return True
+        return is_own_browser(scope)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -112,10 +158,10 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
     )
-    # Last added runs first: check the Host, then the token, before anything else.
-    app.add_middleware(_TokenGate, token=token, open_paths=frozenset({"/api/health"}))
+    # Last added runs first: Host check, security headers, then authentication.
+    app.add_middleware(_AuthGate, is_authorized=is_authorized, open_paths={"/api/health"})
+    app.add_middleware(_SecurityHeaders, port=port, allowed_hosts=tuple(allowed_hosts))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
-    allowed_origins = {f"http://{host}:{port}" for host in allowed_hosts}
 
     @app.exception_handler(ServiceError)
     async def service_error(request: Request, exc: ServiceError) -> JSONResponse:
@@ -124,20 +170,15 @@ def create_app(
             content={"error": {"code": exc.code, "message": str(exc)}},
         )
 
-    def require_token(request: Request) -> None:
-        scheme, _, credentials = request.headers.get("authorization", "").partition(" ")
-        if scheme.lower() != "bearer" or not token_matches(credentials.strip(), token):
-            raise _Unauthorized
-
-    @app.exception_handler(_Unauthorized)
-    async def unauthorized(request: Request, exc: _Unauthorized) -> JSONResponse:
-        return _unauthorized_response()
-
-    api = APIRouter(prefix="/api", dependencies=[Depends(require_token)])
+    api = APIRouter(prefix="/api")
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "name": "kreafinity", "version": __version__}
+
+    @api.get("/info")
+    async def info(service: Service) -> dict[str, Any]:
+        return service.info()
 
     # --- Conversations -----------------------------------------------------------
 
@@ -193,7 +234,7 @@ def create_app(
     ) -> dict[str, Any]:
         return service.resolve_approval(approval_id, body.approved)
 
-    # --- Providers, tools and settings ---------------------------------------------------
+    # --- Providers, keys, tools and settings ----------------------------------------------
 
     @api.get("/providers")
     async def list_providers(service: Service) -> dict[str, Any]:
@@ -206,6 +247,14 @@ def create_app(
     @api.put("/providers/default")
     async def set_default_provider(service: Service, body: DefaultProvider) -> dict[str, Any]:
         return service.set_default_provider(body.provider)
+
+    @api.put("/providers/{name}/key")
+    async def set_api_key(service: Service, name: str, body: ApiKey) -> dict[str, Any]:
+        return service.set_api_key(name, body.api_key)
+
+    @api.delete("/providers/{name}/key")
+    async def delete_api_key(service: Service, name: str) -> dict[str, Any]:
+        return service.delete_api_key(name)
 
     @api.get("/tools")
     async def list_tools(service: Service) -> list[dict[str, Any]]:
@@ -231,6 +280,7 @@ def create_app(
         if origin is not None and origin not in allowed_origins:
             await websocket.close(code=WS_POLICY_VIOLATION)
             return
+        own_browser = origin is not None and from_own_user(websocket.scope)
         await websocket.accept()
         try:
             message = json.loads(
@@ -239,12 +289,12 @@ def create_app(
         except (TimeoutError, WebSocketDisconnect, ValueError):
             await _close_quietly(websocket)
             return
-        if not (
-            isinstance(message, dict)
-            and message.get("type") == "auth"
-            and isinstance(message.get("token"), str)
-            and token_matches(message["token"], token)
-        ):
+        if not (isinstance(message, dict) and message.get("type") == "auth"):
+            await _close_quietly(websocket)
+            return
+        candidate = message.get("token")
+        has_token = isinstance(candidate, str) and token_matches(candidate, token)
+        if not (has_token or own_browser):
             await _close_quietly(websocket)
             return
 
@@ -287,11 +337,12 @@ def create_app(
             service.events.unsubscribe(subscription)
             await _close_quietly(websocket)
 
+    # --- Web interface (static files, last so that /api always wins) ----------------------
+
+    if web_dir is not None:
+        app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
+
     return app
-
-
-class _Unauthorized(Exception):
-    """The request did not carry the right token."""
 
 
 def _unauthorized_response() -> JSONResponse:
@@ -302,22 +353,64 @@ def _unauthorized_response() -> JSONResponse:
     )
 
 
-class _TokenGate:
+class _AuthGate:
     """Refuses unauthenticated API requests before their body is even read."""
 
-    def __init__(self, app: ASGIApp, token: str, open_paths: frozenset[str]) -> None:
+    def __init__(
+        self, app: ASGIApp, is_authorized: Callable[[Scope], bool], open_paths: set[str]
+    ) -> None:
         self.app = app
-        self.token = token
-        self.open_paths = open_paths
+        self.is_authorized = is_authorized
+        self.open_paths = frozenset(open_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path: str = scope.get("path", "")
-        if scope["type"] == "http" and path.startswith("/api/") and path not in self.open_paths:
-            scheme, _, credentials = Headers(scope=scope).get("authorization", "").partition(" ")
-            if scheme.lower() != "bearer" or not token_matches(credentials.strip(), self.token):
-                await _unauthorized_response()(scope, receive, send)
-                return
+        if (
+            scope["type"] == "http"
+            and path.startswith("/api/")
+            and path not in self.open_paths
+            and not self.is_authorized(scope)
+        ):
+            await _unauthorized_response()(scope, receive, send)
+            return
         await self.app(scope, receive, send)
+
+
+class _SecurityHeaders:
+    """Adds a strict Content Security Policy and related headers to every response."""
+
+    def __init__(self, app: ASGIApp, port: int, allowed_hosts: tuple[str, ...]) -> None:
+        self.app = app
+        websockets = " ".join(f"ws://{host}:{port}" for host in allowed_hosts)
+        self.headers = {
+            "Content-Security-Policy": (
+                "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+                f"font-src 'self'; connect-src 'self' {websockets}; manifest-src 'self'; "
+                "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+            ),
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Referrer-Policy": "no-referrer",
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Resource-Policy": "same-origin",
+            "Permissions-Policy": "camera=(), geolocation=(), payment=(), usb=()",
+        }
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        cache = "no-store" if scope.get("path", "").startswith("/api/") else "no-cache"
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in self.headers.items():
+                    headers.setdefault(name, value)
+                headers["Cache-Control"] = cache
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 async def _close_quietly(websocket: WebSocket) -> None:

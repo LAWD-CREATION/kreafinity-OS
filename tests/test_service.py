@@ -66,8 +66,13 @@ async def test_message_is_streamed_and_saved(harness: Harness) -> None:
     run = await harness.service.send_message(conversation["id"], "Salut")
     assert run["provider"] == "ollama" and run["model"] == "llama3.1"
     events = await harness.until("run_finished")
+    updates = [e for e in events if e["type"] == "conversation_updated"]
+    events = [e for e in events if e["type"] != "conversation_updated"]
 
     assert [e["type"] for e in events] == ["run_started", "text_delta", "run_finished"]
+    # The title is known as soon as the request is saved, not only at the end.
+    assert updates and updates[0]["conversation"]["title"] == "Salut"
+    assert updates[0]["conversation"]["running"] is True
     assert events[0]["content"] == "Salut" and events[0]["provider_name"] == "Ollama"
     assert events[1]["text"] == "Bonjour !"
     assert events[2]["reason"] == "completed"

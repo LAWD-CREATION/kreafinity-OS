@@ -44,6 +44,8 @@ class OpenAIProvider(LLMProvider):
 
     name = "openai"
     display_name = "GPT (OpenAI)"
+    requires_api_key = True
+    api_key_env_var = "OPENAI_API_KEY"
 
     def __init__(
         self,

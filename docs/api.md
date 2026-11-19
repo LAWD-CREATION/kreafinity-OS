@@ -1,10 +1,12 @@
 # API locale du démon `kreafinity-core`
 
 Le démon expose l'assistant aux interfaces (interface web, futur bureau) par une API
-**REST** pour les actions et un **WebSocket** pour suivre les réponses en direct.
+**REST** pour les actions et un **WebSocket** pour suivre les réponses en direct. Il sert aussi
+l'interface web à l'adresse `http://127.0.0.1:27494/`.
 
 ```bash
-kreafinity daemon            # ou : kreafinity-core [--port 27494]
+kreafinity ui                # ouvre l'interface (et lance le démon si besoin)
+kreafinity daemon            # lance seulement le démon ; ou : kreafinity-core [--port 27494]
 ```
 
 - Écoute **uniquement sur `127.0.0.1`**, port `27494` par défaut (réglage `port`).
@@ -15,21 +17,40 @@ kreafinity daemon            # ou : kreafinity-core [--port 27494]
 
 ## Authentification
 
-Toute requête, sauf `GET /api/health`, doit présenter le **jeton local**, stocké dans
-`~/.local/share/kreafinity/token` (créé au premier lancement, droits `0600`, dans un dossier
-inaccessible aux outils de l'IA).
+Toute requête vers `/api`, sauf `GET /api/health`, doit être authentifiée de l'une de ces façons.
 
-- REST : en-tête `Authorization: Bearer <jeton>`. Sans jeton valide : `401`.
-- WebSocket : le **premier message** doit être `{"type": "auth", "token": "<jeton>"}`,
-  envoyé dans les 10 secondes ; sinon la connexion est fermée (code 1008).
+**Votre propre navigateur (interface web)** — sans aucun secret. Le démon accepte la requête si :
+
+1. la connexion vient d'un programme de **votre** compte utilisateur : pour une connexion locale,
+   le noyau indique dans `/proc/net/tcp` à quel utilisateur appartient le côté client ;
+2. elle porte l'en-tête `X-Kreafinity-Client: web` ;
+3. elle vient de l'interface elle-même : en-tête `Origin`, s'il est présent, égal à
+   `http://127.0.0.1:<port>` ou `http://localhost:<port>`, et `Sec-Fetch-Site`, s'il est présent,
+   égal à `same-origin`.
+
+Un autre site web ouvert dans votre navigateur ne peut pas remplir ces conditions : l'en-tête
+personnalisé déclenche une vérification CORS préalable que le démon n'accorde jamais, et son
+`Origin` est refusé. Pour le WebSocket, l'`Origin` de l'interface et votre compte utilisateur
+suffisent : le premier message est alors `{"type": "auth", "token": null}`.
+
+**Le jeton local** — pour les scripts, les autres outils, ou si votre navigateur n'est pas
+reconnu (système autre que Linux). Il est stocké dans `~/.local/share/kreafinity/token` (créé au
+premier lancement, droits `0600`, dans un dossier inaccessible aux outils de l'IA).
+
+- REST : en-tête `Authorization: Bearer <jeton>`. Sans authentification valide : `401`, et le
+  corps de la requête n'est même pas lu.
+- WebSocket : le **premier message** doit être `{"type": "auth", "token": "<jeton>"}`, envoyé
+  dans les 10 secondes ; sinon la connexion est fermée (code 1008).
+
+Les autres utilisateurs de la machine n'ont ni votre compte ni accès au jeton : ils sont refusés.
 
 Protections supplémentaires :
 
-- Aucun cookie : un autre site web ouvert dans le navigateur ne peut pas agir à votre place
-  (pas de CSRF), et aucune en-tête CORS n'est envoyée.
+- Aucun cookie : pas de CSRF, et aucune en-tête CORS n'est envoyée.
 - L'en-tête `Host` doit être `127.0.0.1` ou `localhost` (protection contre le *DNS rebinding*).
-- Un WebSocket ouvert depuis une page web doit venir de `http://127.0.0.1:<port>` ou
-  `http://localhost:<port>` (en-tête `Origin`).
+- Toutes les réponses portent une politique de sécurité stricte (`Content-Security-Policy` :
+  scripts et styles du démon uniquement, aucune ressource externe), `X-Frame-Options: DENY` et
+  `Referrer-Policy: no-referrer`.
 
 ```bash
 TOKEN=$(cat ~/.local/share/kreafinity/token)
@@ -41,6 +62,7 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:27494/api/conversations
 | Méthode | Chemin | Rôle |
 |---|---|---|
 | `GET` | `/api/health` | État du démon (sans jeton) |
+| `GET` | `/api/info` | Version, dossier personnel, prénom, trousseau disponible ou non |
 | `GET` | `/api/conversations?limit=50&offset=0` | Conversations, les plus récentes d'abord |
 | `POST` | `/api/conversations` | Nouvelle conversation (`{"title": "…"}` facultatif) → `201` |
 | `GET` | `/api/conversations/{id}` | Une conversation et ses messages |
@@ -53,6 +75,8 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:27494/api/conversations
 | `GET` | `/api/providers` | Fournisseurs, fournisseur par défaut et de secours |
 | `GET` | `/api/providers/{nom}/models` | Modèles d'un fournisseur |
 | `PUT` | `/api/providers/default` | Fournisseur par défaut : `{"provider": "mistral/mistral-large-latest"}` |
+| `PUT` | `/api/providers/{nom}/key` | Enregistrer une clé API dans le trousseau : `{"api_key": "…"}` |
+| `DELETE` | `/api/providers/{nom}/key` | Retirer la clé du trousseau |
 | `GET` | `/api/tools` | Outils, niveau de risque, activé ou non |
 | `GET` | `/api/config` | Réglages |
 | `PATCH` | `/api/config` | Modifier des réglages (validés ensemble) : `{"language": "en", …}` |
@@ -61,9 +85,13 @@ Envoyer un message accepte aussi `"provider": "anthropic/claude-opus-5-5"` : la 
 continue avec ce fournisseur, qui est mémorisé pour elle. Une seule demande à la fois par
 conversation (sinon `409`).
 
+`GET /api/providers` indique pour chaque fournisseur s'il lui faut une clé et d'où elle vient
+(`api_key` : `keyring`, `environment` ou `missing`) ; la clé elle-même n'est jamais renvoyée.
+
 Erreurs : `{"error": {"code": "…", "message": "…"}}` avec les codes `not_found` (404),
 `busy` (409), `invalid` (400), `invalid_config` (409), `provider_unavailable` (503),
-`provider_auth` et `provider_error` (502). Les erreurs de format renvoient `422`.
+`provider_auth` et `provider_error` (502), `keyring_unavailable` (503). Les erreurs de format
+renvoient `422`.
 
 ## Événements (WebSocket `/api/events`)
 
@@ -83,6 +111,7 @@ validations en attente), puis tous les événements, numérotés dans l'ordre (`
 | `run_failed` | `code` (`provider_unavailable`, `provider_auth`…), `message` |
 | `conversation_updated` / `conversation_deleted` | Conversation modifiée (titre, état…) / supprimée |
 | `config_updated` | Nouveaux réglages |
+| `providers_updated` | Clé API enregistrée ou retirée (`provider`, `api_key`) |
 | `resync_required` | Client trop lent : se reconnecter et recharger l'état |
 
 Les événements des demandes portent `conversation_id` et `run_id`.

@@ -160,3 +160,38 @@ def test_second_daemon_leaves_the_first_alone(daemon: Daemon, tmp_path: Path) ->
     info = json.loads((daemon.data / "kreafinity" / "daemon.json").read_text())
     assert info["pid"] == daemon.process.pid
     assert daemon.get("/api/health").status_code == 200
+
+
+def test_ui_command_starts_the_daemon(tmp_path: Path, home: Path) -> None:
+    """`kreafinity ui` starts a daemon in the background when none is running."""
+    port = free_port()
+    config = tmp_path / "xdg-config" / "kreafinity"
+    config.mkdir(parents=True)
+    (config / "config.yaml").write_text(f"port: {port}\n")
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(tmp_path / "xdg-config"),
+        "XDG_DATA_HOME": str(tmp_path / "xdg-data"),
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", "from kreafinity.cli import app; app()", "ui", "--sans-navigateur"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    info_file = tmp_path / "xdg-data" / "kreafinity" / "daemon.json"
+    try:
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert f"http://127.0.0.1:{port}" in result.stdout
+        info = json.loads(info_file.read_text())
+        assert httpx.get(f"{info['url']}/api/health", timeout=5).json()["name"] == "kreafinity"
+        page = httpx.get(info["url"], timeout=5)
+        assert page.status_code == 200 and "<title>Kreafinity</title>" in page.text
+    finally:
+        if info_file.exists():
+            os.kill(json.loads(info_file.read_text())["pid"], signal.SIGTERM)
+            deadline = time.monotonic() + 10
+            while info_file.exists() and time.monotonic() < deadline:
+                time.sleep(0.1)

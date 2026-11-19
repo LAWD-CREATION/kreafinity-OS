@@ -10,7 +10,12 @@ from fakes import ScriptedProvider, call, reply
 from kreafinity import __version__, cli
 from kreafinity.config import default_config_path
 from kreafinity.i18n import set_language
-from kreafinity.providers import ProviderAuthError, ProviderError, ProviderUnavailableError
+from kreafinity.providers import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderUnavailableError,
+    get_provider_class,
+)
 
 runner = CliRunner()
 
@@ -29,6 +34,9 @@ def fake_provider(monkeypatch: pytest.MonkeyPatch, home: Path) -> list[Any]:
 
     def install(provider: ScriptedProvider, *, name: str = "ollama") -> None:
         provider.name = name
+        real = get_provider_class(name)  # same API key needs as the real provider
+        provider.requires_api_key = real.requires_api_key  # type: ignore[misc]
+        provider.api_key_env_var = real.api_key_env_var  # type: ignore[misc]
 
         def create(provider_name: str, **options: Any) -> ScriptedProvider:
             created.append((provider_name, options))
@@ -445,3 +453,35 @@ def test_resume_unknown_conversation() -> None:
     result = runner.invoke(cli.app, ["chat", "--reprendre", "abcdef"])
     assert result.exit_code == 2
     assert "Aucune conversation ne commence par « abcdef »." in result.output
+
+
+# --- kreafinity ui ---------------------------------------------------------------------------
+
+
+def test_ui_opens_the_running_daemon(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened: list[str] = []
+    monkeypatch.setattr(cli, "_running_daemon_url", lambda settings: "http://127.0.0.1:27494")
+    monkeypatch.setattr(cli.webbrowser, "open", lambda url: opened.append(url) or True)
+
+    result = runner.invoke(cli.app, ["ui"])
+
+    assert result.exit_code == 0, result.output
+    assert opened == ["http://127.0.0.1:27494"]  # no secret in the address
+    assert "Interface ouverte" in result.output
+
+    printed = runner.invoke(cli.app, ["ui", "--sans-navigateur"])
+    assert "Ouvrez cette adresse" in printed.output and len(opened) == 1
+
+
+def test_ui_reports_a_daemon_that_does_not_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    started: list[list[str]] = []
+    monkeypatch.setattr(cli, "_running_daemon_url", lambda settings: None)
+    monkeypatch.setattr(cli.subprocess, "Popen", lambda args, **kwargs: started.append(args))
+    monkeypatch.setattr(cli.time, "monotonic", iter([0.0, 0.0, 100.0]).__next__)
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: None)
+
+    result = runner.invoke(cli.app, ["ui", "--sans-navigateur"])
+
+    assert result.exit_code == 1
+    assert started and started[0][1:] == ["-m", "kreafinity.api.server"]
+    assert "daemon.log" in result.output

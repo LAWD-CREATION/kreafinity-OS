@@ -51,6 +51,8 @@ class MistralProvider(LLMProvider):
 
     name = "mistral"
     display_name = "Mistral AI"
+    requires_api_key = True
+    api_key_env_var = "MISTRAL_API_KEY"
 
     def __init__(
         self,
@@ -80,7 +82,7 @@ class MistralProvider(LLMProvider):
     def client(self) -> Mistral:
         """The SDK client, created on first use."""
         if self._client is None:
-            api_key = self._api_key or os.environ.get(API_KEY_VARIABLE)
+            api_key = self._api_key or os.environ.get(self.api_key_env_var or API_KEY_VARIABLE)
             if not api_key:
                 raise ProviderAuthError(f"No API key ({API_KEY_VARIABLE})", provider=self.name)
             self._client = Mistral(api_key=api_key, server_url=self._server_url)

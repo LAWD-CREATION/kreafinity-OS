@@ -9,15 +9,21 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import getpass
+import hashlib
 import json
 import logging
+import os
+import pwd
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from functools import partial
+from pathlib import Path
 from typing import Any, Literal
 
+from kreafinity import __version__
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -32,7 +38,18 @@ from kreafinity.agent import (
     ToolCallStarted,
     complete_unanswered_calls,
 )
-from kreafinity.config import ConfigError, Settings, load_settings, save_settings
+from kreafinity.config import (
+    ConfigError,
+    SecretStoreError,
+    Settings,
+    api_key_source,
+    delete_api_key,
+    keyring_available,
+    load_settings,
+    resolve_provider_options,
+    save_settings,
+    set_api_key,
+)
 from kreafinity.i18n import set_language
 from kreafinity.providers import (
     LLMProvider,
@@ -65,6 +82,7 @@ ErrorCode = Literal[
     "provider_unavailable",
     "provider_auth",
     "provider_error",
+    "keyring_unavailable",
 ]
 Event = dict[str, Any]
 
@@ -221,6 +239,7 @@ class AssistantService:
         self._context = context
         self._action_log = action_log or ActionLog()
         self._providers: dict[str, LLMProvider] = {}
+        self._retired: list[LLMProvider] = []
         self._runs: dict[str, Run] = {}
         self._approvals: dict[str, PendingApproval] = {}
 
@@ -243,8 +262,9 @@ class AssistantService:
         if name not in available_providers():
             known = ", ".join(available_providers())
             raise ServiceError(f"Unknown provider {name!r} (available: {known})", code="invalid")
-        options = settings.provider_options(name)
-        key = f"{name}:{json.dumps(options, sort_keys=True, default=str)}"
+        options = resolve_provider_options(name, settings.provider_options(name))
+        fingerprint = json.dumps(options, sort_keys=True, default=str).encode()
+        key = f"{name}:{hashlib.sha256(fingerprint).hexdigest()}"
         if key not in self._providers:
             try:
                 self._providers[key] = self._provider_factory(name, **options)
@@ -265,9 +285,61 @@ class AssistantService:
                     "name": name,
                     "display_name": provider_class.display_name,
                     "is_local": provider_class.is_local,
+                    "requires_api_key": provider_class.requires_api_key,
+                    "api_key": api_key_source(name),
+                    "api_key_env_var": provider_class.api_key_env_var,
                 }
             )
-        return {"default": settings.provider, "fallback": settings.fallback, "providers": providers}
+        return {
+            "default": settings.provider,
+            "fallback": settings.fallback,
+            "keyring_available": keyring_available(),
+            "providers": providers,
+        }
+
+    def _key_provider(self, name: str) -> None:
+        if name not in available_providers():
+            raise ServiceError(f"Unknown provider {name!r}", code="not_found")
+        if not get_provider_class(name).requires_api_key:
+            raise ServiceError(f"{name} does not use an API key", code="invalid")
+
+    def set_api_key(self, name: str, key: str) -> Event:
+        """Store a provider's API key in the system keyring."""
+        self._key_provider(name)
+        try:
+            set_api_key(name, key)
+        except ValueError as exc:
+            raise ServiceError("Invalid API key", code="invalid") from exc
+        except SecretStoreError as exc:
+            raise ServiceError(str(exc), code="keyring_unavailable") from exc
+        return self._keys_changed(name)
+
+    def delete_api_key(self, name: str) -> Event:
+        """Remove a provider's API key from the system keyring."""
+        self._key_provider(name)
+        try:
+            delete_api_key(name)
+        except SecretStoreError as exc:
+            raise ServiceError(str(exc), code="keyring_unavailable") from exc
+        return self._keys_changed(name)
+
+    def _keys_changed(self, name: str) -> Event:
+        # Providers created with the old key are retired (closed at shutdown).
+        for key in [k for k in self._providers if k.startswith(f"{name}:")]:
+            self._retired.append(self._providers.pop(key))
+        result = {"provider": name, "api_key": api_key_source(name)}
+        self.events.publish({"type": "providers_updated", **result})
+        return result
+
+    def info(self) -> Event:
+        """About this installation, for the interfaces."""
+        home = self._context.home if self._context else Path.home()
+        return {
+            "version": __version__,
+            "home": str(home),
+            "user_name": _first_name(),
+            "keyring_available": keyring_available(),
+        }
 
     async def list_models(self, name: str) -> list[Event]:
         """Models offered by a provider."""
@@ -442,6 +514,10 @@ class AssistantService:
             if new:
                 self.store.append(conversation_id, new)
                 saved = len(conversation.messages)
+                # Title, message count and date changed: let the interfaces know.
+                self.events.publish(
+                    {"type": "conversation_updated", "conversation": self._info(conversation_id)}
+                )
 
         self.events.publish(
             {
@@ -561,12 +637,13 @@ class AssistantService:
             task.cancel()
         if tasks:
             await asyncio.wait(tasks)
-        for provider in self._providers.values():
+        for provider in [*self._providers.values(), *self._retired]:
             try:
                 await provider.aclose()
             except Exception:
                 logger.exception("Closing provider %s failed", provider.name)
         self._providers.clear()
+        self._retired.clear()
 
 
 def _event_to_dict(event: AgentEvent) -> Event:
@@ -600,6 +677,17 @@ def _event_to_dict(event: AgentEvent) -> Event:
     if isinstance(event, AgentDone):
         return {"type": "run_finished", "reason": event.reason, "model": event.model}
     raise TypeError(f"Unknown agent event: {event!r}")  # pragma: no cover
+
+
+def _first_name() -> str:
+    """The user's first name (from the account's full name), or the login name."""
+    try:
+        full_name = pwd.getpwuid(os.getuid()).pw_gecos.split(",")[0].strip()
+    except (KeyError, OSError):
+        full_name = ""
+    if full_name:
+        return full_name.split()[0]
+    return getpass.getuser()
 
 
 def _service_error(exc: ProviderError) -> ServiceError:

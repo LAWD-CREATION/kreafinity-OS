@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import sqlite3
+import subprocess
+import sys
+import time
 import unicodedata
+import webbrowser
 from dataclasses import asdict
 from datetime import datetime
 from typing import Annotated
 
+import httpx
 import typer
 import yaml
 from rich.console import Console
@@ -35,12 +41,19 @@ from kreafinity.agent import (
 )
 from kreafinity.config import (
     ConfigError,
+    SecretStoreError,
     Settings,
+    api_key_source,
     default_config_path,
+    delete_api_key,
+    keyring_available,
     load_settings,
+    resolve_provider_options,
     save_setting,
+    set_api_key,
 )
 from kreafinity.i18n import set_language, t
+from kreafinity.paths import data_dir
 from kreafinity.providers import (
     LLMProvider,
     ProviderAuthError,
@@ -75,12 +88,6 @@ ProviderOption = Annotated[
 QUIT_COMMANDS = frozenset({"/quitter", "/quit", "/exit", "/q"})
 PROVIDER_COMMANDS = frozenset({"/fournisseur", "/provider", "/ia"})
 HELP_COMMANDS = frozenset({"/aide", "/help", "/?"})
-# Until keys are stored in the system keyring (CLAUDE.md §3.6).
-API_KEY_VARIABLES = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "mistral": "MISTRAL_API_KEY",
-}
 
 
 @app.callback()
@@ -198,10 +205,17 @@ def provider_list() -> None:
         err_console.print(Text(str(exc), style="red"))
         raise typer.Exit(2) from exc
     table = Table(title=t("provider.list.title"), title_justify="left")
-    for column in ("provider.column.id", "provider.column.name", "provider.column.where", ""):
+    for column in (
+        "provider.column.id",
+        "provider.column.name",
+        "provider.column.where",
+        "provider.column.key",
+        "",
+    ):
         table.add_column(t(column) if column else "")
     for name in available_providers():
         provider_class = get_provider_class(name)
+        source = api_key_source(name)
         marks = []
         if name == default_name:
             marks.append(
@@ -213,9 +227,58 @@ def provider_list() -> None:
             name,
             provider_class.display_name,
             t("provider.local" if provider_class.is_local else "provider.online"),
+            Text(
+                t(f"provider.key.{source}") if source else "—",
+                style="yellow" if source == "missing" else "",
+            ),
             Text(", ".join(marks), style="bold green"),
         )
     console.print(table)
+
+
+@provider_app.command("key")
+def provider_key(
+    name: Annotated[str, typer.Argument(help="Fournisseur : anthropic, openai, mistral…")],
+    delete: Annotated[
+        bool, typer.Option("--supprimer", "--delete", help="Retirer la clé du trousseau.")
+    ] = False,
+) -> None:
+    """Enregistre la clé API d'un fournisseur dans le trousseau système."""
+    _load_settings()
+    if name not in available_providers():
+        message = t("error.unknown_provider", name=name, available=", ".join(available_providers()))
+        err_console.print(Text(message, style="red"))
+        raise typer.Exit(2)
+    provider_class = get_provider_class(name)
+    if not provider_class.requires_api_key:
+        console.print(t("provider.key.not_needed", provider=provider_class.display_name))
+        return
+    if not keyring_available():
+        err_console.print(
+            Text(
+                t("provider.key.no_keyring", variable=provider_class.api_key_env_var or ""),
+                style="red",
+            )
+        )
+        raise typer.Exit(1)
+    try:
+        if delete:
+            removed = delete_api_key(name)
+            console.print(t("provider.key.deleted" if removed else "provider.key.none_stored"))
+            return
+        key = typer.prompt(
+            t("provider.key.prompt", provider=provider_class.display_name), hide_input=True
+        )
+        set_api_key(name, key)
+    except ValueError as exc:
+        err_console.print(Text(t("provider.key.invalid"), style="red"))
+        raise typer.Exit(2) from exc
+    except SecretStoreError as exc:
+        err_console.print(Text(t("provider.key.store_failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    console.print(
+        Text(t("provider.key.saved", provider=provider_class.display_name), style="green")
+    )
 
 
 @provider_app.command("models")
@@ -289,6 +352,65 @@ def history_command(
         )
     console.print(table)
     console.print(Text(t("history.hint"), style="dim"))
+
+
+@app.command()
+def ui(
+    browser: Annotated[
+        bool,
+        typer.Option(
+            "--navigateur/--sans-navigateur",
+            "--browser/--no-browser",
+            help="Ouvrir le navigateur (sinon, afficher seulement l'adresse).",
+        ),
+    ] = True,
+) -> None:
+    """Ouvre l'interface web de Kreafinity (en lançant le démon si besoin)."""
+    settings = _load_settings()
+    url = _running_daemon_url(settings) or _start_daemon(settings)
+    # No secret in the address: the daemon recognizes the user's own browser.
+    if browser and webbrowser.open(url):
+        console.print(t("ui.opened", url=url))
+    else:
+        console.print(t("ui.address", url=url))
+
+
+def _running_daemon_url(settings: Settings) -> str | None:
+    """Address of the running daemon, if it answers."""
+    from kreafinity.api.server import HOST, read_daemon_info
+
+    info = read_daemon_info()
+    url = info["url"] if info and isinstance(info.get("url"), str) else None
+    url = url or f"http://{HOST}:{settings.port}"
+    try:
+        health = httpx.get(f"{url}/api/health", timeout=2).json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    return url if isinstance(health, dict) and health.get("name") == "kreafinity" else None
+
+
+def _start_daemon(settings: Settings) -> str:
+    """Start the daemon in the background and wait until it answers."""
+    log_path = data_dir() / "daemon.log"
+    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    console.print(Text(t("ui.starting"), style="dim"))
+    fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "ab") as log:
+        subprocess.Popen(
+            [sys.executable, "-m", "kreafinity.api.server"],
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
+        )
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        url = _running_daemon_url(settings)
+        if url:
+            return url
+        time.sleep(0.3)
+    err_console.print(Text(t("ui.start_failed", log=log_path), style="red"))
+    raise typer.Exit(1)
 
 
 @app.command()
@@ -417,7 +539,8 @@ def _make_provider(settings: Settings, spec: str) -> tuple[LLMProvider, str | No
             t("error.unknown_provider", name=name, available=", ".join(available_providers()))
         )
     try:
-        return create_provider(name, **settings.provider_options(name)), model
+        options = resolve_provider_options(name, settings.provider_options(name))
+        return create_provider(name, **options), model
     except TypeError as exc:
         raise _UserError(t("error.provider_options", name=name, detail=exc)) from exc
 
@@ -595,8 +718,10 @@ def _print_provider_error(provider: LLMProvider, model: str | None, exc: Provide
             lines.append(t("hint.ollama_unavailable"))
     elif isinstance(exc, ProviderAuthError):
         lines = [t("error.provider_auth", provider=provider.display_name)]
-        if provider.name in API_KEY_VARIABLES:
-            lines.append(t("hint.api_key", variable=API_KEY_VARIABLES[provider.name]))
+        if provider.requires_api_key:
+            lines.append(
+                t("hint.api_key", provider=provider.name, variable=provider.api_key_env_var or "")
+            )
     else:
         lines = [t("error.provider", provider=provider.display_name, detail=exc)]
         if provider.name == "ollama" and "not found" in str(exc):

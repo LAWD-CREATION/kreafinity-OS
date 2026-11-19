@@ -56,6 +56,8 @@ class AnthropicProvider(LLMProvider):
 
     name = "anthropic"
     display_name = "Claude (Anthropic)"
+    requires_api_key = True
+    api_key_env_var = "ANTHROPIC_API_KEY"
 
     def __init__(
         self,
