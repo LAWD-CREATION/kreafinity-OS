@@ -57,5 +57,19 @@
   "provider.models.none": "No models found.",
   "config.path": "Configuration file: {path}",
   "config.missing": "(file not created yet: default values)",
-  "hint.api_key": "For now, set the {variable} environment variable (system keyring storage is coming soon)."
+  "hint.api_key": "For now, set the {variable} environment variable (system keyring storage is coming soon).",
+  "chat.resumed": "Resuming \"{title}\" ({count} messages).",
+  "history.title": "Recent conversations",
+  "history.column.id": "Id",
+  "history.column.title": "Title",
+  "history.column.provider": "AI",
+  "history.column.updated": "Last message",
+  "history.column.messages": "Messages",
+  "history.date_format": "%Y-%m-%d %H:%M",
+  "history.empty": "No conversations yet.",
+  "history.hint": "Resume a conversation: kreafinity chat --resume <id>",
+  "history.not_found": "No conversation starts with \"{id}\".",
+  "history.ambiguous": "Several conversations start with \"{id}\": give more characters.",
+  "history.unavailable": "History unavailable ({detail}): the conversation will not be saved.",
+  "history.save_failed": "Cannot save the conversation ({detail})."
 }

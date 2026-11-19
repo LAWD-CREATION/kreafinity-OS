@@ -53,6 +53,14 @@ Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la c
 d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
 `~/.local/share/kreafinity/actions.log`.
 
+Historique : `kreafinity history` liste vos conversations, `kreafinity chat --reprendre <id>`
+en reprend une.
+
+Démon (API locale pour l'interface web, sur 127.0.0.1 uniquement, protégée par un jeton) :
+```bash
+kreafinity daemon      # voir docs/api.md
+```
+
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
 
@@ -85,6 +93,8 @@ kreafinity chat --provider anthropic      # with ANTHROPIC_API_KEY set (or opena
 kreafinity provider use mistral           # change the default provider
 ```
 In `kreafinity chat`, `/provider openai` switches AI without losing the conversation.
+`kreafinity history` lists past conversations, `kreafinity chat --resume <id>` resumes one, and
+`kreafinity daemon` starts the local API used by the web interface (see `docs/api.md`).
 Set `language: en` in `~/.config/kreafinity/config.yaml` for English answers, and
 `fallback: ollama/llama3.1` to switch to a local model when offline.
 

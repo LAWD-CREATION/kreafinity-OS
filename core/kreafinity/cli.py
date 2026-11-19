@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import sqlite3
 import unicodedata
 from dataclasses import asdict
+from datetime import datetime
 from typing import Annotated
 
 import typer
@@ -22,9 +25,13 @@ from kreafinity.agent import (
     AgentEvent,
     ApprovalRequest,
     Conversation,
+    ConversationInfo,
+    ConversationNotFoundError,
+    ConversationStore,
     ProviderFallback,
     ToolCallFinished,
     ToolCallStarted,
+    complete_unanswered_calls,
 )
 from kreafinity.config import (
     ConfigError,
@@ -94,11 +101,13 @@ def ask(
 ) -> None:
     """Pose une question à l'assistant et affiche sa réponse."""
     agent = _build_agent(_load_settings(), provider)
+    history = _History(_open_store(), Conversation(), stored=False, provider=provider)
 
     async def run() -> bool:
         try:
-            return await _run_turn(agent, Conversation(), question)
+            return await _run_turn(agent, history.conversation, question)
         finally:
+            history.save()
             await _close_providers(agent)
 
     if not asyncio.run(run()):
@@ -106,15 +115,47 @@ def ask(
 
 
 @app.command()
-def chat(provider: ProviderOption = None) -> None:
+def chat(
+    provider: ProviderOption = None,
+    resume: Annotated[
+        str | None,
+        typer.Option(
+            "--reprendre",
+            "--resume",
+            "-r",
+            help="Reprendre une conversation de l'historique (identifiant ou son début).",
+        ),
+    ] = None,
+) -> None:
     """Ouvre une conversation interactive avec l'assistant."""
     settings = _load_settings()
-    agent = _build_agent(settings, provider)
+    store = _open_store()
+    conversation, stored, spec = Conversation(), False, provider
+    if resume:
+        info = _find_conversation(store, resume)
+        assert store is not None  # _find_conversation exits otherwise
+        loaded = store.messages(info.id)
+        messages = complete_unanswered_calls(loaded)
+        if messages != loaded:
+            store.replace_messages(info.id, messages)
+        conversation, stored, spec = (
+            Conversation(id=info.id, messages=messages),
+            True,
+            (provider or info.provider),
+        )
+    agent = _build_agent(settings, spec)
+    history = _History(store, conversation, stored=stored, provider=spec)
     console.print(t("chat.welcome", provider=_describe(agent.provider, agent.model)))
+    if resume:
+        console.print(
+            Text(
+                t("chat.resumed", title=info.title or "…", count=len(conversation.messages)),
+                style="green",
+            )
+        )
     console.print(Text(t("chat.help"), style="dim"))
 
     async def run() -> None:
-        conversation = Conversation()
         replaced: list[LLMProvider] = []
         try:
             while True:
@@ -129,12 +170,16 @@ def chat(provider: ProviderOption = None) -> None:
                 if command.lower() in QUIT_COMMANDS:
                     break
                 if command.lower() in PROVIDER_COMMANDS:
-                    _switch_provider(agent, settings, argument.strip(), replaced)
+                    if _switch_provider(agent, settings, argument.strip(), replaced):
+                        history.set_provider(argument.strip())
                 elif command.lower() in HELP_COMMANDS:
                     console.print(Text(t("chat.help"), style="dim"))
                 elif text:
                     console.print()
-                    await _run_turn(agent, conversation, text)
+                    try:
+                        await _run_turn(agent, conversation, text)
+                    finally:
+                        history.save()
         finally:
             await _close_providers(agent, *replaced)
 
@@ -215,6 +260,37 @@ def provider_use(
     console.print(t("provider.default_set", provider=_describe(provider, model)))
 
 
+@app.command("history")
+def history_command(
+    limit: Annotated[
+        int, typer.Option("--limit", "-n", min=1, max=500, help="Nombre de conversations.")
+    ] = 20,
+) -> None:
+    """Affiche les dernières conversations (CLI et interface web)."""
+    _load_settings()
+    store = _open_store()
+    if store is None:
+        raise typer.Exit(1)
+    conversations = store.list_conversations(limit=limit)
+    if not conversations:
+        console.print(t("history.empty"))
+        return
+    table = Table(title=t("history.title"), title_justify="left")
+    for key in ("id", "title", "provider", "updated", "messages"):
+        table.add_column(t(f"history.column.{key}"), overflow="fold")
+    for info in conversations:
+        updated = datetime.fromisoformat(info.updated_at).astimezone()
+        table.add_row(
+            info.id[:8],
+            Text(printable(info.title or "…")),
+            info.provider or "",
+            updated.strftime(t("history.date_format")),
+            str(info.message_count),
+        )
+    console.print(table)
+    console.print(Text(t("history.hint"), style="dim"))
+
+
 @app.command()
 def daemon(
     port: Annotated[
@@ -247,6 +323,73 @@ def show_config() -> None:
 
 class _UserError(Exception):
     """A problem to show to the user, without a traceback."""
+
+
+def _open_store() -> ConversationStore | None:
+    """The shared conversation history, or None (with a warning) if unavailable."""
+    try:
+        return ConversationStore()
+    except (sqlite3.Error, OSError, RuntimeError) as exc:
+        err_console.print(Text(t("history.unavailable", detail=exc), style="yellow"))
+        return None
+
+
+def _find_conversation(store: ConversationStore | None, prefix: str) -> ConversationInfo:
+    """The stored conversation whose id starts with `prefix` (exits if none or several)."""
+    if store is None:
+        raise typer.Exit(1)
+    prefix = prefix.strip().lower()
+    matches = [
+        info
+        for info in store.list_conversations(limit=100_000)
+        if prefix and info.id.startswith(prefix)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    key = "history.ambiguous" if len(matches) > 1 else "history.not_found"
+    err_console.print(Text(t(key, id=prefix), style="red"))
+    raise typer.Exit(2)
+
+
+class _History:
+    """Saves a CLI conversation in the shared history (also shown in the web interface)."""
+
+    def __init__(
+        self,
+        store: ConversationStore | None,
+        conversation: Conversation,
+        *,
+        stored: bool,
+        provider: str | None,
+    ) -> None:
+        self.store = store
+        self.conversation = conversation
+        self.stored = stored
+        self.provider = provider
+        self.saved = len(conversation.messages)
+
+    def save(self) -> None:
+        """Store the messages added since the last call."""
+        new = self.conversation.messages[self.saved :]
+        if self.store is None or not new:
+            return
+        try:
+            if not self.stored:
+                info = self.store.create(provider=self.provider)
+                self.conversation.id = info.id
+                self.stored = True
+            self.store.append(self.conversation.id, new)
+            self.saved = len(self.conversation.messages)
+        except (sqlite3.Error, OSError, ConversationNotFoundError) as exc:
+            err_console.print(Text(t("history.save_failed", detail=exc), style="yellow"))
+            self.store = None  # keep chatting without history
+
+    def set_provider(self, spec: str) -> None:
+        """Remember the provider chosen for this conversation."""
+        self.provider = spec
+        if self.store is not None and self.stored:
+            with contextlib.suppress(sqlite3.Error, OSError, ConversationNotFoundError):
+                self.store.set_provider(self.conversation.id, spec)
 
 
 def _load_settings() -> Settings:
@@ -311,19 +454,23 @@ def _build_agent(settings: Settings, provider_spec: str | None) -> Agent:
 
 def _switch_provider(
     agent: Agent, settings: Settings, spec: str, replaced: list[LLMProvider]
-) -> None:
-    """Handle ``/fournisseur [spec]`` in a chat: show or change the provider."""
+) -> bool:
+    """Handle ``/fournisseur [spec]`` in a chat: show or change the provider.
+
+    Returns whether the provider was changed.
+    """
     if not spec:
         console.print(t("provider.current", provider=_describe(agent.provider, agent.model)))
-        return
+        return False
     try:
         provider, model = _make_provider(settings, spec)
     except _UserError as exc:
         console.print(Text(str(exc), style="red"))
-        return
+        return False
     replaced.append(agent.provider)
     agent.use_provider(provider, model)
     console.print(Text(t("provider.switched", provider=_describe(provider, model)), style="green"))
+    return True
 
 
 def _describe(provider: LLMProvider, model: str | None) -> str:

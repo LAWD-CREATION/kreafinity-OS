@@ -374,3 +374,74 @@ def test_config_command() -> None:
     assert result.exit_code == 0, result.output
     assert "config.yaml" in result.output
     assert "provider: ollama/llama3.1" in result.output
+
+
+# --- History shared with the daemon -----------------------------------------------------
+
+
+def test_ask_is_saved_and_listed(fake_provider: list[Any]) -> None:
+    from kreafinity.agent import ConversationStore
+
+    fake_provider[0](ScriptedProvider(reply("Il fait beau.")))
+    assert (
+        runner.invoke(cli.app, ["history"]).output.strip() == "Aucune conversation pour l'instant."
+    )
+
+    result = runner.invoke(cli.app, ["ask", "Quel temps fait-il ?"])
+    assert result.exit_code == 0, result.output
+
+    [info] = ConversationStore().list_conversations()
+    assert info.title == "Quel temps fait-il ?"
+    assert [m.content for m in ConversationStore().messages(info.id)] == [
+        "Quel temps fait-il ?",
+        "Il fait beau.",
+    ]
+    listed = runner.invoke(cli.app, ["history"], env={"COLUMNS": "200"})
+    assert listed.exit_code == 0
+    assert info.id[:8] in listed.output and "Quel temps fait-il ?" in listed.output
+    assert "--reprendre" in listed.output
+
+
+def test_chat_resumes_a_conversation(providers: dict[str, ScriptedProvider]) -> None:
+    from kreafinity.agent import ConversationStore
+    from kreafinity.providers import Message, ToolCall
+
+    store = ConversationStore()
+    info = store.create(provider="anthropic/claude-opus-5-5")
+    store.append(
+        info.id,
+        [
+            Message.user("Liste Documents"),
+            # interrupted before the tool result was saved
+            Message.assistant("", [ToolCall(id="t1", name="list_directory", arguments={})]),
+        ],
+    )
+    providers["anthropic"] = ScriptedProvider(reply("Je reprends."))
+    providers["mistral"] = ScriptedProvider(reply("Bonjour de Mistral."))
+
+    result = runner.invoke(
+        cli.app,
+        ["chat", "--reprendre", info.id[:6]],
+        input="On continue ?\n/fournisseur mistral\nEt toi ?\n/quitter\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Reprise de « Liste Documents » (3 messages)." in result.output
+    messages, _, model = providers["anthropic"].requests[0]
+    assert model == "claude-opus-5-5"  # the provider remembered for this conversation
+    assert [m.role for m in messages[1:]] == ["user", "assistant", "tool", "user"]
+    saved = store.messages(info.id)
+    assert [m.content for m in saved[-4:]] == [
+        "On continue ?",
+        "Je reprends.",
+        "Et toi ?",
+        "Bonjour de Mistral.",
+    ]
+    assert store.get(info.id).provider == "mistral"
+    assert len(store.list_conversations()) == 1
+
+
+def test_resume_unknown_conversation() -> None:
+    result = runner.invoke(cli.app, ["chat", "--reprendre", "abcdef"])
+    assert result.exit_code == 2
+    assert "Aucune conversation ne commence par « abcdef »." in result.output

@@ -23,7 +23,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends, FastAPI, Query, Request, WebSocket, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, StrictBool
+from starlette.datastructures import Headers
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 from kreafinity import __version__
@@ -110,6 +112,8 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
     )
+    # Last added runs first: check the Host, then the token, before anything else.
+    app.add_middleware(_TokenGate, token=token, open_paths=frozenset({"/api/health"}))
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
     allowed_origins = {f"http://{host}:{port}" for host in allowed_hosts}
 
@@ -127,11 +131,7 @@ def create_app(
 
     @app.exception_handler(_Unauthorized)
     async def unauthorized(request: Request, exc: _Unauthorized) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"error": {"code": "unauthorized", "message": "Missing or invalid token"}},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return _unauthorized_response()
 
     api = APIRouter(prefix="/api", dependencies=[Depends(require_token)])
 
@@ -292,6 +292,32 @@ def create_app(
 
 class _Unauthorized(Exception):
     """The request did not carry the right token."""
+
+
+def _unauthorized_response() -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"error": {"code": "unauthorized", "message": "Missing or invalid token"}},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+class _TokenGate:
+    """Refuses unauthenticated API requests before their body is even read."""
+
+    def __init__(self, app: ASGIApp, token: str, open_paths: frozenset[str]) -> None:
+        self.app = app
+        self.token = token
+        self.open_paths = open_paths
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path: str = scope.get("path", "")
+        if scope["type"] == "http" and path.startswith("/api/") and path not in self.open_paths:
+            scheme, _, credentials = Headers(scope=scope).get("authorization", "").partition(" ")
+            if scheme.lower() != "bearer" or not token_matches(credentials.strip(), self.token):
+                await _unauthorized_response()(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 async def _close_quietly(websocket: WebSocket) -> None:

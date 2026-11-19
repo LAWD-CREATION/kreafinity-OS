@@ -52,6 +52,8 @@ def serve(port: int | None = None) -> None:
         DaemonError: The port is already in use.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    for noisy in ("httpx", "httpx2", "httpcore"):  # one line per LLM request otherwise
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     settings = load_settings()
     port = port or settings.port
     # Reserve the port first: if another daemon runs, leave its files alone.

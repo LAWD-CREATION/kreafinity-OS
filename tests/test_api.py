@@ -89,6 +89,16 @@ def test_token_is_required(client: TestClient, headers: dict[str, str]) -> None:
         assert response.headers["www-authenticate"] == "Bearer"
 
 
+def test_body_is_not_read_without_token(client: TestClient) -> None:
+    response = client.post(
+        "/api/conversations/x/messages",
+        content=b"{" * 1_000_000,  # not even valid JSON
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 401
+    assert client.get("/api/unknown-route").status_code == 401  # no route discovery either
+
+
 def test_foreign_host_is_refused(client: TestClient) -> None:
     """DNS rebinding: a website resolving its name to 127.0.0.1 is still refused."""
     response = client.get("/api/health", headers={**AUTH, "Host": "evil.example"})

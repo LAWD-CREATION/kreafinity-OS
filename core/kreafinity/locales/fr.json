@@ -57,5 +57,19 @@
   "provider.models.none": "Aucun modèle trouvé.",
   "config.path": "Fichier de configuration : {path}",
   "config.missing": "(fichier pas encore créé : valeurs par défaut)",
-  "hint.api_key": "Pour l'instant, définissez la variable d'environnement {variable} (le stockage dans le trousseau système arrive bientôt)."
+  "hint.api_key": "Pour l'instant, définissez la variable d'environnement {variable} (le stockage dans le trousseau système arrive bientôt).",
+  "chat.resumed": "Reprise de « {title} » ({count} messages).",
+  "history.title": "Dernières conversations",
+  "history.column.id": "Identifiant",
+  "history.column.title": "Titre",
+  "history.column.provider": "IA",
+  "history.column.updated": "Dernier message",
+  "history.column.messages": "Messages",
+  "history.date_format": "%d/%m/%Y %H:%M",
+  "history.empty": "Aucune conversation pour l'instant.",
+  "history.hint": "Reprendre une conversation : kreafinity chat --reprendre <identifiant>",
+  "history.not_found": "Aucune conversation ne commence par « {id} ».",
+  "history.ambiguous": "Plusieurs conversations commencent par « {id} » : donnez plus de caractères.",
+  "history.unavailable": "Historique indisponible ({detail}) : la conversation ne sera pas enregistrée.",
+  "history.save_failed": "Impossible d'enregistrer la conversation ({detail})."
 }
