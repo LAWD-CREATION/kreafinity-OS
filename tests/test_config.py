@@ -122,3 +122,27 @@ def test_translations() -> None:
         assert t("no.such.key") == "no.such.key"
     finally:
         set_language(previous)
+
+
+def test_save_setting_keeps_other_settings() -> None:
+    from kreafinity.config import save_setting
+
+    write_config("language: en\nproviders:\n  ollama:\n    base_url: http://box:11434\n")
+    path = save_setting("provider", "mistral/mistral-small-latest")
+    assert path == default_config_path()
+    settings = load_settings()
+    assert settings.provider == "mistral/mistral-small-latest"
+    assert settings.language == "en"
+    assert settings.provider_options("ollama") == {"base_url": "http://box:11434"}
+
+
+def test_save_setting_creates_file_and_validates() -> None:
+    from kreafinity.config import save_setting
+
+    save_setting("fallback", "ollama/llama3.1")
+    assert load_settings().fallback == "ollama/llama3.1"
+    with pytest.raises(ConfigError):
+        save_setting("max_iterations", 0)
+    with pytest.raises(ConfigError):
+        save_setting("no_such_setting", 1)
+    assert load_settings().max_iterations == 10

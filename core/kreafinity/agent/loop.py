@@ -16,9 +16,12 @@ from kreafinity.paths import user_dirs
 from kreafinity.providers.base import (
     LLMProvider,
     Message,
+    ProviderUnavailableError,
     ResponseDone,
+    StreamEvent,
     TextDelta,
     ToolCall,
+    ToolSpec,
 )
 from kreafinity.tools.base import (
     RiskLevel,
@@ -107,7 +110,23 @@ class AgentDone:
     type: Literal["agent_done"] = "agent_done"
 
 
-AgentEvent = TextDelta | ToolCallStarted | ToolCallFinished | AgentDone
+@dataclass(frozen=True, slots=True)
+class ProviderFallback:
+    """The provider could not be reached; the agent switched to the fallback one.
+
+    Attributes:
+        unavailable: Display name of the provider that failed.
+        fallback: Display name of the provider now in use.
+        reason: Why the first provider failed.
+    """
+
+    unavailable: str
+    fallback: str
+    reason: str
+    type: Literal["provider_fallback"] = "provider_fallback"
+
+
+AgentEvent = TextDelta | ToolCallStarted | ToolCallFinished | ProviderFallback | AgentDone
 
 
 class Agent:
@@ -128,6 +147,7 @@ class Agent:
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         approver: Approver | None = None,
         action_log: ActionLog | None = None,
+        fallback: tuple[LLMProvider, str | None] | None = None,
     ) -> None:
         """Create an agent.
 
@@ -141,6 +161,9 @@ class Agent:
             approver: Asked before every `confirm`/`danger` tool call. Without
                 one, those calls are always refused.
             action_log: Where tool calls are recorded (none: not recorded).
+            fallback: Provider and model to switch to when the current
+                provider cannot be reached (e.g. a local Ollama model when
+                there is no Internet connection).
         """
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -152,6 +175,7 @@ class Agent:
         self.max_iterations = max_iterations
         self.approver = approver
         self.action_log = action_log
+        self.fallback = fallback
 
     def use_provider(self, provider: LLMProvider, model: str | None = None) -> None:
         """Switch provider and model; takes effect from the next LLM call."""
@@ -181,13 +205,11 @@ class Agent:
 
         for iteration in range(1, self.max_iterations + 1):
             done: ResponseDone | None = None
-            async for event in self.provider.chat(
-                [system, *conversation.messages], specs, model=self.model
-            ):
-                if isinstance(event, TextDelta):
-                    yield event
-                else:
+            async for event in self._stream_response([system, *conversation.messages], specs):
+                if isinstance(event, ResponseDone):
                     done = event
+                else:
+                    yield event
             if done is None:  # pragma: no cover - providers always end with ResponseDone
                 raise RuntimeError("Provider stream ended without a final event")
             model = done.model
@@ -230,6 +252,28 @@ class Agent:
                     yield tool_event
 
         raise AssertionError("unreachable")  # pragma: no cover
+
+    async def _stream_response(
+        self, messages: list[Message], specs: list[ToolSpec]
+    ) -> AsyncIterator[StreamEvent | ProviderFallback]:
+        """Call the provider, switching to the fallback one if it cannot be reached."""
+        started = False
+        try:
+            async for event in self.provider.chat(messages, specs, model=self.model):
+                started = True
+                yield event
+            return
+        except ProviderUnavailableError as exc:
+            # Only before anything was received, and never from the fallback itself.
+            if started or self.fallback is None or self.provider is self.fallback[0]:
+                raise
+            unavailable = self.provider.display_name
+            self.use_provider(*self.fallback)
+            yield ProviderFallback(
+                unavailable=unavailable, fallback=self.provider.display_name, reason=str(exc)
+            )
+        async for event in self.provider.chat(messages, specs, model=self.model):
+            yield event
 
     async def _run_call(
         self, conversation: Conversation, call: ToolCall, model: str | None

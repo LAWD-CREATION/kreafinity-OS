@@ -33,11 +33,25 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 ollama pull llama3.1
 kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
 
-# Avec Claude :
-export ANTHROPIC_API_KEY=...   # bientôt stockée dans le trousseau système
-kreafinity chat --provider anthropic
+# Avec une IA en ligne (clés bientôt stockées dans le trousseau système) :
+export ANTHROPIC_API_KEY=...   # Claude      → kreafinity chat -p anthropic
+export OPENAI_API_KEY=...      # GPT         → kreafinity chat -p openai
+export MISTRAL_API_KEY=...     # Mistral AI  → kreafinity chat -p mistral
 ```
-Réglages : `~/.config/kreafinity/config.yaml` — journal des actions : `~/.local/share/kreafinity/actions.log`.
+
+Changer d'IA :
+```bash
+kreafinity provider list                  # fournisseurs disponibles
+kreafinity provider models mistral        # modèles d'un fournisseur
+kreafinity provider use mistral/mistral-large-latest   # fournisseur par défaut
+```
+Dans `kreafinity chat`, tapez `/fournisseur anthropic` pour changer d'IA **sans perdre la conversation**.
+Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, ajoutez
+`fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`.
+
+Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la corbeille…) vous est
+d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
+`~/.local/share/kreafinity/actions.log`.
 
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
@@ -67,9 +81,12 @@ git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
 python3 -m venv .venv && source .venv/bin/activate && pip install -e .
 ollama pull llama3.1                      # local model, see https://ollama.com
 kreafinity ask "What are the 5 largest files in my Downloads folder?"
-kreafinity chat --provider anthropic      # with ANTHROPIC_API_KEY set
+kreafinity chat --provider anthropic      # with ANTHROPIC_API_KEY set (or openai, mistral)
+kreafinity provider use mistral           # change the default provider
 ```
-Set `language: en` in `~/.config/kreafinity/config.yaml` for English answers.
+In `kreafinity chat`, `/provider openai` switches AI without losing the conversation.
+Set `language: en` in `~/.config/kreafinity/config.yaml` for English answers, and
+`fallback: ollama/llama3.1` to switch to a local model when offline.
 
 ---
 

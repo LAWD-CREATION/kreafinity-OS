@@ -3,6 +3,7 @@
 Example::
 
     provider: ollama/llama3.1      # default provider and model
+    fallback: ollama/llama3.1      # used when the provider cannot be reached (optional)
     language: fr                   # language of the assistant
     max_iterations: 10             # LLM calls allowed per request
     allowed_paths: ["~"]           # folders the tools may access
@@ -45,6 +46,7 @@ class Settings:
     """Validated user settings, with defaults for everything."""
 
     provider: str = "ollama/llama3.1"
+    fallback: str | None = None
     language: str = "fr"
     max_iterations: int = 10
     allowed_paths: list[str] = field(default_factory=lambda: ["~"])
@@ -93,6 +95,8 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
             raise ConfigError(f"{path}: {key!r} must be {description}")
 
     check("provider", str, "a string such as 'ollama/llama3.1'")
+    if values.get("fallback") is not None:
+        check("fallback", str, "a string such as 'ollama/llama3.1'")
     check("language", str, "a language code such as 'fr'")
     check("max_iterations", int, "an integer")
     if values.get("max_iterations", 1) < 1:
@@ -118,3 +122,31 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
             )
     values["providers"] = providers
     return Settings(**values)
+
+
+def save_setting(key: str, value: Any, path: Path | None = None) -> Path:
+    """Set one top-level setting in the configuration file, keeping the others.
+
+    The file is created if needed and replaced atomically. Comments in the
+    file are not preserved.
+
+    Raises:
+        ConfigError: The current file is invalid, or `key` is unknown.
+    """
+    if key not in {f.name for f in fields(Settings)}:
+        raise ConfigError(f"Unknown setting {key!r}")
+    path = path or default_config_path()
+    load_settings(path)  # refuse to rewrite an invalid file
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except FileNotFoundError:
+        data = {}
+    data[key] = value
+    _from_mapping(data, path)  # validate the result before writing
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".yaml.tmp")
+    temporary.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    temporary.replace(path)
+    return path

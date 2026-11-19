@@ -80,11 +80,25 @@ Traduisez les erreurs de l'API en :
 - `ProviderError(retryable=...)` : toute autre erreur ; `retryable=True` si réessayer
   plus tard peut fonctionner (limite de débit, surcharge).
 
+### API au format « chat completions »
+
+Beaucoup d'API reprennent le format de Chat Completions d'OpenAI. Le module privé
+`providers/_chat_format.py` fournit la conversion des messages et des outils
+(`to_chat_messages`, `to_chat_tools`), la reconstitution des appels d'outils envoyés par
+morceaux (`ToolCallAccumulator`) et la traduction des `finish_reason`. Les adaptateurs
+`openai.py` et `mistral.py` s'en servent ; l'adaptateur OpenAI accepte aussi un
+`base_url` pour les serveurs compatibles (LM Studio, vLLM, OpenRouter…).
+
 ### Points d'attention
 
 - Tous les résultats d'outils d'un même tour doivent être renvoyés ensemble si l'API
   l'exige (c'est le cas d'Anthropic).
 - Si l'API ne fournit pas d'identifiant d'appel d'outil, utilisez `new_tool_call_id()`.
+- L'historique peut venir d'un autre fournisseur : si l'API impose un format d'identifiant
+  (Mistral : 9 caractères alphanumériques), convertissez les identifiants de façon stable
+  (voir `mistral_tool_call_id`).
+- Le repli hors connexion repose sur `ProviderUnavailableError` : levez-la uniquement quand
+  le service est injoignable (réseau, serveur arrêté), pas pour une clé refusée.
 - Les arguments d'outils viennent du modèle : ce sont des données non fiables, validées
   ensuite par la couche outils.
 

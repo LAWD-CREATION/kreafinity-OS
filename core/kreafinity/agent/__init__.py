@@ -8,6 +8,7 @@ from kreafinity.agent.loop import (
     ApprovalRequest,
     Approver,
     Conversation,
+    ProviderFallback,
     ToolCallFinished,
     ToolCallStarted,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "ApprovalRequest",
     "Approver",
     "Conversation",
+    "ProviderFallback",
     "ToolCallFinished",
     "ToolCallStarted",
     "build_system_prompt",

@@ -353,3 +353,59 @@ def test_system_prompt_language(context: ToolContext, home: Path) -> None:
 def test_invalid_iteration_limit(context: ToolContext) -> None:
     with pytest.raises(ValueError):
         make_agent(ScriptedProvider(reply("ok")), context, max_iterations=0)
+
+
+# --- Fallback when the provider cannot be reached ----------------------------------------
+
+
+async def test_fallback_when_provider_unavailable(context: ToolContext) -> None:
+    from kreafinity.agent import ProviderFallback
+
+    online = ScriptedProvider(ProviderUnavailableError("no network", provider="scripted"))
+    online.display_name = "Claude"
+    local = ScriptedProvider(reply("Réponse locale."))
+    local.display_name = "Ollama"
+    agent = make_agent(online, context, fallback=(local, "llama3.1"))
+    conversation = Conversation()
+
+    events = await run(agent, conversation, "Salut")
+
+    assert events[0] == ProviderFallback(
+        unavailable="Claude", fallback="Ollama", reason="no network"
+    )
+    assert TextDelta("Réponse locale.") in events
+    assert events[-1].reason == "completed"
+    assert agent.provider is local and agent.model == "llama3.1"
+    assert local.requests[0][2] == "llama3.1"
+    # The fallback stays in use for the next requests.
+    await run(agent, conversation, "Encore ?")
+    assert len(online.requests) == 1 and len(local.requests) == 2
+
+
+async def test_no_fallback_for_other_errors_or_from_fallback(context: ToolContext) -> None:
+    from kreafinity.providers import ProviderAuthError
+
+    local = ScriptedProvider(reply("ok"))
+    rejected = ScriptedProvider(ProviderAuthError("bad key", provider="scripted"))
+    agent = make_agent(rejected, context, fallback=(local, None))
+    with pytest.raises(ProviderAuthError):
+        await run(agent, Conversation(), "Salut")
+    assert local.requests == []
+
+    down = ScriptedProvider(ProviderUnavailableError("down", provider="scripted"))
+    agent = make_agent(down, context, fallback=(down, None))
+    with pytest.raises(ProviderUnavailableError):
+        await run(agent, Conversation(), "Salut")
+
+
+async def test_no_fallback_once_the_answer_has_started(context: ToolContext) -> None:
+    class Flaky(ScriptedProvider):
+        async def chat(self, messages: Any, tools: Any = (), *, model: Any = None) -> Any:
+            yield TextDelta("Début")
+            raise ProviderUnavailableError("connection lost", provider="scripted")
+
+    local = ScriptedProvider(reply("ok"))
+    agent = make_agent(Flaky(reply("unused")), context, fallback=(local, None))
+    with pytest.raises(ProviderUnavailableError):
+        await run(agent, Conversation(), "Salut")
+    assert local.requests == []

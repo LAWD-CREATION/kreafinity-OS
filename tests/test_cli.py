@@ -262,3 +262,115 @@ def test_end_of_step_1_scenario(fake_provider: list[Any], home: Path) -> None:
         assert (trash / "info" / f"{name}.trashinfo").exists()
     assert (downloads / "fichier4.bin").exists()
     assert "C'est fait" in result.output
+
+
+# --- Providers: list, use, models, switching and fallback -----------------------------
+
+
+@pytest.fixture
+def providers(monkeypatch: pytest.MonkeyPatch, home: Path) -> dict[str, ScriptedProvider]:
+    """Scripted providers by name, created by the CLI instead of the real ones."""
+    monkeypatch.setenv("HOME", str(home))
+    by_name: dict[str, ScriptedProvider] = {}
+
+    def create(name: str, **options: Any) -> ScriptedProvider:
+        provider = by_name[name]
+        provider.name = name
+        provider.display_name = name.title()
+        return provider
+
+    monkeypatch.setattr(cli, "create_provider", create)
+    return by_name
+
+
+def test_provider_list() -> None:
+    path = default_config_path()
+    path.parent.mkdir(parents=True)
+    path.write_text("provider: mistral/mistral-small-latest\nfallback: ollama\n")
+    result = runner.invoke(cli.app, ["provider", "list"], env={"COLUMNS": "150"})
+    assert result.exit_code == 0, result.output
+    for name in ("anthropic", "mistral", "ollama", "openai"):
+        assert name in result.output
+    assert "par défaut (mistral-small-latest)" in result.output
+    assert "secours hors connexion" in result.output
+    assert "sur cet ordinateur" in result.output
+
+
+def test_provider_use_saves_default(providers: dict[str, ScriptedProvider]) -> None:
+    providers["mistral"] = ScriptedProvider(reply("ok"))
+    result = runner.invoke(cli.app, ["provider", "use", "mistral/mistral-small-latest"])
+    assert result.exit_code == 0, result.output
+    assert "Mistral · mistral-small-latest" in result.output
+    assert "provider: mistral/mistral-small-latest" in default_config_path().read_text()
+
+    result = runner.invoke(cli.app, ["provider", "use", "skynet"])
+    assert result.exit_code == 2
+    assert "provider: mistral/mistral-small-latest" in default_config_path().read_text()
+
+
+def test_provider_models(providers: dict[str, ScriptedProvider]) -> None:
+    providers["ollama"] = ScriptedProvider(reply("ok"))
+    result = runner.invoke(cli.app, ["provider", "models"])
+    assert result.exit_code == 0, result.output
+    assert "ollama/fake-model" in result.output
+
+
+def test_provider_models_offline(providers: dict[str, ScriptedProvider]) -> None:
+    class Offline(ScriptedProvider):
+        async def list_models(self) -> Any:
+            raise ProviderUnavailableError("refused", provider="ollama")
+
+    providers["ollama"] = Offline(reply("ok"))
+    result = runner.invoke(cli.app, ["provider", "models", "ollama"])
+    assert result.exit_code == 1
+    assert "ollama serve" in result.output
+
+
+def test_chat_switches_provider_and_keeps_conversation(
+    providers: dict[str, ScriptedProvider],
+) -> None:
+    providers["ollama"] = ScriptedProvider(reply("Bonjour depuis Ollama."))
+    providers["anthropic"] = ScriptedProvider(reply("Bonjour depuis Claude.", model="claude"))
+
+    result = runner.invoke(
+        cli.app,
+        ["chat"],
+        input="Salut\n/fournisseur\n/fournisseur anthropic/claude-opus-5-5\nTu es qui ?\n"
+        "/fournisseur skynet\n/quitter\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Fournisseur actuel : Ollama · llama3.1" in result.output
+    assert "Vous parlez maintenant à Anthropic · claude-opus-5-5" in result.output
+    assert "Fournisseur inconnu" in result.output
+    messages, _, model = providers["anthropic"].requests[0]
+    assert model == "claude-opus-5-5"
+    assert [m.content for m in messages[1:]] == [
+        "Salut",
+        "Bonjour depuis Ollama.",
+        "Tu es qui ?",
+    ]
+    assert providers["ollama"].closed and providers["anthropic"].closed
+
+
+def test_ask_falls_back_to_local_model(providers: dict[str, ScriptedProvider]) -> None:
+    path = default_config_path()
+    path.parent.mkdir(parents=True)
+    path.write_text("provider: anthropic\nfallback: ollama/llama3.1\n")
+    providers["anthropic"] = ScriptedProvider(
+        ProviderUnavailableError("no network", provider="anthropic")
+    )
+    providers["ollama"] = ScriptedProvider(reply("Réponse hors connexion."))
+
+    result = runner.invoke(cli.app, ["ask", "Salut"])
+
+    assert result.exit_code == 0, result.output
+    assert "Anthropic est injoignable : je continue avec Ollama." in result.output
+    assert "Réponse hors connexion." in result.output
+
+
+def test_config_command() -> None:
+    result = runner.invoke(cli.app, ["config"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0, result.output
+    assert "config.yaml" in result.output
+    assert "provider: ollama/llama3.1" in result.output

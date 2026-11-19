@@ -66,6 +66,7 @@ def display(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     yield display
     server.terminate()  # X clients exit with their display
     server.wait()
+    server.stdout.close()
 
 
 def windows() -> set[str]:
