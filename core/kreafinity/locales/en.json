@@ -1,0 +1,21 @@
+{
+  "cli.tool_denied": "action denied",
+  "cli.tool_error": "failed: {detail}",
+  "cli.tool_skipped": "not executed",
+  "cli.done.iteration_limit": "Request stopped: limit of {limit} steps reached.",
+  "cli.done.max_tokens": "Answer cut off: length limit reached.",
+  "cli.done.refusal": "The model declined this request.",
+  "cli.done.other": "The answer stopped unexpectedly.",
+  "chat.welcome": "Kreafinity — {provider}. Type /quit to exit.",
+  "chat.you": "You",
+  "chat.bye": "Goodbye!",
+  "error.config": "Invalid configuration: {detail}",
+  "error.unknown_provider": "Unknown provider: \"{name}\". Available: {available}.",
+  "error.provider_options": "Invalid options for provider \"{name}\" in the configuration: {detail}",
+  "error.provider_unavailable": "Cannot reach {provider}: {detail}",
+  "error.provider_auth": "Missing or rejected API key for {provider}.",
+  "error.provider": "{provider} error: {detail}",
+  "hint.ollama_unavailable": "Check that Ollama is installed and running (\"ollama serve\").",
+  "hint.ollama_model": "If the model is not downloaded yet: \"ollama pull {model}\".",
+  "hint.anthropic_auth": "For now, set the ANTHROPIC_API_KEY environment variable (system keyring storage is coming soon)."
+}

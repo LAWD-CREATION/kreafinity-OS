@@ -32,31 +32,40 @@ Créez **un seul fichier** dans `core/kreafinity/providers/`, par exemple `monia
 from collections.abc import AsyncIterator, Sequence
 
 from kreafinity.providers.base import (
-    LLMProvider, Message, ModelInfo, ResponseDone, StreamEvent, TextDelta, ToolSpec,
+    LLMProvider,
+    Message,
+    ModelInfo,
+    ResponseDone,
+    StreamEvent,
+    TextDelta,
+    ToolSpec,
 )
 from kreafinity.providers.registry import register_provider
 
 
 @register_provider
 class MonIAProvider(LLMProvider):
-    name = "monia"                 # utilisé dans la config et la CLI : monia/mon-modele
+    name = "monia"  # utilisé dans la config et la CLI : monia/mon-modele
     display_name = "Mon IA"
-    is_local = False               # True si le modèle tourne sur la machine
+    is_local = False  # True si le modèle tourne sur la machine
 
     def __init__(self, *, api_key: str | None = None, default_model: str = "mon-modele") -> None:
         super().__init__(default_model=default_model)
         ...
 
     async def chat(
-        self, messages: Sequence[Message], tools: Sequence[ToolSpec] = (), *, model: str | None = None
+        self,
+        messages: Sequence[Message],
+        tools: Sequence[ToolSpec] = (),
+        *,
+        model: str | None = None,
     ) -> AsyncIterator[StreamEvent]:
         # 1. convertir `messages` et `tools` vers le format de l'API
         # 2. appeler l'API en streaming et émettre des TextDelta
         # 3. terminer par exactement un ResponseDone
         ...
 
-    async def list_models(self) -> list[ModelInfo]:
-        ...
+    async def list_models(self) -> list[ModelInfo]: ...
 ```
 
 Le fichier est découvert automatiquement : aucun autre fichier n'est à modifier.

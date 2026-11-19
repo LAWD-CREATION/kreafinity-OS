@@ -1,17 +1,12 @@
-from collections.abc import AsyncIterator, Sequence
-
 import pytest
 
+from fakes import ScriptedProvider
 from kreafinity.providers import (
-    LLMProvider,
     Message,
-    ModelInfo,
     ProviderError,
     ResponseDone,
-    StreamEvent,
     TextDelta,
     ToolCall,
-    ToolSpec,
     available_providers,
     create_provider,
     get_provider_class,
@@ -20,30 +15,6 @@ from kreafinity.providers import (
 )
 from kreafinity.providers.anthropic import AnthropicProvider
 from kreafinity.providers.ollama import OllamaProvider
-
-
-class ScriptedProvider(LLMProvider):
-    """Provider replaying a fixed list of events (not registered)."""
-
-    name = "scripted"
-    display_name = "Scripted"
-
-    def __init__(self, events: list[StreamEvent]) -> None:
-        super().__init__(default_model="scripted-1")
-        self.events = events
-
-    async def chat(
-        self,
-        messages: Sequence[Message],
-        tools: Sequence[ToolSpec] = (),
-        *,
-        model: str | None = None,
-    ) -> AsyncIterator[StreamEvent]:
-        for event in self.events:
-            yield event
-
-    async def list_models(self) -> list[ModelInfo]:
-        return [ModelInfo(id="scripted-1", provider=self.name)]
 
 
 def test_message_helpers() -> None:

@@ -8,18 +8,15 @@ add providers without touching this code by declaring an entry point in the
 
 from __future__ import annotations
 
-import importlib
 import logging
-import pkgutil
-from importlib.metadata import entry_points
 from typing import Any, TypeVar
 
+from kreafinity.plugins import import_package_modules, load_entry_points
 from kreafinity.providers.base import LLMProvider
 
 logger = logging.getLogger(__name__)
 
 ENTRY_POINT_GROUP = "kreafinity.providers"
-_INTERNAL_MODULES = frozenset({"base", "registry"})
 
 _registry: dict[str, type[LLMProvider]] = {}
 _discovered = False
@@ -42,27 +39,12 @@ def _discover() -> None:
     if _discovered:
         return
     _discovered = True
-
-    package = importlib.import_module("kreafinity.providers")
-    for module in pkgutil.iter_modules(package.__path__):
-        if module.name in _INTERNAL_MODULES or module.name.startswith("_"):
-            continue
-        try:
-            importlib.import_module(f"{package.__name__}.{module.name}")
-        except ImportError as exc:  # optional SDK not installed
-            logger.warning("Provider module %r unavailable: %s", module.name, exc)
-
-    for entry_point in entry_points(group=ENTRY_POINT_GROUP):
-        try:
-            cls = entry_point.load()
-        except Exception as exc:
-            logger.warning("Cannot load provider plugin %r: %s", entry_point.name, exc)
-            continue
-        if not (isinstance(cls, type) and issubclass(cls, LLMProvider)):
-            logger.warning("Provider plugin %r is not an LLMProvider subclass", entry_point.name)
-            continue
-        if cls.name not in _registry:
-            register_provider(cls)
+    import_package_modules("kreafinity.providers", skip={"base", "registry"})
+    for name, obj in load_entry_points(ENTRY_POINT_GROUP):
+        if not (isinstance(obj, type) and issubclass(obj, LLMProvider)):
+            logger.warning("Provider plugin %r is not an LLMProvider subclass", name)
+        elif obj.name not in _registry:
+            register_provider(obj)
 
 
 def available_providers() -> list[str]:

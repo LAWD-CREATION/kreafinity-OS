@@ -1,1 +1,5 @@
-"""Kreafinity config package (to be implemented, see CLAUDE.md §7)."""
+"""Configuration loading (``~/.config/kreafinity/config.yaml``)."""
+
+from kreafinity.config.settings import ConfigError, Settings, default_config_path, load_settings
+
+__all__ = ["ConfigError", "Settings", "default_config_path", "load_settings"]

@@ -1,0 +1,21 @@
+{
+  "cli.tool_denied": "action refusée",
+  "cli.tool_error": "échec : {detail}",
+  "cli.tool_skipped": "non exécutée",
+  "cli.done.iteration_limit": "Demande interrompue : limite de {limit} étapes atteinte.",
+  "cli.done.max_tokens": "Réponse tronquée : limite de longueur atteinte.",
+  "cli.done.refusal": "Le modèle a refusé de traiter cette demande.",
+  "cli.done.other": "La réponse s'est arrêtée de façon inattendue.",
+  "chat.welcome": "Kreafinity — {provider}. Tapez /quitter pour sortir.",
+  "chat.you": "Vous",
+  "chat.bye": "À bientôt !",
+  "error.config": "Configuration invalide : {detail}",
+  "error.unknown_provider": "Fournisseur inconnu : « {name} ». Disponibles : {available}.",
+  "error.provider_options": "Options invalides pour le fournisseur « {name} » dans la configuration : {detail}",
+  "error.provider_unavailable": "Impossible de joindre {provider} : {detail}",
+  "error.provider_auth": "Clé API manquante ou refusée pour {provider}.",
+  "error.provider": "Erreur de {provider} : {detail}",
+  "hint.ollama_unavailable": "Vérifiez qu'Ollama est installé et lancé (commande « ollama serve »).",
+  "hint.ollama_model": "Si le modèle n'est pas encore téléchargé : « ollama pull {model} ».",
+  "hint.anthropic_auth": "Pour l'instant, définissez la variable d'environnement ANTHROPIC_API_KEY (le stockage dans le trousseau système arrive bientôt)."
+}

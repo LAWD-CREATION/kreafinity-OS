@@ -24,6 +24,21 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - [ ] **Étape 2** — Bureau façon Windows avec IA intégrée
 - [ ] **Étape 3** — Distribution bootable (ISO, clé USB live, installateur)
 
+### Essayer (version de développement)
+```bash
+git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
+python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+
+# Avec un modèle local (https://ollama.com) :
+ollama pull llama3.1
+kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
+
+# Avec Claude :
+export ANTHROPIC_API_KEY=...   # bientôt stockée dans le trousseau système
+kreafinity chat --provider anthropic
+```
+Réglages : `~/.config/kreafinity/config.yaml` — journal des actions : `~/.local/share/kreafinity/actions.log`.
+
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
 
@@ -45,6 +60,16 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - [ ] **Step 1** — Multi-LLM system assistant (daemon, CLI, web chat UI)
 - [ ] **Step 2** — Windows-like desktop shell with built-in AI
 - [ ] **Step 3** — Bootable distribution (ISO, live USB, installer)
+
+### Try it (development version)
+```bash
+git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
+python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+ollama pull llama3.1                      # local model, see https://ollama.com
+kreafinity ask "What are the 5 largest files in my Downloads folder?"
+kreafinity chat --provider anthropic      # with ANTHROPIC_API_KEY set
+```
+Set `language: en` in `~/.config/kreafinity/config.yaml` for English answers.
 
 ---
 
