@@ -24,8 +24,69 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - [ ] **Étape 2** — Bureau façon Windows avec IA intégrée
 - [ ] **Étape 3** — Distribution bootable (ISO, clé USB live, installateur)
 
+### Installer
+Sur Debian, Ubuntu et dérivées, une seule commande (sans `sudo`) :
+```bash
+curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/packaging/install.sh | bash
+```
+Kreafinity s'installe dans votre dossier personnel, démarre avec votre session, s'ajoute au menu
+des applications et vous demande quelle IA utiliser : Ollama (sur l'ordinateur, gratuit et privé),
+Claude, GPT ou Mistral. Options, emplacements, mise à jour et dépannage :
+[docs/installation.md](docs/installation.md). Pour désinstaller : `kreafinity uninstall`
+(`--purge` efface aussi vos réglages et conversations).
+
+### Utiliser
+```bash
+kreafinity ui             # ouvre l'interface web dans votre navigateur (ou « Kreafinity » dans le menu)
+```
+
+![Interface web de Kreafinity : une action sensible attend votre validation](docs/img/interface-validation.png)
+
+L'interface web montre les réponses en direct, vous laisse choisir l'IA et vous présente chaque
+action sur l'ordinateur avant qu'elle ne soit faite : une suppression demande de cocher une case
+puis de confirmer. Elle fonctionne sans connexion Internet et sans jeton : le démon reconnaît
+votre propre navigateur.
+
+Sur le bureau, une **bulle** reste en bas à droite de l'écran : un clic ouvre un petit panneau
+pour poser une question, un nouveau clic le referme. Une pastille orange signale une action qui
+attend votre accord.
+L'installation l'affiche à chaque ouverture de session ; sinon :
+```bash
+kreafinity bubble                         # affiche la bulle (kreafinity bulle marche aussi)
+kreafinity bubble --autostart             # l'afficher à chaque ouverture de session
+```
+
+En ligne de commande :
+```bash
+kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
+kreafinity chat                           # conversation ; /fournisseur anthropic pour changer d'IA
+kreafinity history                        # vos conversations ; chat --reprendre <id> pour continuer
+```
+
+Avec une IA en ligne, enregistrez votre clé dans le **trousseau système** (jamais dans un fichier),
+depuis les réglages de l'interface ou ainsi :
+```bash
+kreafinity provider key anthropic         # Claude (ou openai, mistral)
+kreafinity provider use anthropic         # IA par défaut
+kreafinity provider list                  # fournisseurs, clés, IA par défaut et de secours
+```
+Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, choisissez une IA
+de secours dans les réglages (ou `fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`).
+
+Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la corbeille…) vous est
+d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
+`~/.local/share/kreafinity/actions.log`. API locale du démon : [docs/api.md](docs/api.md).
+
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
+Version de développement :
+```bash
+git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
+python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+pytest
+```
+Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
+[ajouter un outil](docs/ajouter-un-outil.md), [interface web](docs/interface-web.md).
 
 ---
 
@@ -45,6 +106,28 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - [ ] **Step 1** — Multi-LLM system assistant (daemon, CLI, web chat UI)
 - [ ] **Step 2** — Windows-like desktop shell with built-in AI
 - [ ] **Step 3** — Bootable distribution (ISO, live USB, installer)
+
+### Install
+On Debian, Ubuntu and derivatives, one command (without `sudo`):
+```bash
+curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/packaging/install.sh | bash
+```
+Kreafinity installs in your home folder, starts with your session, adds itself to the applications
+menu and asks which AI to use. Details (in French): [docs/installation.md](docs/installation.md).
+Uninstall with `kreafinity uninstall` (`--purge` also erases settings and conversations).
+
+### Use
+```bash
+kreafinity ui                             # opens the web interface in your browser
+kreafinity ask "What are the 5 largest files in my Downloads folder?"
+kreafinity provider key anthropic         # store an API key in the system keyring
+kreafinity chat --provider anthropic      # or openai, mistral
+```
+The web interface streams answers, lets you pick the AI and shows every action on the computer
+before it happens. `kreafinity bubble` adds a small round button at the bottom right of the desktop:
+click it to ask something in a compact panel. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
+resumes one. Set `language: en` in `~/.config/kreafinity/config.yaml` (or in the settings) for
+English. The daemon's local API is described in `docs/api.md`.
 
 ---
 

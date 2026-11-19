@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Kreafinity</title>
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="loading" class="loading" aria-hidden="true"><span class="logo-mark huge pulse"></span></div>
+
+  <!-- Shown only when the browser cannot be recognized (e.g. not Linux): asks for the token. -->
+  <main id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <div class="brand big"><span class="logo-mark"></span><span>Kreafinity</span></div>
+      <h1 data-i18n="login.title">Connexion à votre assistant</h1>
+      <p data-i18n="login.text">Ce navigateur n'a pas pu être reconnu automatiquement. Collez le jeton d'accès de Kreafinity.</p>
+      <label for="login-token" data-i18n="login.token">Jeton d'accès</label>
+      <input id="login-token" type="password" autocomplete="off" spellcheck="false" required>
+      <p class="hint" data-i18n="login.hint">Il se trouve dans le fichier ~/.local/share/kreafinity/token</p>
+      <p id="login-error" class="form-error" hidden></p>
+      <button class="button primary wide" type="submit" data-i18n="login.submit">Se connecter</button>
+    </form>
+  </main>
+
+  <div id="app" class="app" hidden>
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand"><span class="logo-mark"></span><span>Kreafinity</span></div>
+        <button id="close-sidebar" class="icon-button only-narrow" type="button" data-i18n-aria="sidebar.close"><span data-icon="close"></span></button>
+      </div>
+      <button id="new-conversation" class="button primary wide" type="button">
+        <span data-icon="plus"></span><span data-i18n="sidebar.new">Nouvelle conversation</span>
+      </button>
+      <nav id="conversation-list" class="conversation-list" data-i18n-aria="sidebar.conversations"></nav>
+      <div class="sidebar-footer">
+        <div id="connection" class="connection" role="status"><span class="dot"></span><span id="connection-text"></span></div>
+        <button id="open-settings" class="button ghost wide" type="button">
+          <span data-icon="sliders"></span><span data-i18n="sidebar.settings">Réglages</span>
+        </button>
+      </div>
+    </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+
+    <main class="chat">
+      <header class="chat-header">
+        <button id="open-sidebar" class="icon-button only-narrow" type="button" data-i18n-aria="sidebar.open"><span data-icon="menu"></span></button>
+        <div class="title-area">
+          <h1 id="conversation-title" class="conversation-title"></h1>
+          <button id="rename-conversation" class="icon-button small" type="button" hidden data-i18n-aria="conversation.rename"><span data-icon="edit"></span></button>
+        </div>
+        <div class="compact-actions">
+          <button id="compact-new" class="icon-button" type="button" data-i18n-aria="sidebar.new"><span data-icon="plus"></span></button>
+          <button id="expand" class="icon-button" type="button" data-i18n-aria="compact.expand"><span data-icon="expand"></span></button>
+          <button id="close-panel" class="icon-button" type="button" hidden data-i18n-aria="compact.close"><span data-icon="close"></span></button>
+        </div>
+        <div class="model-picker">
+          <label class="visually-hidden" for="provider-select" data-i18n="picker.provider">Intelligence artificielle</label>
+          <select id="provider-select"></select>
+          <label class="visually-hidden" for="model-input" data-i18n="picker.model">Modèle</label>
+          <input id="model-input" list="model-options" autocomplete="off" spellcheck="false">
+          <datalist id="model-options"></datalist>
+        </div>
+      </header>
+      <div id="key-warning" class="key-warning" hidden>
+        <span data-icon="key"></span><span id="key-warning-text"></span>
+        <button id="key-warning-button" class="button small" type="button" data-i18n="picker.add_key">Ajouter la clé</button>
+      </div>
+
+      <section id="messages" class="messages" aria-live="polite">
+        <div id="welcome" class="welcome">
+          <span class="logo-mark huge"></span>
+          <h2 id="welcome-title"></h2>
+          <p data-i18n="welcome.text">Je peux chercher et ranger vos fichiers, ouvrir vos applications ou vous renseigner sur votre ordinateur.</p>
+          <div id="suggestions" class="suggestions"></div>
+        </div>
+      </section>
+
+      <form id="composer" class="composer">
+        <div class="composer-box">
+          <textarea id="prompt" rows="1" data-i18n-placeholder="composer.placeholder"></textarea>
+          <button id="send" class="round-button" type="submit" data-i18n-aria="composer.send"><span data-icon="send"></span></button>
+          <button id="stop" class="round-button stop" type="button" hidden data-i18n-aria="composer.stop"><span data-icon="stop"></span></button>
+        </div>
+        <p class="composer-hint" data-i18n="composer.hint">Toute action sur votre ordinateur vous est présentée avant d'être faite.</p>
+      </form>
+    </main>
+  </div>
+
+  <dialog id="settings" class="settings" data-i18n-aria="settings.title"></dialog>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

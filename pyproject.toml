@@ -27,20 +27,34 @@ dependencies = [
     "rich>=13.7",
     "httpx>=0.27",
     "pyyaml>=6.0",
+    "anthropic>=2.10",
+    "openai>=3.50",
+    "mistralai>=3.8",
+    "psutil>=5.9",
+    "jsonschema>=4.20",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "websockets>=13",
+    "keyring>=25",
 ]
 
 [project.optional-dependencies]
-# Provider SDKs are added in later steps (see CLAUDE.md §7).
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
+    "playwright>=1.45",
     "ruff>=0.6",
     "mypy>=1.10",
     "pre-commit>=3.7",
     "types-PyYAML",
+    "types-psutil",
+    "types-jsonschema",
 ]
 
 [project.scripts]
 kreafinity = "kreafinity.cli:app"
+kreafinity-core = "kreafinity.api.server:main"
 
 [project.urls]
 Homepage = "https://kreafinity.com"
@@ -48,6 +62,11 @@ Repository = "https://github.com/LAWD-CREATION/kreafinity-OS"
 
 [tool.hatch.build.targets.wheel]
 packages = ["core/kreafinity"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# The web interface ships inside the package (kreafinity/web).
+"ui/web" = "kreafinity/web"
+"ui/desktop" = "kreafinity/desktop"
 
 # --- Quality tools -----------------------------------------------------------
 
@@ -65,6 +84,14 @@ strict = true
 mypy_path = "core"
 packages = ["kreafinity"]
 
+[[tool.mypy.overrides]]
+# Optional dependency of the OpenAI SDK, whose stubs need a newer Python syntax.
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"
+timeout = 60
