@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -63,6 +63,38 @@ class ApprovalRequest:
 #: Asked before running a `confirm` or `danger` tool; returns True to allow it.
 #: Anything else than True (False, an exception…) denies the action.
 Approver = Callable[[ApprovalRequest], Awaitable[bool]]
+
+
+INTERRUPTED_RESULT = "Not executed: the request was interrupted."
+
+
+def complete_unanswered_calls(messages: Sequence[Message]) -> list[Message]:
+    """Give every tool call a result, adding an error result where one is missing.
+
+    A request interrupted between a tool call and its result (cancelled,
+    crashed, Ctrl-C) would otherwise leave a conversation that providers
+    reject on the next request.
+    """
+    result: list[Message] = []
+    pending: dict[str, ToolCall] = {}
+
+    def answer_pending() -> None:
+        for call in pending.values():
+            result.append(
+                Message.tool_result(call.id, call.name, INTERRUPTED_RESULT, is_error=True)
+            )
+        pending.clear()
+
+    for message in messages:
+        if message.role == "tool":
+            pending.pop(message.tool_call_id or "", None)
+        else:
+            answer_pending()
+            if message.role == "assistant":
+                pending.update((call.id, call) for call in message.tool_calls)
+        result.append(message)
+    answer_pending()
+    return result
 
 
 @dataclass
@@ -198,6 +230,7 @@ class Agent:
         `AgentDone`. Provider errors propagate (`ProviderError`); the
         conversation keeps what was done so far and stays usable.
         """
+        conversation.messages[:] = complete_unanswered_calls(conversation.messages)
         conversation.messages.append(Message.user(user_text))
         system = Message.system(self.system_prompt())
         specs = self.tools.specs() if self.provider.supports_tools else []

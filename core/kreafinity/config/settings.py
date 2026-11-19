@@ -6,6 +6,7 @@ Example::
     fallback: ollama/llama3.1      # used when the provider cannot be reached (optional)
     language: fr                   # language of the assistant
     max_iterations: 10             # LLM calls allowed per request
+    port: 27494                    # port of the local daemon (127.0.0.1 only)
     allowed_paths: ["~"]           # folders the tools may access
     tools: null                    # enabled tools (null = all)
     providers:                     # options passed to each adapter
@@ -49,6 +50,7 @@ class Settings:
     fallback: str | None = None
     language: str = "fr"
     max_iterations: int = 10
+    port: int = 27494
     allowed_paths: list[str] = field(default_factory=lambda: ["~"])
     tools: list[str] | None = None
     providers: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -101,6 +103,9 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
     check("max_iterations", int, "an integer")
     if values.get("max_iterations", 1) < 1:
         raise ConfigError(f"{path}: 'max_iterations' must be at least 1")
+    check("port", int, "an integer")
+    if not 1024 <= values.get("port", 27494) <= 65535:
+        raise ConfigError(f"{path}: 'port' must be between 1024 and 65535")
     for key in ("allowed_paths", "tools"):
         value = values.get(key)
         if value is None and key == "tools":
@@ -127,21 +132,33 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
 def save_setting(key: str, value: Any, path: Path | None = None) -> Path:
     """Set one top-level setting in the configuration file, keeping the others.
 
-    The file is created if needed and replaced atomically. Comments in the
-    file are not preserved.
+    See `save_settings`.
+    """
+    return save_settings({key: value}, path)
+
+
+def save_settings(changes: dict[str, Any], path: Path | None = None) -> Path:
+    """Change top-level settings in the configuration file, keeping the others.
+
+    All changes are validated together before anything is written; the file
+    is created if needed and replaced atomically. Comments in the file are
+    not preserved. A value of ``None`` for ``fallback`` or ``tools`` restores
+    the default.
 
     Raises:
-        ConfigError: The current file is invalid, or `key` is unknown.
+        ConfigError: The current file or the result is invalid, or a key is unknown.
     """
-    if key not in {f.name for f in fields(Settings)}:
-        raise ConfigError(f"Unknown setting {key!r}")
+    known = {f.name for f in fields(Settings)}
+    unknown = sorted(changes.keys() - known)
+    if unknown:
+        raise ConfigError(f"Unknown setting {unknown[0]!r}")
     path = path or default_config_path()
     load_settings(path)  # refuse to rewrite an invalid file
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except FileNotFoundError:
         data = {}
-    data[key] = value
+    data.update(changes)
     _from_mapping(data, path)  # validate the result before writing
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".yaml.tmp")

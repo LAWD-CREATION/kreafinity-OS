@@ -32,12 +32,16 @@ dependencies = [
     "mistralai>=3.8",
     "psutil>=5.9",
     "jsonschema>=4.20",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "websockets>=13",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
     "ruff>=0.6",
     "mypy>=1.10",
     "pre-commit>=3.7",
@@ -48,6 +52,7 @@ dev = [
 
 [project.scripts]
 kreafinity = "kreafinity.cli:app"
+kreafinity-core = "kreafinity.api.server:main"
 
 [project.urls]
 Homepage = "https://kreafinity.com"
@@ -82,3 +87,4 @@ follow_imports_for_stubs = true
 testpaths = ["tests"]
 addopts = "-ra"
 asyncio_mode = "auto"
+timeout = 60

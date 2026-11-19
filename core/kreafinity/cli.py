@@ -215,6 +215,23 @@ def provider_use(
     console.print(t("provider.default_set", provider=_describe(provider, model)))
 
 
+@app.command()
+def daemon(
+    port: Annotated[
+        int | None, typer.Option(help="Port d'écoute (par défaut : réglage « port »).")
+    ] = None,
+) -> None:
+    """Lance le démon Kreafinity (API locale pour l'interface web), sur 127.0.0.1."""
+    from kreafinity.api.server import DaemonError, serve  # imported here: slow to load
+
+    _load_settings()
+    try:
+        serve(port)
+    except DaemonError as exc:
+        err_console.print(Text(str(exc), style="red"))
+        raise typer.Exit(1) from exc
+
+
 @app.command("config")
 def show_config() -> None:
     """Affiche la configuration utilisée."""
