@@ -359,6 +359,27 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .toast.warning { border-left-color: var(--warning); }
 .toast span { flex: 1; font-size: 14px; }
 
+/* --- Compact mode (the desktop bubble's panel: ?compact=1) ------------------------------------ */
+
+.compact-actions { display: none; gap: 2px; }
+html.compact body { border: 1px solid var(--border); }
+.compact .compact-actions { display: flex; }
+.compact .model-picker, .compact .composer-hint, .compact #rename-conversation { display: none; }
+.compact .chat-header { flex-wrap: nowrap; padding: 8px 10px; gap: 6px; }
+.compact .conversation-title { font-size: 15px; }
+.compact .messages { padding: 14px 12px 8px; gap: 14px; }
+.compact .welcome { padding: 10px 0; }
+.compact .welcome .logo-mark.huge { width: 64px; height: 46px; }
+.compact .welcome h2 { font-size: 19px; margin-top: 6px; }
+.compact .welcome p { font-size: 14px; margin-bottom: 8px; }
+.compact .suggestions { grid-template-columns: 1fr; gap: 8px; }
+.compact .suggestion { padding: 9px 12px; font-size: 14px; }
+.compact .suggestion:nth-child(n + 4) { display: none; }
+.compact .composer { padding: 4px 10px 10px; }
+.compact .composer-box { box-shadow: none; }
+.compact .message.assistant .avatar { display: none; }
+.compact .key-warning { margin: 8px 10px 0; }
+
 /* --- Narrow screens ---------------------------------------------------------------------- */
 
 .only-narrow { display: none; }

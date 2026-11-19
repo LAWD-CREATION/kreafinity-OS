@@ -66,6 +66,7 @@ packages = ["core/kreafinity"]
 [tool.hatch.build.targets.wheel.force-include]
 # The web interface ships inside the package (kreafinity/web).
 "ui/web" = "kreafinity/web"
+"ui/desktop" = "kreafinity/desktop"
 
 # --- Quality tools -----------------------------------------------------------
 

@@ -87,5 +87,10 @@
   "ui.opened": "Interface opened in your browser: {url}",
   "ui.address": "Open this address in your browser: {url}",
   "ui.starting": "Starting the Kreafinity daemon…",
-  "ui.start_failed": "The daemon could not start. See the log: {log}"
+  "ui.start_failed": "The daemon could not start. See the log: {log}",
+  "bubble.started": "The Kreafinity bubble is shown at the bottom right of the screen.",
+  "bubble.no_gui": "The bubble needs GTK and WebKitGTK: sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1",
+  "bubble.autostart_on": "The bubble will be shown at every login ({path}).",
+  "bubble.autostart_off": "The bubble will no longer be shown at login.",
+  "bubble.autostart_comment": "Kreafinity assistant bubble"
 }

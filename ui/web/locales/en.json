@@ -130,5 +130,7 @@
   "settings.general.theme": "Theme",
   "settings.theme.dark": "Dark",
   "settings.theme.light": "Light",
-  "settings.theme.system": "Same as the system"
+  "settings.theme.system": "Same as the system",
+  "compact.expand": "Open the full interface",
+  "compact.close": "Close the panel"
 }

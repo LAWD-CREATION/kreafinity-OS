@@ -87,5 +87,10 @@
   "ui.opened": "Interface ouverte dans votre navigateur : {url}",
   "ui.address": "Ouvrez cette adresse dans votre navigateur : {url}",
   "ui.starting": "Démarrage du démon Kreafinity…",
-  "ui.start_failed": "Le démon n'a pas pu démarrer. Consultez le journal : {log}"
+  "ui.start_failed": "Le démon n'a pas pu démarrer. Consultez le journal : {log}",
+  "bubble.started": "La bulle Kreafinity est affichée en bas à droite de l'écran.",
+  "bubble.no_gui": "La bulle a besoin de GTK et WebKitGTK : sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1",
+  "bubble.autostart_on": "La bulle s'affichera à chaque ouverture de session ({path}).",
+  "bubble.autostart_off": "La bulle ne s'affichera plus à l'ouverture de session.",
+  "bubble.autostart_comment": "Bulle de l'assistant Kreafinity"
 }

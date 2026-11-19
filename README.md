@@ -40,6 +40,14 @@ action sur l'ordinateur avant qu'elle ne soit faite : une suppression demande de
 puis de confirmer. Elle fonctionne sans connexion Internet et sans jeton : le démon reconnaît
 votre propre navigateur.
 
+Sur le bureau, une **bulle** reste en bas à droite de l'écran : un clic ouvre un petit panneau
+pour poser une question, un nouveau clic le referme. Une pastille orange signale une action qui
+attend votre accord.
+```bash
+kreafinity bubble                         # affiche la bulle (kreafinity bulle marche aussi)
+kreafinity bubble --autostart             # l'afficher à chaque ouverture de session
+```
+
 En ligne de commande :
 ```bash
 kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
@@ -94,7 +102,8 @@ kreafinity provider key anthropic         # store an API key in the system keyri
 kreafinity chat --provider anthropic      # or openai, mistral
 ```
 The web interface streams answers, lets you pick the AI and shows every action on the computer
-before it happens. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
+before it happens. `kreafinity bubble` adds a small round button at the bottom right of the desktop:
+click it to ask something in a compact panel. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
 resumes one. Set `language: en` in `~/.config/kreafinity/config.yaml` (or in the settings) for
 English. The daemon's local API is described in `docs/api.md`.
 

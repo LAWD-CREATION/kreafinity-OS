@@ -10,6 +10,19 @@ import { SettingsDialog, applyTheme } from "./settings.js";
 const api = new Api();
 const $ = (id) => document.getElementById(id);
 
+// Compact mode: the panel of the desktop bubble (?compact=1). When shown by
+// the bubble, the page can talk to it (pending approvals, close, expand).
+const compact = new URLSearchParams(location.search).has("compact");
+const bubble = window.webkit?.messageHandlers?.kreafinity ?? null;
+
+function tellBubble(message) {
+  try {
+    bubble?.postMessage(JSON.stringify(message));
+  } catch {
+    /* not in the bubble */
+  }
+}
+
 const state = {
   info: null,
   config: null,
@@ -30,6 +43,7 @@ let settings;
 
 async function boot() {
   applyTheme();
+  document.documentElement.classList.toggle("compact", compact);
   hydrateIcons();
   welcome = $("welcome");
   await setLanguage(navigator.language?.toLowerCase().startsWith("en") ? "en" : "fr");
@@ -117,13 +131,25 @@ function bindInterface() {
   });
   $("prompt").addEventListener("input", autosize);
   $("stop").addEventListener("click", stopRequest);
+  $("compact-new").addEventListener("click", showNewConversation);
+  $("expand").addEventListener("click", () => {
+    if (bubble) tellBubble({ type: "expand" });
+    else window.open(`${location.origin}/`, "_blank", "noopener");
+  });
+  $("close-panel").hidden = !bubble;
+  $("close-panel").addEventListener("click", () => tellBubble({ type: "close" }));
+  document.addEventListener("visibilitychange", () => {
+    if (compact && document.visibilityState === "visible") $("prompt").focus();
+  });
   $("provider-select").addEventListener("change", () => {
     $("model-input").value = "";
     pickerChanged();
   });
   $("model-input").addEventListener("change", pickerChanged);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeSidebar();
+    if (event.key !== "Escape") return;
+    if ($("app").classList.contains("sidebar-open")) closeSidebar();
+    else if (bubble && !document.querySelector("dialog[open]")) tellBubble({ type: "close" });
   });
 }
 
@@ -139,6 +165,7 @@ function setConnected(online) {
 // --- Sidebar --------------------------------------------------------------------------
 
 function renderSidebar() {
+  tellBubble({ type: "attention", count: state.approvals.size });
   const list = $("conversation-list");
   if (!state.conversations.length) {
     list.replaceChildren(el("p", { class: "empty" }, t("sidebar.empty")));

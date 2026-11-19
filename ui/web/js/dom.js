@@ -16,6 +16,7 @@ const ICONS = {
   shield: "M12 3l8 4v5c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4z",
   key: "M15 3a6 6 0 0 0-5.7 7.9L3 17.2V21h3.8v-2.5h2.5V16h2.5l1.3-1.3A6 6 0 1 0 15 3zM16.5 7.5h.01",
   check: "M5 12.5l4.5 4.5L19 7",
+  expand: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",
 };
 
 /** Build an element: el("p", {class: "x", dataset: {id: "1"}, onclick: fn}, "text", child). */

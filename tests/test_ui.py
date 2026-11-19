@@ -200,3 +200,40 @@ def test_history_and_settings(page: Any, daemon: str, tmp_path: Path) -> None:
     page.click("#settings button[type=submit]")
     page.wait_for_selector("#new-conversation >> text=New conversation")
     assert "language: en" in (tmp_path / "xdg-config" / "kreafinity" / "config.yaml").read_text()
+
+
+def test_compact_panel_of_the_desktop_bubble(browser: Any, daemon: str, downloads: Path) -> None:
+    """The bubble's panel: compact layout, and messages to the bubble (badge, close, expand)."""
+    context = browser.new_context(viewport={"width": 400, "height": 620}, locale="fr-FR")
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    # Stand-in for the bubble's bridge (WebKitGTK's script message handler).
+    page.add_init_script(
+        "window.__messages = [];"
+        "window.webkit = {messageHandlers: {kreafinity: {"
+        "postMessage: (message) => window.__messages.push(JSON.parse(message))}}};"
+    )
+    page.goto(f"{daemon}/?compact=1")
+    page.wait_for_selector("#connection.online")
+    messages = lambda: page.evaluate("window.__messages")  # noqa: E731
+
+    assert page.evaluate("document.documentElement.classList.contains('compact')")
+    assert not page.is_visible(".model-picker")
+    assert page.is_visible("#close-panel") and page.is_visible("#expand")
+    assert page.locator(".suggestion:visible").count() == 3
+
+    page.fill("#prompt", "Montre-moi les 5 plus gros fichiers de mon dossier Téléchargements")
+    page.press("#prompt", "Enter")
+    page.wait_for_selector(".approval.danger")
+    assert {"type": "attention", "count": 1} in messages()  # badge on the bubble
+    page.click(".approval.danger >> text=Refuser")
+    page.wait_for_selector("text=D'accord, je n'ai rien mis à la corbeille.")
+    assert messages()[-1] == {"type": "attention", "count": 0}
+
+    page.click("#expand")
+    assert messages()[-1] == {"type": "expand"}
+    page.keyboard.press("Escape")
+    assert messages()[-1] == {"type": "close"}
+    assert errors == []
+    context.close()

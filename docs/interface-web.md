@@ -62,3 +62,26 @@ pytest tests/test_web.py tests/test_ui.py
 pilote Chromium : scénario complet (lister, valider, mettre à la corbeille), refus, protection
 contre le HTML piégé, historique et réglages. Ces tests sont ignorés si Playwright ou Chromium
 manquent.
+
+## La bulle de bureau
+
+`kreafinity bubble` affiche un bouton rond en bas à droite du bureau (`ui/desktop/kreafinity_bubble.py`).
+Un clic ouvre un panneau qui affiche cette même interface en **mode compact** (`/?compact=1` :
+pas de liste de conversations visible ni de sélecteur d'IA, boutons « nouvelle conversation »,
+« interface complète » et « fermer »).
+
+- Programme autonome en Python + GTK 3 + WebKitGTK (paquets Debian/Ubuntu `python3-gi`,
+  `gir1.2-gtk-3.0`, `gir1.2-webkit2-4.1`), lancé avec le Python du système qui fournit ces
+  bibliothèques ; il ne dépend pas du cœur de Kreafinity et ne parle qu'au démon.
+- La bulle reste au premier plan, sur tous les espaces de travail, hors de la barre des tâches ;
+  on peut la déplacer en la faisant glisser ; clic droit : interface complète ou masquer la bulle.
+- Le panneau est chargé dès le démarrage (caché) : il reçoit les événements du démon et la page
+  signale à la bulle les actions en attente (pastille orange), par un pont WebKit
+  (`window.webkit.messageHandlers.kreafinity`). Seuls trois messages existent (`attention`,
+  `close`, `expand`) et le panneau n'affiche jamais d'autre page que l'interface du démon : les
+  liens externes s'ouvrent dans le navigateur.
+- Wayland ne laisse pas une application choisir sa position ni rester au premier plan : la bulle
+  passe alors par XWayland (comme une application X11), ce qui fonctionne sous GNOME et KDE.
+  Le bureau de l'étape 2 intégrera la bulle directement.
+- `kreafinity bubble --autostart` crée `~/.config/autostart/kreafinity-bubble.desktop` pour
+  l'afficher à chaque ouverture de session (`--no-autostart` pour l'enlever).

@@ -130,5 +130,7 @@
   "settings.general.theme": "Thème",
   "settings.theme.dark": "Sombre",
   "settings.theme.light": "Clair",
-  "settings.theme.system": "Comme le système"
+  "settings.theme.system": "Comme le système",
+  "compact.expand": "Ouvrir l'interface complète",
+  "compact.close": "Fermer le panneau"
 }

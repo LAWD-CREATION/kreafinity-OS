@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import unicodedata
 import webbrowser
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -53,7 +55,7 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language, t
-from kreafinity.paths import data_dir
+from kreafinity.paths import data_dir, xdg_config_home
 from kreafinity.providers import (
     LLMProvider,
     ProviderAuthError,
@@ -411,6 +413,118 @@ def _start_daemon(settings: Settings) -> str:
         time.sleep(0.3)
     err_console.print(Text(t("ui.start_failed", log=log_path), style="red"))
     raise typer.Exit(1)
+
+
+#: Checks that a Python interpreter has GTK 3 and WebKitGTK (needed by the bubble).
+GUI_CHECK = """
+import gi
+gi.require_version("Gtk", "3.0")
+try:
+    gi.require_version("WebKit2", "4.1")
+except ValueError:
+    gi.require_version("WebKit2", "4.0")
+from gi.repository import WebKit2
+"""
+AUTOSTART_FILE = "kreafinity-bubble.desktop"
+
+
+@app.command()
+def bubble(
+    autostart: Annotated[
+        bool | None,
+        typer.Option(
+            "--autostart/--no-autostart",
+            help="Afficher (ou non) la bulle automatiquement à l'ouverture de session.",
+        ),
+    ] = None,
+) -> None:
+    """Affiche la bulle Kreafinity en bas à droite du bureau."""
+    settings = _load_settings()
+    if autostart is not None:
+        path = xdg_config_home() / "autostart" / AUTOSTART_FILE
+        if autostart:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_autostart_entry(), encoding="utf-8")
+            console.print(t("bubble.autostart_on", path=path))
+        else:
+            path.unlink(missing_ok=True)
+            console.print(t("bubble.autostart_off"))
+        return
+
+    from kreafinity.api.web import bubble_script
+
+    script = bubble_script()
+    python = _gui_python()
+    if script is None or python is None:
+        err_console.print(Text(t("bubble.no_gui"), style="red"))
+        raise typer.Exit(1)
+    url = _running_daemon_url(settings) or _start_daemon(settings)
+    log_path = data_dir() / "bubble.log"
+    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "ab") as log:
+        subprocess.Popen(
+            [python, str(script), "--url", url, "--lang", settings.language],
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            start_new_session=True,
+        )
+    console.print(t("bubble.started"))
+
+
+# French alias: « kreafinity bulle »
+app.command("bulle", hidden=True)(bubble)
+
+
+def _gui_python() -> str | None:
+    """A Python interpreter with GTK 3 and WebKitGTK (the system one, usually)."""
+    system = sorted(
+        (
+            str(p)
+            for p in Path("/usr/bin").glob("python3.*")
+            if re.fullmatch(r"python3\.\d+", p.name)
+        ),
+        key=lambda name: [int(part) for part in name.rsplit("python", 1)[1].split(".")],
+        reverse=True,
+    )
+    for candidate in dict.fromkeys([sys.executable, "/usr/bin/python3", *system]):
+        if not os.access(candidate, os.X_OK):
+            continue
+        try:
+            check = subprocess.run(
+                [candidate, "-c", GUI_CHECK], capture_output=True, timeout=30, check=False
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if check.returncode == 0:
+            return candidate
+    return None
+
+
+def _autostart_entry() -> str:
+    """The freedesktop autostart entry showing the bubble at login."""
+    command = " ".join(
+        _desktop_quote(part) for part in (sys.executable, "-m", "kreafinity.cli", "bubble")
+    )
+    comment = t("bubble.autostart_comment")
+    return (
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=Kreafinity\n"
+        f"Comment={comment}\n"
+        f"Exec={command}\n"
+        "Terminal=false\n"
+        "X-GNOME-Autostart-enabled=true\n"
+    )
+
+
+def _desktop_quote(argument: str) -> str:
+    """Quote an argument for the Exec key of a desktop entry."""
+    if argument and not any(char in argument for char in " \t\n\"'\\<>~|&;$*?#()`"):
+        return argument
+    escaped = "".join("\\" + char if char in '"`$\\' else char for char in argument)
+    return f'"{escaped}"'
 
 
 @app.command()
