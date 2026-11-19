@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Install desktop test tools (virtual X display)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            xvfb xdotool x11-apps x11-utils libglib2.0-bin
       - name: Install
         run: pip install -e ".[dev]"
       - name: Lint
