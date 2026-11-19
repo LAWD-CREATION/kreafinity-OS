@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -146,3 +147,118 @@ def test_chat_in_english(fake_provider: list[Any]) -> None:
     result = runner.invoke(cli.app, ["chat"], input="")
     assert "Type /quit to exit." in result.output
     assert "Goodbye!" in result.output
+
+
+# --- Approval of confirm/danger actions ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("answer", "created"), [("o", True), ("oui", True), ("n", False), ("", False)]
+)
+def test_confirm_action_needs_yes(
+    fake_provider: list[Any], home: Path, answer: str, created: bool
+) -> None:
+    provider = ScriptedProvider(
+        reply("", [call("create_folder", path="~/Projets")]), reply("Terminé.")
+    )
+    fake_provider[0](provider)
+
+    result = runner.invoke(cli.app, ["ask", "Crée un dossier Projets"], input=f"{answer}\n")
+
+    assert result.exit_code == 0, result.output
+    assert "Validation requise" in result.output
+    assert "Créer un dossier" in result.output
+    assert (home / "Projets").is_dir() is created
+    assert ("action refusée" in result.output) is not created
+
+
+@pytest.mark.parametrize(("answer", "trashed"), [("oui", True), ("o", False), ("OUI ", True)])
+def test_danger_action_needs_explicit_word(
+    fake_provider: list[Any], home: Path, answer: str, trashed: bool
+) -> None:
+    provider = ScriptedProvider(
+        reply("", [call("move_to_trash", paths=["~/Documents/Facture-2026.pdf"])]),
+        reply("Fait."),
+    )
+    fake_provider[0](provider)
+
+    result = runner.invoke(cli.app, ["ask", "Supprime la facture"], input=f"{answer}\n")
+
+    assert "Action sensible" in result.output
+    assert "Facture-2026.pdf" in result.output
+    assert (home / "Documents" / "Facture-2026.pdf").exists() is not trashed
+
+
+def test_approval_without_input_is_denied(fake_provider: list[Any], home: Path) -> None:
+    provider = ScriptedProvider(
+        reply("", [call("move_to_trash", paths=["~/Documents"])]), reply("Ok.")
+    )
+    fake_provider[0](provider)
+    result = runner.invoke(cli.app, ["ask", "Supprime Documents"], input="")
+    assert (home / "Documents").is_dir()
+    assert "action refusée" in result.output
+
+
+def test_model_output_control_characters_are_stripped(fake_provider: list[Any]) -> None:
+    fake_provider[0](ScriptedProvider(reply("Salut\x1b[2J\x07 !\n")))
+    result = runner.invoke(cli.app, ["ask", "Salut"])
+    assert "\x1b" not in result.output and "\x07" not in result.output
+    assert "Salut[2J !" in result.output  # inert text once the escape character is gone
+
+
+def test_end_of_step_1_scenario(fake_provider: list[Any], home: Path) -> None:
+    """« Montre-moi les 5 plus gros fichiers de mon dossier Téléchargements et mets-les à
+    la corbeille » : the AI lists them, asks for approval, then trashes them."""
+    downloads = home / "Téléchargements"
+    for index, size in enumerate([9000, 8000, 7000, 6000, 1]):
+        (downloads / f"fichier{index}.bin").write_bytes(b"x" * size)
+    largest = ["fichier0.bin", "fichier1.bin", "fichier2.bin", "fichier3.bin", "big.iso"]
+
+    provider = ScriptedProvider(
+        reply(
+            "Je cherche les plus gros fichiers.",
+            [
+                call(
+                    "search_files",
+                    pattern="*",
+                    path="~/Téléchargements",
+                    sort_by="size",
+                    limit=5,
+                )
+            ],
+        ),
+        reply(
+            "Voici les 5 plus gros fichiers. Je les mets à la corbeille.",
+            [call("move_to_trash", "call_2", paths=[f"~/Téléchargements/{n}" for n in largest])],
+        ),
+        reply("C'est fait : les 5 fichiers sont dans la corbeille."),
+    )
+    fake_provider[0](provider)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "ask",
+            "Montre-moi les 5 plus gros fichiers de mon dossier Téléchargements et "
+            "mets-les à la corbeille",
+        ],
+        input="oui\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    # 1. The search result given to the model lists the 5 largest files.
+    search_result = provider.requests[1][0][-1]
+    names = [r["name"] for r in json.loads(search_result.content)["results"]]
+    assert names == largest
+    # 2. The user saw the exact list before approving.
+    assert "Mettre 5 éléments à la corbeille" in result.output
+    for name in largest:
+        assert name in result.output
+    # 3. The files are in the trash, restorable; the others are untouched.
+    trash = home.parent.parent / "xdg-data" / "Trash"
+    for name in largest:
+        assert not (downloads / name).exists()
+        assert (trash / "files" / name).exists()
+        assert (trash / "info" / f"{name}.trashinfo").exists()
+    assert (downloads / "fichier4.bin").exists()
+    assert "C'est fait" in result.output

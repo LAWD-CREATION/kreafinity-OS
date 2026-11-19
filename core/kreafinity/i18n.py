@@ -38,7 +38,20 @@ def get_language() -> str:
     return _language
 
 
+def _lookup(key: str) -> str | None:
+    return _catalog(_language).get(key) or _catalog(DEFAULT_LANGUAGE).get(key)
+
+
 def t(key: str, **values: Any) -> str:
-    """Return the text for `key` in the current language, filled with `values`."""
-    text = _catalog(_language).get(key) or _catalog(DEFAULT_LANGUAGE).get(key) or key
+    """Return the text for `key` in the current language, filled with `values`.
+
+    With a ``count`` value, ``key.one`` or ``key.other`` is used when the
+    catalog defines them (in French, 0 and 1 take the singular).
+    """
+    text = None
+    count = values.get("count")
+    if isinstance(count, int):
+        singular = count in (0, 1) if _language == "fr" else count == 1
+        text = _lookup(f"{key}.{'one' if singular else 'other'}")
+    text = text or _lookup(key) or key
     return text.format(**values) if values else text

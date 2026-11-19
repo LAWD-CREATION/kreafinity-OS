@@ -20,7 +20,14 @@ from kreafinity.providers.base import (
     TextDelta,
     ToolCall,
 )
-from kreafinity.tools.base import RiskLevel, Tool, ToolContext, ToolError, ToolResult
+from kreafinity.tools.base import (
+    RiskLevel,
+    Tool,
+    ToolContext,
+    ToolError,
+    ToolResult,
+    printable,
+)
 from kreafinity.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -29,8 +36,30 @@ DEFAULT_MAX_ITERATIONS = 10
 # Longer tool outputs are cut to keep the conversation within context limits.
 MAX_TOOL_RESULT_CHARS = 20_000
 
+
+@dataclass(frozen=True, slots=True)
+class ApprovalRequest:
+    """A `confirm`/`danger` tool call waiting for the user's decision.
+
+    Attributes:
+        call: The call, with the exact arguments that will be used.
+        tool: Name of the tool.
+        risk: ``confirm`` (simple approval) or ``danger`` (explicit approval
+            after showing exactly what will happen).
+        summary: What will happen, in the user's language.
+        details: The exact targets (paths, URL…), safe to display.
+    """
+
+    call: ToolCall
+    tool: str
+    risk: RiskLevel
+    summary: str
+    details: tuple[str, ...] = ()
+
+
 #: Asked before running a `confirm` or `danger` tool; returns True to allow it.
-Approver = Callable[[Tool, ToolCall], Awaitable[bool]]
+#: Anything else than True (False, an exception…) denies the action.
+Approver = Callable[[ApprovalRequest], Awaitable[bool]]
 
 
 @dataclass
@@ -214,10 +243,10 @@ class Agent:
             status, result = "error", ToolResult(f"Unknown tool: {call.name}", is_error=True)
         elif (problem := _validation_error(tool, call.arguments)) is not None:
             status, result = "error", ToolResult(f"Invalid arguments: {problem}", is_error=True)
-        elif tool.risk is not RiskLevel.SAFE and not await self._approve(tool, call):
-            status, result = "denied", ToolResult("The user denied this action.", is_error=True)
-        else:
+        elif tool.risk is RiskLevel.SAFE:
             status, result = await self._execute(tool, call)
+        else:
+            status, result = await self._run_with_approval(tool, call)
 
         if len(result.content) > MAX_TOOL_RESULT_CHARS:
             result = ToolResult(
@@ -229,14 +258,38 @@ class Agent:
         )
         yield ToolCallFinished(call=call, status=status, result=result)
 
-    async def _approve(self, tool: Tool, call: ToolCall) -> bool:
+    async def _run_with_approval(
+        self, tool: Tool, call: ToolCall
+    ) -> tuple[ActionStatus, ToolResult]:
+        """Run a `confirm`/`danger` tool only if the user approves it."""
         if self.approver is None:
-            return False
+            return "denied", ToolResult(
+                "This action needs the user's approval, which is not available here.",
+                is_error=True,
+            )
         try:
-            return await self.approver(tool, call)
+            preview = await tool.preview(call.arguments, self.context)
+        except ToolError as exc:
+            return "error", ToolResult(str(exc), is_error=True)
+        except Exception as exc:
+            logger.exception("Preview of %s crashed", call.name)
+            return "error", ToolResult(f"Internal error in {call.name}: {exc}", is_error=True)
+
+        request = ApprovalRequest(
+            call=call,
+            tool=tool.name,
+            risk=tool.risk,
+            summary=printable(preview.summary),
+            details=tuple(printable(line) for line in preview.details),
+        )
+        try:
+            approved = await self.approver(request)
         except Exception:
             logger.exception("Approval of %s failed; treated as denied", call.name)
-            return False
+            approved = False
+        if approved is not True:
+            return "denied", ToolResult("The user denied this action.", is_error=True)
+        return await self._execute(tool, call)
 
     async def _execute(self, tool: Tool, call: ToolCall) -> tuple[ActionStatus, ToolResult]:
         try:

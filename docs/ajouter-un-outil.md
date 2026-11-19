@@ -46,13 +46,44 @@ class DiskUsage(Tool):
 Le fichier est découvert automatiquement ; un fichier dont le nom commence par `_` est
 ignoré (utile pour du code partagé, comme `_fs.py`).
 
+## Outils `confirm` et `danger` : l'aperçu
+
+Avant d'exécuter un outil qui n'est pas `SAFE`, l'agent appelle sa méthode `preview()`
+et montre le résultat à l'utilisateur (carte de validation dans le terminal, et plus
+tard dans l'interface web). L'outil ne s'exécute que si l'utilisateur accepte :
+
+```python
+async def preview(self, arguments, context) -> ActionPreview:
+    paths = self._plan(arguments, context)  # mêmes vérifications que run()
+    return ActionPreview(
+        summary=t("tool.mon_outil.summary", count=len(paths)),  # texte traduit
+        details=tuple(str(p) for p in paths),  # cibles exactes, une par ligne
+    )
+```
+
+- `summary` dit ce qui va se passer, dans la langue de l'utilisateur (clés dans
+  `core/kreafinity/locales/*.json`, avec `.one`/`.other` pour les pluriels).
+- `details` liste **exactement** ce qui sera touché (chemins, adresse, processus…).
+  Pour un outil `danger`, c'est obligatoire : l'utilisateur doit voir l'action exacte.
+- Faites les vérifications dans une méthode commune à `preview()` et `run()` : une
+  erreur levée dans `preview()` est renvoyée au modèle sans déranger l'utilisateur.
+- Les textes affichés sont nettoyés par l'agent (`printable()`) : un nom de fichier
+  piégé (séquences de contrôle, inversion de sens d'écriture) ne peut pas tromper l'affichage.
+
+Dans le terminal, `confirm` se valide par `o`/`oui` ; `danger` exige de taper `oui` en
+entier. Sans réponse, l'action est refusée.
+
 ## Règles
 
 - **Arguments** : ils sont validés par l'agent avec le JSON Schema `parameters` avant
   l'appel, mais restent des données non fiables produites par le modèle.
-- **Chemins** : passez toujours par `context.resolve()`. Il interprète `~`, résout les
-  liens symboliques et refuse tout ce qui sort des dossiers autorisés (dossier personnel
-  par défaut) ou touche aux dossiers sensibles (`~/.ssh`, `~/.gnupg`, trousseaux…).
+- **Chemins** : passez par `context.resolve()` pour lire ou ouvrir (il suit les liens
+  symboliques, puis vérifie la cible), et par `context.resolve_entry()` pour déplacer,
+  renommer ou mettre à la corbeille (il agit sur le lien lui-même, jamais sur sa cible).
+  Les deux interprètent `~` et refusent tout ce qui sort des dossiers autorisés (dossier
+  personnel par défaut) ou touche aux dossiers sensibles (`~/.ssh`, `~/.gnupg`,
+  trousseaux, corbeille…). `context.is_protected()` signale le dossier personnel et les
+  dossiers autorisés eux-mêmes, qu'on ne doit jamais déplacer ni supprimer en bloc.
   Pour parcourir une arborescence, ne suivez pas les liens symboliques et vérifiez chaque
   entrée avec `context.is_allowed()`.
 - **Erreurs attendues** : levez `ToolError("message")` ; le message est transmis au modèle,
@@ -61,7 +92,10 @@ ignoré (utile pour du code partagé, comme `_fs.py`).
   pour ne pas bloquer le démon.
 - **Sortie** : préférez `ToolResult.json(...)`, avec des données compactes. Au-delà de
   20 000 caractères, la sortie est tronquée.
-- **Suppression** : jamais de `rm` ; envoi à la corbeille (spécification freedesktop).
+- **Suppression** : jamais de `rm` ; envoi à la corbeille avec
+  `kreafinity.system.trash.move_to_trash()` (spécification freedesktop).
+- **Lancer un programme** : `kreafinity.system.desktop.launch()` (détaché, erreurs
+  immédiates détectées), jamais via un shell.
 - **Root** : jamais de `sudo` ; passez par `pkexec`/polkit.
 - Chaque appel est inscrit dans le journal `~/.local/share/kreafinity/actions.log`.
 

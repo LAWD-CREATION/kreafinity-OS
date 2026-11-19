@@ -9,19 +9,33 @@ from kreafinity.agent import (
     ActionLog,
     Agent,
     AgentDone,
+    ApprovalRequest,
     Conversation,
     ToolCallFinished,
     ToolCallStarted,
 )
-from kreafinity.providers import Message, ProviderUnavailableError, TextDelta, ToolCall
-from kreafinity.tools import RiskLevel, Tool, ToolContext, ToolRegistry, ToolResult
+from kreafinity.providers import (
+    Message,
+    ProviderUnavailableError,
+    TextDelta,
+    ToolCall,
+)
+from kreafinity.tools import (
+    ActionPreview,
+    RiskLevel,
+    Tool,
+    ToolContext,
+    ToolError,
+    ToolRegistry,
+    ToolResult,
+)
 
 
-class TrashTool(Tool):
-    """A `confirm` tool recording its calls (stand-in until step 4)."""
+class FakeAction(Tool):
+    """A `confirm` tool recording its calls."""
 
-    name = "move_to_trash"
-    description = "Move a file to the trash."
+    name = "fake_action"
+    description = "Do something to a file."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {"path": {"type": "string"}},
@@ -32,9 +46,14 @@ class TrashTool(Tool):
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
+    async def preview(self, arguments: dict[str, Any], context: ToolContext) -> ActionPreview:
+        if arguments["path"] == "~/missing":
+            raise ToolError("Not found: ~/missing")
+        return ActionPreview(summary="Faire l'action", details=(arguments["path"],))
+
     async def run(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         self.calls.append(arguments)
-        return ToolResult("moved")
+        return ToolResult("done")
 
 
 class CrashingTool(Tool):
@@ -155,50 +174,87 @@ async def test_failing_calls_are_reported_to_the_model(
 
 
 async def test_confirm_tool_is_denied_without_approver(context: ToolContext) -> None:
-    trash = TrashTool()
-    provider = ScriptedProvider(reply("", [call("move_to_trash", path="~/x")]), reply("Refusé."))
+    action = FakeAction()
+    provider = ScriptedProvider(reply("", [call("fake_action", path="~/x")]), reply("Refusé."))
     conversation = Conversation()
-    events = await run(make_agent(provider, context, trash), conversation, "Supprime x")
+    events = await run(make_agent(provider, context, action), conversation, "Vas-y")
 
-    assert trash.calls == []
+    assert action.calls == []
     finished = next(e for e in events if isinstance(e, ToolCallFinished))
     assert finished.status == "denied"
-    assert conversation.messages[2].content == "The user denied this action."
+    assert "approval" in conversation.messages[2].content
 
 
-@pytest.mark.parametrize(("answer", "executed"), [(True, True), (False, False)])
+@pytest.mark.parametrize(("answer", "executed"), [(True, True), (False, False), ("yes", False)])
 async def test_confirm_tool_follows_approver(
-    context: ToolContext, answer: bool, executed: bool
+    context: ToolContext, answer: Any, executed: bool
 ) -> None:
-    trash = TrashTool()
-    asked: list[tuple[str, ToolCall]] = []
+    action = FakeAction()
+    asked: list[ApprovalRequest] = []
 
-    async def approver(tool: Tool, tool_call: ToolCall) -> bool:
-        asked.append((tool.name, tool_call))
-        return answer
+    async def approver(request: ApprovalRequest) -> bool:
+        asked.append(request)
+        return answer  # type: ignore[no-any-return]
 
-    trash_call = call("move_to_trash", path="~/x")
-    provider = ScriptedProvider(reply("", [trash_call]), reply("Ok."))
-    agent = make_agent(provider, context, trash, approver=approver)
-    await run(agent, Conversation(), "Supprime x")
+    action_call = call("fake_action", path="~/x")
+    provider = ScriptedProvider(reply("", [action_call]), reply("Ok."))
+    conversation = Conversation()
+    await run(make_agent(provider, context, action, approver=approver), conversation, "Vas-y")
 
-    assert asked == [("move_to_trash", trash_call)]
-    assert bool(trash.calls) is executed
+    assert asked == [
+        ApprovalRequest(
+            call=action_call,
+            tool="fake_action",
+            risk=RiskLevel.CONFIRM,
+            summary="Faire l'action",
+            details=("~/x",),
+        )
+    ]
+    assert bool(action.calls) is executed
+    if not executed:
+        assert conversation.messages[2].content == "The user denied this action."
+
+
+async def test_preview_errors_do_not_bother_the_user(context: ToolContext) -> None:
+    action = FakeAction()
+
+    async def approver(request: ApprovalRequest) -> bool:
+        raise AssertionError("should not be asked")
+
+    provider = ScriptedProvider(reply("", [call("fake_action", path="~/missing")]), reply("Ok."))
+    conversation = Conversation()
+    events = await run(make_agent(provider, context, action, approver=approver), conversation, "x")
+    finished = next(e for e in events if isinstance(e, ToolCallFinished))
+    assert finished.status == "error"
+    assert conversation.messages[2].content == "Not found: ~/missing"
+
+
+async def test_approval_display_is_sanitized(context: ToolContext) -> None:
+    asked: list[ApprovalRequest] = []
+
+    async def approver(request: ApprovalRequest) -> bool:
+        asked.append(request)
+        return False
+
+    sneaky = "~/facture\u202egpj.exe\x1b[2J"
+    provider = ScriptedProvider(reply("", [call("fake_action", path=sneaky)]), reply("Ok."))
+    await run(make_agent(provider, context, FakeAction(), approver=approver), Conversation(), "x")
+    assert asked[0].details == ("~/facture\\u202egpj.exe\\x1b[2J",)
 
 
 async def test_failing_approver_means_denied(context: ToolContext) -> None:
-    trash = TrashTool()
+    action = FakeAction()
 
-    async def approver(tool: Tool, tool_call: ToolCall) -> bool:
+    async def approver(request: ApprovalRequest) -> bool:
         raise RuntimeError("UI disconnected")
 
-    provider = ScriptedProvider(reply("", [call("move_to_trash", path="~/x")]), reply("Ok."))
-    await run(make_agent(provider, context, trash, approver=approver), Conversation(), "Vas-y")
-    assert trash.calls == []
+    provider = ScriptedProvider(reply("", [call("fake_action", path="~/x")]), reply("Ok."))
+    await run(make_agent(provider, context, action, approver=approver), Conversation(), "Vas-y")
+    assert action.calls == []
 
 
 async def test_safe_tools_do_not_ask(context: ToolContext) -> None:
-    async def approver(tool: Tool, tool_call: ToolCall) -> bool:
+    async def approver(request: ApprovalRequest) -> bool:
         raise AssertionError("should not be asked")
 
     provider = ScriptedProvider(reply("", [call("system_info")]), reply("Ok."))
@@ -220,16 +276,16 @@ async def test_iteration_limit(context: ToolContext) -> None:
 
 
 async def test_truncated_tool_calls_are_not_run(context: ToolContext) -> None:
-    trash = TrashTool()
+    action = FakeAction()
 
-    async def approver(tool: Tool, tool_call: ToolCall) -> bool:
+    async def approver(request: ApprovalRequest) -> bool:
         return True
 
-    provider = ScriptedProvider(reply("", [call("move_to_trash", path="~/Doc")], stop="max_tokens"))
+    provider = ScriptedProvider(reply("", [call("fake_action", path="~/Doc")], stop="max_tokens"))
     conversation = Conversation()
-    events = await run(make_agent(provider, context, trash, approver=approver), conversation, "x")
+    events = await run(make_agent(provider, context, action, approver=approver), conversation, "x")
 
-    assert trash.calls == []
+    assert action.calls == []
     assert events[-1] == AgentDone(reason="max_tokens", model="fake-model")
     assert conversation.messages[-1].role == "tool"  # history stays valid
 

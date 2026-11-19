@@ -17,6 +17,11 @@ def _xdg_base(variable: str, default: str) -> Path:
     return Path.home() / default
 
 
+def xdg_data_home() -> Path:
+    """Base directory for user data (``~/.local/share``)."""
+    return _xdg_base("XDG_DATA_HOME", ".local/share")
+
+
 def config_dir() -> Path:
     """Directory holding the configuration (``~/.config/kreafinity``)."""
     return _xdg_base("XDG_CONFIG_HOME", ".config") / APP_NAME

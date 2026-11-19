@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import unicodedata
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.text import Text
 
 from kreafinity import __version__
@@ -15,6 +17,7 @@ from kreafinity.agent import (
     Agent,
     AgentDone,
     AgentEvent,
+    ApprovalRequest,
     Conversation,
     ToolCallFinished,
     ToolCallStarted,
@@ -30,7 +33,7 @@ from kreafinity.providers import (
     create_provider,
     parse_model_spec,
 )
-from kreafinity.tools import ToolContext, ToolRegistry
+from kreafinity.tools import RiskLevel, ToolContext, ToolRegistry, printable
 
 app = typer.Typer(
     name="kreafinity",
@@ -149,6 +152,7 @@ def _build_agent(settings: Settings, provider_spec: str | None) -> Agent:
 async def _run_turn(agent: Agent, conversation: Conversation, text: str) -> bool:
     """Run one request and print it; return False if it failed."""
     renderer = _Renderer(agent)
+    agent.approver = renderer.approve
     try:
         async for event in agent.run(conversation, text):
             renderer.show(event)
@@ -167,18 +171,54 @@ class _Renderer:
         self.mid_line = False
         self.reason: str | None = None
 
+    def _short(self, text: str) -> str:
+        """Show paths inside the home folder as ``~/…``."""
+        home = str(self.agent.context.home)
+        return text.replace(home + "/", "~/").replace(f"'{home}'", "'~'")
+
     def end_line(self) -> None:
         if self.mid_line:
             console.print()
             self.mid_line = False
 
+    async def approve(self, request: ApprovalRequest) -> bool:
+        """Show an approval card and read the user's decision."""
+        self.end_line()
+        danger = request.risk is RiskLevel.DANGER
+        body = Text(printable(request.summary), style="bold")
+        for line in request.details:
+            body.append("\n  • " + self._short(printable(line)), style="default")
+        console.print(
+            Panel(
+                body,
+                title=t("approval.title.danger" if danger else "approval.title.confirm"),
+                title_align="left",
+                border_style="red" if danger else "yellow",
+                expand=False,
+            )
+        )
+        prompt = Text(t("approval.prompt.danger" if danger else "approval.prompt.confirm"))
+        try:
+            answer = await asyncio.to_thread(console.input, prompt)
+        except EOFError:
+            answer = ""
+        answer = answer.strip().casefold()
+        if danger:
+            return answer == t("approval.danger_word")
+        return answer in t("approval.yes_words").split(",")
+
     def show(self, event: AgentEvent) -> None:
         if isinstance(event, TextDelta):
-            console.print(event.text, end="", markup=False, highlight=False, soft_wrap=True)
-            self.mid_line = not event.text.endswith("\n")
+            text = _strip_control(event.text)
+            console.print(text, end="", markup=False, highlight=False, soft_wrap=True)
+            self.mid_line = not text.endswith("\n")
         elif isinstance(event, ToolCallStarted):
             self.end_line()
-            console.print(Text(f"  ⚙ {event.description}", style="dim cyan"))
+            line = f"  ⚙ {self._short(event.description)}"
+            width = max(console.width - 1, 20)
+            if len(line) > width:
+                line = line[: width - 1] + "…"
+            console.print(Text(line, style="dim cyan"), soft_wrap=True)
         elif isinstance(event, ToolCallFinished):
             self._show_tool_outcome(event)
         elif isinstance(event, AgentDone):
@@ -200,6 +240,11 @@ class _Renderer:
             detail = event.result.content.splitlines()[0][:200] if event.result.content else ""
             message = t("cli.tool_error", detail=detail)
         console.print(Text(f"    ✗ {message}", style="yellow"))
+
+
+def _strip_control(text: str) -> str:
+    """Drop terminal control characters from model output (keeps newlines and tabs)."""
+    return "".join(c for c in text if c in "\n\t" or unicodedata.category(c) != "Cc")
 
 
 def _print_provider_error(agent: Agent, exc: ProviderError) -> None:

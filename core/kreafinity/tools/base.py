@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import unicodedata
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -12,13 +14,15 @@ from typing import Any, ClassVar
 
 from kreafinity.providers.base import ToolSpec
 
-# Folders holding secrets: never exposed to the model, even inside an allowed root.
+# Folders holding secrets or Kreafinity's own data: never exposed to the
+# model, even inside an allowed root.
 DEFAULT_DENIED_PATHS = (
     "~/.ssh",
     "~/.gnupg",
     "~/.pki",
     "~/.password-store",
     "~/.local/share/keyrings",
+    "~/.local/share/Trash",
     "~/.config/kreafinity",
     "~/.local/share/kreafinity",
 )
@@ -47,9 +51,37 @@ class ToolResult:
     is_error: bool = False
 
     @classmethod
-    def json(cls, data: Any) -> ToolResult:
+    def json(cls, data: Any, *, is_error: bool = False) -> ToolResult:
         """Build a result holding `data` serialized as JSON."""
-        return cls(json.dumps(data, ensure_ascii=False, default=str))
+        return cls(json.dumps(data, ensure_ascii=False, default=str), is_error=is_error)
+
+
+@dataclass(frozen=True, slots=True)
+class ActionPreview:
+    """What a `confirm`/`danger` call is about to do, shown to the user for approval.
+
+    Attributes:
+        summary: One sentence in the user's language (« Mettre 3 éléments à la corbeille »).
+        details: The exact targets: paths, URL, processes… one per line.
+    """
+
+    summary: str
+    details: tuple[str, ...] = ()
+
+
+def printable(text: str) -> str:
+    """Make untrusted text (file names, URLs…) safe to display.
+
+    Control and invisible formatting characters are shown as escapes, so a
+    crafted file name cannot rewrite the terminal or disguise itself (ANSI
+    sequences, right-to-left override…).
+    """
+    return "".join(
+        char.encode("unicode_escape").decode("ascii")
+        if unicodedata.category(char) in ("Cc", "Cf", "Zl", "Zp")
+        else char
+        for char in text
+    )
 
 
 @dataclass(frozen=True)
@@ -77,42 +109,60 @@ class ToolContext:
         home = (home or Path.home()).resolve()
         return cls(
             home=home,
-            allowed_roots=tuple(_expand(p, home) for p in allowed_paths),
-            denied_paths=tuple(_expand(p, home) for p in denied_paths),
+            allowed_roots=tuple(_absolute(p, home).resolve() for p in allowed_paths),
+            denied_paths=tuple(_absolute(p, home).resolve() for p in denied_paths),
         )
 
     def resolve(self, raw: str | None) -> Path:
-        """Turn a path given by the model into an absolute path the tools may use.
+        """Turn a path given by the model into the absolute path of its target.
 
         ``~`` and relative paths start from the home directory. Symlinks are
-        resolved before checking, so a link cannot lead outside the sandbox.
+        followed before checking, so a link cannot lead outside the sandbox.
+        Use this to read or open something.
 
         Raises:
             ToolError: The path is outside the allowed folders or denied.
         """
-        path = _expand(raw or "~", self.home)
-        if not self.is_allowed(path):
-            raise ToolError(f"Access denied: {path} is outside the folders you may access")
-        return path
+        return self._check(_absolute(raw or "~", self.home).resolve())
+
+    def resolve_entry(self, raw: str) -> Path:
+        """Like `resolve`, but keep a symlink itself instead of its target.
+
+        Use this to move, rename or trash an entry: acting on a link must
+        never affect the file it points to.
+        """
+        path = Path(os.path.normpath(_absolute(raw, self.home)))
+        if path.name:
+            path = path.parent.resolve() / path.name
+        return self._check(path)
 
     def is_allowed(self, path: Path) -> bool:
-        """Whether an absolute, resolved `path` is inside the sandbox."""
+        """Whether an absolute `path` is inside the sandbox."""
         if any(path.is_relative_to(denied) for denied in self.denied_paths):
             return False
         return any(path.is_relative_to(root) for root in self.allowed_roots)
 
+    def is_protected(self, path: Path) -> bool:
+        """Whether `path` is the home folder, an allowed root or one of their parents.
 
-def _expand(raw: str, home: Path) -> Path:
+        Such folders must never be moved or trashed as a whole.
+        """
+        return any(root.is_relative_to(path) for root in (self.home, *self.allowed_roots))
+
+    def _check(self, path: Path) -> Path:
+        if not self.is_allowed(path):
+            raise ToolError(f"Access denied: {path} is outside the folders you may access")
+        return path
+
+
+def _absolute(raw: str, home: Path) -> Path:
     raw = raw.strip()
     if raw == "~" or raw.startswith("~/"):
-        path = home / raw[2:]
-    elif raw.startswith("~"):
+        return home / raw[2:]
+    if raw.startswith("~"):
         raise ToolError(f"Unsupported path: {raw}")
-    else:
-        path = Path(raw)
-        if not path.is_absolute():
-            path = home / path
-    return path.resolve()
+    path = Path(raw)
+    return path if path.is_absolute() else home / path
 
 
 class Tool(ABC):
@@ -120,7 +170,8 @@ class Tool(ABC):
 
     Subclasses set the class attributes, implement `run` and register
     themselves with `kreafinity.tools.register_tool`. Arguments are validated
-    against `parameters` before `run` is called.
+    against `parameters` before `preview` and `run` are called. Tools that
+    are not `SAFE` should override `preview` to show exactly what they will do.
     """
 
     #: Unique name, as the model sees it (``snake_case``).
@@ -138,9 +189,18 @@ class Tool(ABC):
         return ToolSpec(name=cls.name, description=cls.description, parameters=cls.parameters)
 
     def describe(self, arguments: dict[str, Any]) -> str:
-        """One-line summary of a call, shown to the user and in the action log."""
+        """One-line technical summary of a call, shown while it runs and logged."""
         args = ", ".join(f"{key}={value!r}" for key, value in arguments.items())
         return f"{self.name}({args})"
+
+    async def preview(self, arguments: dict[str, Any], context: ToolContext) -> ActionPreview:
+        """Describe what the call will do, before the user approves it.
+
+        Also the place to check the arguments (paths exist, are allowed…):
+        raising `ToolError` here reports the problem to the model without
+        bothering the user.
+        """
+        return ActionPreview(summary=self.describe(arguments))
 
     @abstractmethod
     async def run(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
@@ -149,7 +209,7 @@ class Tool(ABC):
         Args:
             arguments: Arguments chosen by the model, already validated
                 against `parameters` (but still untrusted: check paths with
-                `ToolContext.resolve`).
+                `ToolContext.resolve` or `ToolContext.resolve_entry`).
             context: What the tool may access.
 
         Raises:
