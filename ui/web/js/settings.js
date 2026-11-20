@@ -48,13 +48,15 @@ export class SettingsDialog {
 
   async open(section) {
     try {
-      const [config, providers, tools] = await Promise.all([
+      const [config, providers, tools, memory] = await Promise.all([
         this.api.get("/api/config"),
         this.api.get("/api/providers"),
         this.api.get("/api/tools"),
+        this.api.get("/api/memory").catch(() => null),
       ]);
       this.config = config;
       this.providers = providers;
+      this.memory = memory;
       this.render(config, providers, tools);
     } catch (error) {
       this.toast(error.message, "error");
@@ -97,7 +99,13 @@ export class SettingsDialog {
         ),
       ),
       checkUpdates: el("input", { id: "settings-check-updates", type: "checkbox", checked: config.check_updates !== false }),
+      memory: el("input", { id: "settings-memory", type: "checkbox", checked: config.memory !== false }),
+      memoryReview: el("input", { id: "settings-memory-review", type: "checkbox", checked: config.memory_review !== false }),
+      memoryUser: el("textarea", { id: "settings-memory-user", class: "prose", rows: 4, spellcheck: "true" }),
+      memoryNotes: el("textarea", { id: "settings-memory-notes", class: "prose", rows: 4, spellcheck: "true" }),
     };
+    this.fields.memoryUser.value = this.memory?.user ?? "";
+    this.fields.memoryNotes.value = this.memory?.notes ?? "";
     this.fields.folders.value = config.allowed_paths.join("\n");
     this.toolBoxes = new Map();
     this.error = el("p", { class: "form-error", hidden: true });
@@ -134,6 +142,7 @@ export class SettingsDialog {
           el("p", {}, t("settings.tools.text")),
           sortedTools.map((tool) => this.toolRow(tool)),
         ),
+        this.renderMemory(),
         el(
           "section",
           { class: "settings-section", dataset: { section: "folders" } },
@@ -176,6 +185,62 @@ export class SettingsDialog {
       el("label", { for: id }, el("div", { class: "tool-name" }, label === `tool.${tool.name}` ? tool.name : label), el("div", { class: "hint" }, t(`tool.${tool.name}.help`) === `tool.${tool.name}.help` ? tool.description : t(`tool.${tool.name}.help`))),
       el("span", { class: `risk ${tool.risk}` }, t(`risk.${tool.risk}`)),
     );
+  }
+
+  /** What Kreafinity remembers: notebooks it curates, skills it learned. */
+  renderMemory() {
+    const memory = this.memory;
+    const section = el(
+      "section",
+      { class: "settings-section", dataset: { section: "memory" } },
+      el("h3", {}, t("settings.memory.title")),
+      el("p", {}, t("settings.memory.text")),
+      el("div", { class: "field-row two" }, el("label", { for: "settings-memory" }, t("settings.memory.enabled")), el("div", {}, this.fields.memory)),
+      el("div", { class: "field-row two" }, el("label", { for: "settings-memory-review" }, t("settings.memory.review")), el("div", {}, this.fields.memoryReview)),
+    );
+    if (!memory) return section;
+    section.append(
+      el("label", { for: "settings-memory-user" }, t("settings.memory.user")),
+      this.fields.memoryUser,
+      el("label", { for: "settings-memory-notes" }, t("settings.memory.notes")),
+      this.fields.memoryNotes,
+      el("h4", {}, t("settings.memory.skills")),
+    );
+    if (!memory.skills.length) section.append(el("p", { class: "hint" }, t("settings.memory.no_skills")));
+    for (const skill of memory.skills) {
+      const row = el(
+        "div",
+        { class: "skill-row" },
+        el("div", {}, el("div", { class: "tool-name" }, skill.title), el("div", { class: "hint" }, skill.description)),
+        el("span", { class: "hint" }, t("settings.memory.uses", { count: skill.uses })),
+      );
+      const remove = el("button", { class: "button small ghost", type: "button" }, t("settings.memory.delete_skill"));
+      remove.addEventListener("click", async () => {
+        try {
+          this.memory = await this.api.delete(`/api/memory/skills/${encodeURIComponent(skill.name)}`);
+          row.remove();
+        } catch (error) {
+          this.toast(error.message, "error");
+        }
+      });
+      row.append(remove);
+      section.append(row);
+    }
+    const forget = el("button", { class: "button small danger-ghost", type: "button", id: "settings-memory-forget" }, t("settings.memory.forget"));
+    forget.addEventListener("click", async () => {
+      if (!confirm(t("settings.memory.forget_confirm"))) return;
+      try {
+        this.memory = await this.api.delete("/api/memory");
+        this.fields.memoryUser.value = "";
+        this.fields.memoryNotes.value = "";
+        section.querySelectorAll(".skill-row").forEach((row) => row.remove());
+        this.toast(t("settings.memory.forgotten"));
+      } catch (error) {
+        this.toast(error.message, "error");
+      }
+    });
+    section.append(el("div", {}, forget));
+    return section;
   }
 
   /** Installed version and « Rechercher maintenant » (updates). */
@@ -279,6 +344,10 @@ export class SettingsDialog {
     if (fields.checkUpdates.checked !== (this.config.check_updates !== false)) {
       changes.check_updates = fields.checkUpdates.checked;
     }
+    if (fields.memory.checked !== (this.config.memory !== false)) changes.memory = fields.memory.checked;
+    if (fields.memoryReview.checked !== (this.config.memory_review !== false)) {
+      changes.memory_review = fields.memoryReview.checked;
+    }
 
     const theme = fields.theme.value;
     try {
@@ -290,6 +359,11 @@ export class SettingsDialog {
 
     this.error.hidden = true;
     try {
+      for (const [section, field] of [["user", fields.memoryUser], ["notes", fields.memoryNotes]]) {
+        if (this.memory && field.value.trim() !== this.memory[section].trim()) {
+          await this.api.put(`/api/memory/${section}`, { content: field.value });
+        }
+      }
       const config = Object.keys(changes).length ? await this.api.patch("/api/config", changes) : this.config;
       this.dialog.close();
       this.onSaved(config, changes);

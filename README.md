@@ -15,6 +15,7 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 ### Pourquoi Kreafinity OS ?
 - 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral, Ollama Cloud, les centaines de modèles d'OpenRouter, ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
 - 🛡️ **Vous gardez le contrôle** : aucune action sensible (suppression, commande système, installation) sans votre validation.
+- 🧠 **Une mémoire qui s'améliore** : Kreafinity se souvient de vous et apprend de chaque conversation, comme Hermes Agent ; vous pouvez tout lire, corriger ou effacer ([docs/memoire.md](docs/memoire.md)).
 - 🔒 **Vie privée** : fonctionne entièrement hors ligne avec un modèle local.
 - 🪟 **Interface familière** : barre des tâches, menu démarrer, fenêtres… avec l'IA intégrée partout.
 - 🌍 **Open source** : construit sur Linux (Debian), ouvert aux contributions.
@@ -110,6 +111,7 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 ### Why Kreafinity OS?
 - 🔓 **Freedom of AI provider**: Claude, GPT, Mistral, Ollama Cloud, hundreds of models through OpenRouter, or a fully local model via Ollama. Switch anytime.
 - 🛡️ **You stay in control**: no sensitive action (deletion, shell command, install) without your approval.
+- 🧠 **A memory that improves**: Kreafinity remembers you and learns from each conversation, like Hermes Agent; you can read, fix or erase it all.
 - 🔒 **Privacy**: runs fully offline with a local model.
 - 🪟 **Familiar interface**: taskbar, start menu, windows… with AI built in everywhere.
 - 🌍 **Open source**: built on Linux (Debian), open to contributions.

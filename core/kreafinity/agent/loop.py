@@ -12,6 +12,7 @@ import jsonschema
 
 from kreafinity.agent.action_log import ActionLog, ActionStatus
 from kreafinity.agent.prompts import build_system_prompt
+from kreafinity.memory import MemoryStore
 from kreafinity.paths import user_dirs
 from kreafinity.providers.base import (
     LLMProvider,
@@ -180,6 +181,8 @@ class Agent:
         approver: Approver | None = None,
         action_log: ActionLog | None = None,
         fallback: tuple[LLMProvider, str | None] | None = None,
+        memory: MemoryStore | None = None,
+        instructions: str | None = None,
     ) -> None:
         """Create an agent.
 
@@ -196,6 +199,10 @@ class Agent:
             fallback: Provider and model to switch to when the current
                 provider cannot be reached (e.g. a local Ollama model when
                 there is no Internet connection).
+            memory: The assistant's persistent memory, shown at the start of
+                every request (none: no memory).
+            instructions: System prompt to use instead of the assistant's
+                usual one (e.g. for the review of a conversation).
         """
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -208,6 +215,8 @@ class Agent:
         self.approver = approver
         self.action_log = action_log
         self.fallback = fallback
+        self.memory = memory
+        self.instructions = instructions
 
     def use_provider(self, provider: LLMProvider, model: str | None = None) -> None:
         """Switch provider and model; takes effect from the next LLM call."""
@@ -215,13 +224,16 @@ class Agent:
         self.model = model
 
     def system_prompt(self) -> str:
-        """The system prompt sent with every request."""
-        return build_system_prompt(
+        """The system prompt sent with every request (with the memory, if any)."""
+        prompt = self.instructions or build_system_prompt(
             language=self.language,
             home=self.context.home,
             allowed_roots=self.context.allowed_roots,
             user_dirs=user_dirs(self.context.home),
+            memory=self.memory is not None,
         )
+        snapshot = self.memory.snapshot(self.language) if self.memory else ""
+        return f"{prompt}\n\n{snapshot}" if snapshot else prompt
 
     async def run(self, conversation: Conversation, user_text: str) -> AsyncIterator[AgentEvent]:
         """Handle one user request, appending every message to `conversation`.

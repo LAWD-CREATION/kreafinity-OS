@@ -14,6 +14,9 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `search_files` | safe | Chercher des fichiers (par nom, taille, date) |
 | `read_file` | safe | Lire un fichier texte |
 | `list_applications` | safe | Lister les applications installées |
+| `search_conversations` | safe | Chercher dans les conversations passées |
+| `memory` | safe | Retenir ou corriger une note de sa mémoire (voir [memoire.md](memoire.md)) |
+| `skill` | safe | Lire, enregistrer ou améliorer un savoir-faire |
 | `create_folder` | confirm | Créer un dossier |
 | `create_file` | confirm | Créer un fichier texte (sans jamais écraser) |
 | `move_file` | confirm | Déplacer ou renommer |

@@ -703,6 +703,10 @@ function onEvent(event) {
       if (!compact) return;
       tellBubble({ type: "show" });
       return openConversation(event.conversation_id);
+    case "memory_updated":
+      // Learned something from a finished conversation (not the user's own edit).
+      if (event.conversation_id && !compact) toast(t("memory.updated"));
+      break;
     case "update_available":
     case "update_started":
       updates?.onEvent(event);

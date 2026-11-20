@@ -196,6 +196,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .update-text ul { margin: 6px 0 0; padding-left: 18px; max-height: 160px; overflow-y: auto; }
 .update-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .update-check { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.settings-section h4 { margin: 6px 0 0; font-size: 14px; }
+.skill-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+.button.danger-ghost { background: transparent; border-color: color-mix(in srgb, var(--danger) 55%, transparent); color: var(--danger); }
 @keyframes pulse { 50% { opacity: .35; } }
 
 /* --- Messages --------------------------------------------------------------------------- */
@@ -363,6 +366,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .risk.confirm { color: var(--kf-violet); background: color-mix(in srgb, var(--kf-violet) 16%, transparent); }
 .risk.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
 .settings textarea { width: 100%; font-family: var(--mono); font-size: 13px; }
+.settings textarea.prose { font-family: var(--font); font-size: 14px; line-height: 1.5; }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); }
 .settings-footer .version { flex: 1; color: var(--text-muted); font-size: 13px; }
 

@@ -41,7 +41,9 @@ from kreafinity.agent import (
     ToolCallFinished,
     ToolCallStarted,
     complete_unanswered_calls,
+    review,
 )
+from kreafinity.agent.review import ReviewState
 from kreafinity.config import (
     ConfigError,
     SecretStoreError,
@@ -55,6 +57,7 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language
+from kreafinity.memory import MAX_SECTION, MEMORY_TOOLS, MemoryRefusedError, MemoryStore
 from kreafinity.providers import (
     LLMProvider,
     Message,
@@ -80,6 +83,8 @@ EVENT_QUEUE_SIZE = 5000
 TOOL_RESULT_EXCERPT = 2000
 #: A request to show a conversation is ignored by panels after this many seconds.
 UI_REQUEST_MAX_AGE = 60.0
+#: A conversation quiet for this long is reviewed to improve the memory.
+REVIEW_DELAY = 120.0
 
 ErrorCode = Literal[
     "not_found",
@@ -320,6 +325,8 @@ class AssistantService:
             client=update_client,
         )
         self._background: list[asyncio.Task[None]] = []
+        self._reviews: dict[str, asyncio.Task[None]] = {}
+        self.review_delay = REVIEW_DELAY
 
     # --- Settings and providers --------------------------------------------------------
 
@@ -573,7 +580,7 @@ class AssistantService:
         )
         agent = Agent(
             llm,
-            ToolRegistry.load(settings.tools),
+            ToolRegistry.load(settings.tools, exclude=() if settings.memory else MEMORY_TOOLS),
             self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
             model=model,
             language=settings.language,
@@ -581,7 +588,11 @@ class AssistantService:
             approver=partial(self._ask_approval, run),
             action_log=self._action_log,
             fallback=fallback,
+            memory=MemoryStore() if settings.memory else None,
         )
+        pending = self._reviews.pop(conversation_id, None)
+        if pending is not None:  # the conversation goes on: review it later
+            pending.cancel()
         self._runs[conversation_id] = run
         run.task = asyncio.create_task(self._process(run, agent, text))
         return {"run_id": run.id, "provider": run.provider, "model": run.model}
@@ -625,10 +636,12 @@ class AssistantService:
                 "content": text,
             }
         )
+        completed = False
         try:
             async for event in agent.run(conversation, text):
                 persist()
                 self.events.publish({**base, **_event_to_dict(event)})
+            completed = True
         except asyncio.CancelledError:
             persist()
             self.events.publish({"type": "run_finished", **base, "reason": "cancelled"})
@@ -661,6 +674,125 @@ class AssistantService:
                 self.events.publish(
                     {"type": "conversation_updated", "conversation": self._info(conversation_id)}
                 )
+            if completed:
+                self._schedule_review(conversation_id, f"{run.provider}/{run.model}")
+
+    # --- Memory: learning from conversations ---------------------------------------------
+
+    def _schedule_review(self, conversation_id: str, spec: str) -> None:
+        settings = self.settings()
+        if not (settings.memory and settings.memory_review):
+            return
+        previous = self._reviews.pop(conversation_id, None)
+        if previous is not None:
+            previous.cancel()
+
+        async def later() -> None:
+            await asyncio.sleep(self.review_delay)
+            try:
+                await self.review_conversation(conversation_id, spec)
+            except Exception:
+                logger.exception("Review of conversation %s failed", conversation_id)
+            finally:
+                if self._reviews.get(conversation_id) is task:
+                    del self._reviews[conversation_id]
+
+        task = asyncio.create_task(later())
+        self._reviews[conversation_id] = task
+
+    async def review_conversation(self, conversation_id: str, spec: str | None = None) -> int:
+        """Reread what is new in a conversation and improve the memory from it.
+
+        Returns:
+            How many changes were made to the memory and skills.
+        """
+        settings = self.settings()
+        if not settings.memory:
+            return 0
+        state = ReviewState()
+        try:
+            messages = self.store.messages(conversation_id)
+        except ConversationNotFoundError:
+            return 0
+        new = messages[state.reviewed(conversation_id) :]
+        if not any(message.role == "user" for message in new):
+            return 0
+        try:
+            llm, model = self._provider(settings, spec or settings.provider)
+        except ServiceError as exc:
+            logger.info("No review of %s: %s", conversation_id, exc)
+            return 0
+        memory = MemoryStore()
+        agent = Agent(
+            llm,
+            ToolRegistry.load(sorted(MEMORY_TOOLS)),
+            self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
+            model=model,
+            language=settings.language,
+            max_iterations=6,
+            action_log=self._action_log,
+            memory=memory,
+            instructions=review.instructions(settings.language),
+        )
+        changes = 0
+        try:
+            async for event in agent.run(Conversation(), review.transcript(new, settings.language)):
+                if isinstance(event, ToolCallFinished) and event.status == "ok":
+                    changes += 1
+        except ProviderError as exc:
+            logger.info("Review of %s failed: %s", conversation_id, exc)
+            return 0  # retried after the next exchange
+        state.mark(conversation_id, len(messages))
+        if changes:
+            self.events.publish(
+                {"type": "memory_updated", "conversation_id": conversation_id, "changes": changes}
+            )
+        return changes
+
+    def memory_info(self) -> Event:
+        """What the assistant remembers (for the settings)."""
+        settings = self.settings()
+        store = MemoryStore()
+        return {
+            "enabled": settings.memory,
+            "review": settings.memory_review,
+            "user": store.read("user"),
+            "notes": store.read("notes"),
+            "skills": [
+                {
+                    "name": skill.name,
+                    "title": skill.title,
+                    "description": skill.description,
+                    "uses": skill.uses,
+                    "updated": skill.updated,
+                }
+                for skill in store.skills()
+            ],
+            "limit": MAX_SECTION,
+        }
+
+    def write_memory(self, section: str, content: str) -> Event:
+        """Replace a notebook with the user's text."""
+        try:
+            MemoryStore().write(section, content)
+        except MemoryRefusedError as exc:
+            raise ServiceError(str(exc), code="invalid") from exc
+        result = self.memory_info()
+        self.events.publish({"type": "memory_updated", "changes": 1})
+        return result
+
+    def delete_skill(self, name: str) -> Event:
+        try:
+            MemoryStore().delete_skill(name)
+        except MemoryRefusedError as exc:
+            raise ServiceError(str(exc), code="not_found") from exc
+        return self.memory_info()
+
+    def forget_memory(self) -> Event:
+        """Erase everything the assistant remembers."""
+        MemoryStore().forget_all()
+        self.events.publish({"type": "memory_updated", "changes": 1})
+        return self.memory_info()
 
     # --- Approvals ------------------------------------------------------------------------
 
@@ -752,6 +884,9 @@ class AssistantService:
 
     async def aclose(self) -> None:
         """Stop running requests and release the providers."""
+        for review_task in list(self._reviews.values()):
+            review_task.cancel()
+        self._reviews.clear()
         for background in self._background:
             background.cancel()
         for background in self._background:

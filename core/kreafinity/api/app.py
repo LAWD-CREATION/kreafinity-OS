@@ -86,6 +86,10 @@ class NewMessage(BaseModel):
     provider: str | None = Field(None, min_length=1, max_length=200)
 
 
+class MemoryText(BaseModel):
+    content: str = Field(max_length=20_000)
+
+
 class ShowRequest(BaseModel):
     conversation_id: str = Field(min_length=1, max_length=100)
 
@@ -227,6 +231,26 @@ def create_app(
     async def cancel(service: Service, conversation_id: str) -> dict[str, str]:
         await service.cancel_run(conversation_id)
         return {"status": "cancelled"}
+
+    # --- Memory ------------------------------------------------------------------------
+
+    @api.get("/memory")
+    async def memory(service: Service) -> dict[str, Any]:
+        return service.memory_info()
+
+    @api.put("/memory/{section}")
+    async def write_memory(service: Service, section: str, body: MemoryText) -> dict[str, Any]:
+        if section not in ("user", "notes"):
+            raise ServiceError("Unknown memory section", code="not_found")
+        return service.write_memory(section, body.content)
+
+    @api.delete("/memory/skills/{name}")
+    async def delete_skill(service: Service, name: str) -> dict[str, Any]:
+        return service.delete_skill(name)
+
+    @api.delete("/memory")
+    async def forget_memory(service: Service) -> dict[str, Any]:
+        return service.forget_memory()
 
     # --- Updates -----------------------------------------------------------------------
 

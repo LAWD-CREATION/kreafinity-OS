@@ -60,13 +60,18 @@ class ToolRegistry:
         self._tools = {tool.name: tool for tool in tools}
 
     @classmethod
-    def load(cls, enabled: Iterable[str] | None = None) -> ToolRegistry:
+    def load(
+        cls, enabled: Iterable[str] | None = None, *, exclude: Iterable[str] = ()
+    ) -> ToolRegistry:
         """Instantiate the registered tools, or only those named in `enabled`.
 
-        Unknown names are ignored with a warning (e.g. a plugin uninstalled).
+        Unknown names are ignored with a warning (e.g. a plugin uninstalled);
+        names in `exclude` are left out (e.g. memory turned off).
         """
         _discover()
         names = sorted(_classes) if enabled is None else list(enabled)
+        excluded = set(exclude)
+        names = [name for name in names if name not in excluded]
         tools: list[Tool] = []
         for name in names:
             tool_class = _classes.get(name)

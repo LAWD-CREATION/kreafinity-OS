@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 from collections.abc import Iterator, Sequence
@@ -21,7 +22,7 @@ from typing import Any
 from kreafinity.paths import data_dir
 from kreafinity.providers.base import Message, ToolCall
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 TITLE_LENGTH = 80
 
 _SCHEMA = """
@@ -47,6 +48,34 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS conversations_by_update ON conversations(updated_at DESC);
 """
+
+# Schema 2: full-text search of what the user and the assistant wrote (accents ignored).
+_SEARCH_SCHEMA = """
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_search USING fts5(
+    content, conversation_id UNINDEXED, position UNINDEXED, role UNINDEXED,
+    tokenize = 'unicode61 remove_diacritics 2'
+);
+CREATE TRIGGER IF NOT EXISTS messages_search_insert AFTER INSERT ON messages
+WHEN new.role IN ('user', 'assistant') AND new.content != '' BEGIN
+    INSERT INTO messages_search (content, conversation_id, position, role)
+    VALUES (new.content, new.conversation_id, new.position, new.role);
+END;
+CREATE TRIGGER IF NOT EXISTS messages_search_delete AFTER DELETE ON messages BEGIN
+    DELETE FROM messages_search
+    WHERE conversation_id = old.conversation_id AND position = old.position;
+END;
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class SearchResult:
+    """A message matching a search."""
+
+    conversation_id: str
+    title: str
+    role: str
+    excerpt: str
+    date: str
 
 
 class ConversationNotFoundError(LookupError):
@@ -118,6 +147,13 @@ class ConversationStore:
                     f"(schema {version}, this version knows {SCHEMA_VERSION})"
                 )
             db.executescript(_SCHEMA)
+            db.executescript(_SEARCH_SCHEMA)
+            if version < 2:  # index the conversations kept before the search existed
+                db.execute(
+                    "INSERT INTO messages_search (content, conversation_id, position, role) "
+                    "SELECT content, conversation_id, position, role FROM messages "
+                    "WHERE role IN ('user', 'assistant') AND content != ''"
+                )
             db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         with self._db() as db:
             db.execute("PRAGMA journal_mode = WAL")
@@ -247,6 +283,34 @@ class ConversationStore:
                 "UPDATE conversations SET updated_at = ?, title = ? WHERE id = ?",
                 (now, title, conversation_id),
             )
+
+    def search(self, query: str, *, limit: int = 8) -> list[SearchResult]:
+        """Messages containing the words of `query` (accents ignored), best first."""
+        words = [word for word in re.findall(r"\w+", query) if len(word) > 1]
+        if not words:
+            return []
+        expression = " OR ".join(f'"{word}"*' for word in words)
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT s.conversation_id, s.role, c.title, m.created_at, "
+                "snippet(messages_search, 0, '«', '»', '…', 16) AS excerpt "
+                "FROM messages_search s "
+                "JOIN conversations c ON c.id = s.conversation_id "
+                "JOIN messages m ON m.conversation_id = s.conversation_id "
+                "AND m.position = s.position "
+                "WHERE messages_search MATCH ? ORDER BY bm25(messages_search) LIMIT ?",
+                (expression, limit),
+            ).fetchall()
+        return [
+            SearchResult(
+                conversation_id=row["conversation_id"],
+                title=row["title"],
+                role=row["role"],
+                excerpt=row["excerpt"],
+                date=row["created_at"],
+            )
+            for row in rows
+        ]
 
     def replace_messages(self, conversation_id: str, messages: Sequence[Message]) -> None:
         """Replace all the messages of a conversation."""

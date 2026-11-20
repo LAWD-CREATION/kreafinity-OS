@@ -117,6 +117,43 @@ def version() -> None:
     console.print(f"Kreafinity OS [bold]{__version__}[/bold]{detail}")
 
 
+@app.command("memory")
+def memory_command(
+    forget: Annotated[
+        bool, typer.Option("--forget", "--oublier", help="Tout effacer (notes et savoir-faire).")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+) -> None:
+    """Montre ce dont Kreafinity se souvient de vous, ou l'efface."""
+    from kreafinity.memory import MemoryStore
+
+    _load_settings()
+    store = MemoryStore()
+    if forget:
+        if not yes and not typer.confirm(t("memory.cli.forget_confirm"), default=False):
+            raise typer.Exit(1)
+        store.forget_all()
+        console.print(Text(t("memory.cli.forgotten"), style="green"))
+        return
+    if store.is_empty():
+        console.print(t("memory.cli.empty"))
+        return
+    for section in ("user", "notes"):
+        entries = store.entries(section)
+        if entries:
+            console.print(Text(t(f"memory.cli.{section}"), style="bold"))
+            for entry in entries:
+                console.print(Text(f"  • {entry}"))
+    skills = store.skills()
+    if skills:
+        console.print(Text(t("memory.cli.skills"), style="bold"))
+        for skill in skills:
+            console.print(Text(f"  • {skill.title} — {skill.description}"))
+    console.print(Text(t("memory.cli.where", path=store.folder), style="dim"))
+
+
 @app.command("update")
 def update_command(
     check_only: Annotated[
@@ -873,15 +910,18 @@ def _build_agent(settings: Settings, provider_spec: str | None) -> Agent:
     except _UserError as exc:
         err_console.print(Text(str(exc), style="red"))
         raise typer.Exit(2) from exc
+    from kreafinity.memory import MEMORY_TOOLS, MemoryStore
+
     return Agent(
         provider,
-        ToolRegistry.load(settings.tools),
+        ToolRegistry.load(settings.tools, exclude=() if settings.memory else MEMORY_TOOLS),
         ToolContext.create(allowed_paths=settings.allowed_paths),
         model=model,
         language=settings.language,
         max_iterations=settings.max_iterations,
         action_log=ActionLog(),
         fallback=fallback,
+        memory=MemoryStore() if settings.memory else None,
     )
 
 

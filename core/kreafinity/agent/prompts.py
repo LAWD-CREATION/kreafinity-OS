@@ -96,6 +96,7 @@ def build_system_prompt(
     allowed_roots: Sequence[Path],
     user_dirs: Mapping[str, Path],
     today: date | None = None,
+    memory: bool = False,
 ) -> str:
     """Return the system prompt in `language` (French and English built in).
 
@@ -111,7 +112,7 @@ def build_system_prompt(
         for key, path in user_dirs.items()
     ]
     dirs_text = "\n".join([_USER_DIRS_HEADER[lang], *lines]) if lines else ""
-    return (
+    prompt = (
         _PROMPTS[lang]
         .format(
             allowed=", ".join(str(p) for p in allowed_roots),
@@ -122,3 +123,28 @@ def build_system_prompt(
         )
         .rstrip()
     )
+    if memory:
+        prompt += "\n\n" + _MEMORY_RULES[lang]
+    return prompt
+
+
+_MEMORY_RULES = {
+    "fr": """\
+Mémoire :
+- Tu te souviens d'une conversation à l'autre. Quand tu apprends quelque chose de durable \
+sur l'utilisateur (prénom, préférences, habitudes) ou qu'il te corrige, enregistre-le avec \
+l'outil memory ; corrige ce qui devient faux.
+- Avant une tâche semblable à l'un de tes savoir-faire, lis-le avec l'outil skill. Après une \
+tâche en plusieurs étapes réussie, enregistre ou améliore le savoir-faire correspondant.
+- Pour retrouver ce qui a été dit dans une conversation passée, utilise search_conversations.
+- N'enregistre jamais de mot de passe, de clé ni de donnée sensible.""",
+    "en": """\
+Memory:
+- You remember things from one conversation to the next. When you learn something durable \
+about the user (name, preferences, habits) or they correct you, save it with the memory tool; \
+fix what becomes wrong.
+- Before a task similar to one of your skills, read it with the skill tool. After succeeding \
+at a multi-step task, save or improve the matching skill.
+- To recall what was said in a past conversation, use search_conversations.
+- Never save passwords, keys or sensitive data.""",
+}

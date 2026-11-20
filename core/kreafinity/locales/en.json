@@ -152,5 +152,12 @@
   "update.cli.hint": "To install it: kreafinity update",
   "update.cli.confirm": "Install the update now?",
   "update.cli.failed": "The update failed: {detail}",
-  "update.cli.done": "Kreafinity is up to date. KDE desktop parts refresh at the next session."
+  "update.cli.done": "Kreafinity is up to date. KDE desktop parts refresh at the next session.",
+  "memory.cli.empty": "Kreafinity does not remember anything yet.",
+  "memory.cli.user": "What Kreafinity knows about you:",
+  "memory.cli.notes": "What Kreafinity has learned:",
+  "memory.cli.skills": "Learned skills:",
+  "memory.cli.where": "Files: {path} (also editable in the interface's settings)",
+  "memory.cli.forget_confirm": "Erase everything Kreafinity remembers? Your conversations are kept.",
+  "memory.cli.forgotten": "Kreafinity forgot everything."
 }
