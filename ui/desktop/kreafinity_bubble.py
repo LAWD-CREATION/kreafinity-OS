@@ -386,9 +386,8 @@ class Bubble:
             self.hide_panel()
         elif kind == "expand":
             self.open_full()
-        elif kind == "show":  # a desktop search sent a question: show the answer
-            if not self.panel.get_visible():
-                self.show_panel()
+        elif kind == "show" and not self.panel.get_visible():
+            self.show_panel()  # a desktop search sent a question: show the answer
 
     def on_policy(self, view: Any, decision: Any, decision_type: Any) -> bool:
         WebKit2 = self.m["WebKit2"]
