@@ -68,6 +68,7 @@ packages = ["core/kreafinity"]
 # The web interface ships inside the package (kreafinity/web).
 "ui/web" = "kreafinity/web"
 "ui/desktop" = "kreafinity/desktop"
+"ui/plasma" = "kreafinity/plasma_assets"
 
 # --- Quality tools -----------------------------------------------------------
 

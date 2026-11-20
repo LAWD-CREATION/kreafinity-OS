@@ -56,6 +56,16 @@ kreafinity bubble                         # affiche la bulle (kreafinity bulle m
 kreafinity bubble --autostart             # l'afficher à chaque ouverture de session
 ```
 
+**Sur KDE Plasma** (étape 2, en cours), Kreafinity s'intègre au bureau : une question tapée dans
+le menu démarrer est envoyée à l'assistant, un bouton ∞ dans la barre des tâches ouvre le
+panneau, et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
+[docs/bureau-kde.md](docs/bureau-kde.md).
+```bash
+kreafinity desktop install --theme        # recherche, bouton de la barre des tâches, couleurs
+```
+
+![Une question posée depuis le menu démarrer de KDE Plasma](docs/img/plasma-panneau.jpg)
+
 En ligne de commande :
 ```bash
 kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
@@ -87,7 +97,7 @@ git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
 python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 pytest
 ```
-Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
+Guides : [bureau KDE Plasma](docs/bureau-kde.md), [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
 [ajouter un outil](docs/ajouter-un-outil.md), [interface web](docs/interface-web.md).
 
 ---
@@ -127,7 +137,9 @@ kreafinity chat --provider anthropic      # or openai, mistral, ollama-cloud, op
 ```
 The web interface streams answers, lets you pick the AI and shows every action on the computer
 before it happens. `kreafinity bubble` adds a small round button at the bottom right of the desktop:
-click it to ask something in a compact panel. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
+click it to ask something in a compact panel. On KDE Plasma, `kreafinity desktop install` adds an
+"Ask Kreafinity" result to the start menu search, an assistant button to the taskbar and a
+Windows-like Kreafinity theme (see `docs/bureau-kde.md`). `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
 resumes one. Set `language: en` in `~/.config/kreafinity/config.yaml` (or in the settings) for
 English. The daemon's local API is described in `docs/api.md`.
 

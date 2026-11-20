@@ -85,6 +85,10 @@ class NewMessage(BaseModel):
     provider: str | None = Field(None, min_length=1, max_length=200)
 
 
+class ShowRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=100)
+
+
 class ApprovalDecision(BaseModel):
     approved: StrictBool
 
@@ -222,6 +226,22 @@ def create_app(
         await service.cancel_run(conversation_id)
         return {"status": "cancelled"}
 
+    # --- Assistant panels (bubble, Plasma widget) ---------------------------------------
+
+    @api.post("/ui/show")
+    async def show_conversation(service: Service, body: ShowRequest) -> dict[str, Any]:
+        """Ask the panels to show a conversation; ``delivered`` says if one listens."""
+        return await service.show_conversation(body.conversation_id)
+
+    @api.get("/ui/requests")
+    async def ui_requests(
+        service: Service,
+        after: Annotated[int | None, Query(ge=0)] = None,
+        wait: Annotated[float, Query(ge=0, le=60)] = 25,
+    ) -> dict[str, Any]:
+        """Long polling for panels without a WebSocket: the requests after `after`."""
+        return await service.wait_ui_requests(after, wait)
+
     # --- Approvals ---------------------------------------------------------------------
 
     @api.get("/approvals")
@@ -299,7 +319,8 @@ def create_app(
             return
 
         service: AssistantService = websocket.app.state.service
-        subscription = service.events.subscribe()
+        # ?panel=1: a compact assistant panel, which can show a conversation when asked.
+        subscription = service.events.subscribe(panel=websocket.query_params.get("panel") == "1")
         try:
             await websocket.send_json(
                 {

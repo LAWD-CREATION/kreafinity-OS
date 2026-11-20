@@ -29,6 +29,10 @@ Lancez cette commande **sans** `sudo`. Le script :
    Ollama Cloud, Claude, GPT, Mistral ou OpenRouter ; ou plus tard ;
 6. affiche la bulle.
 
+Sur **KDE Plasma**, la bulle est remplacée par l'intégration au bureau (recherche dans le menu
+démarrer, bouton ∞ dans la barre des tâches) ; le script propose aussi le thème Kreafinity et,
+si vous le voulez, une disposition à la façon de Windows. Voir [bureau-kde.md](bureau-kde.md).
+
 Ensuite, essayez par exemple : « Montre-moi les 5 plus gros fichiers de mon dossier
 Téléchargements et mets-les à la corbeille ». L'IA liste les fichiers, vous montre ce qu'elle
 s'apprête à faire et attend votre accord.
@@ -47,6 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 | `--provider=NOM` | IA à configurer : `ollama`, `ollama-cloud`, `anthropic`, `openai`, `mistral`, `openrouter` ou `later` |
 | `--no-system-packages` | ne rien installer avec apt (les paquets absents sont seulement signalés) |
 | `--no-bubble` | pas de bulle sur le bureau (serveur, session sans écran) |
+| `--no-plasma` | ne pas intégrer Kreafinity à KDE Plasma (recherche, bouton, thème) |
 | `--allow-root` | autoriser l'installation pour root (conteneurs de test uniquement) |
 | `--help` | afficher l'aide |
 

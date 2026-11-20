@@ -1,4 +1,4 @@
-"""Location of the interfaces' files: web interface and desktop bubble."""
+"""Location of the interfaces' files: web interface, desktop bubble, Plasma add-ons."""
 
 from __future__ import annotations
 
@@ -28,3 +28,8 @@ def bubble_script() -> Path | None:
     """The desktop bubble program (``ui/desktop/kreafinity_bubble.py``)."""
     folder = _find("desktop", "desktop", "kreafinity_bubble.py")
     return folder / "kreafinity_bubble.py" if folder else None
+
+
+def plasma_assets() -> Path | None:
+    """Plasma add-ons: search plugin, taskbar widget, theme (``ui/plasma`` in a checkout)."""
+    return _find("plasma_assets", "plasma", "krunner/kreafinity.desktop")

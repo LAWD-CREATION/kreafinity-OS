@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Authors": [{"Email": "contact@kreafinity.com", "Name": "Kreafinity"}],
+        "Id": "Kreafinity",
+        "License": "CC-BY-SA-4.0",
+        "Name": "Kreafinity"
+    }
+}

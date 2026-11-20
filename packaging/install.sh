@@ -12,6 +12,7 @@
 #                             mistral, openrouter, later
 #   --no-system-packages      ne pas installer de paquets système (apt)
 #   --no-bubble               ne pas afficher la bulle sur le bureau
+#   --no-plasma               ne pas intégrer Kreafinity à KDE Plasma (recherche, widget, thème)
 #   --allow-root              autoriser l'installation pour root (conteneurs de test)
 #   --help, -h                afficher cette aide
 #
@@ -34,6 +35,7 @@ provider=""
 system_packages=1
 bubble=1
 allow_root=0
+plasma_integration=1
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m' VIOLET=$'\033[1;35m' YELLOW=$'\033[1;33m' RED=$'\033[1;31m' RESET=$'\033[0m'
@@ -52,7 +54,7 @@ usage() {
   if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   else # read from a pipe (curl … | bash -s -- --help)
-    echo "Options : --yes, --provider=NOM, --no-system-packages, --no-bubble, --allow-root"
+    echo "Options : --yes, --provider=NOM, --no-system-packages, --no-bubble, --no-plasma, --allow-root"
     echo "Aide complète : $REPOSITORY/blob/main/docs/installation.md"
   fi
   exit 0
@@ -64,6 +66,7 @@ for argument in "$@"; do
     --provider=*) provider="${argument#--provider=}" ;;
     --no-system-packages) system_packages=0 ;;
     --no-bubble) bubble=0 ;;
+    --no-plasma) plasma_integration=0 ;;
     --allow-root) allow_root=1 ;;
     --help | -h) usage ;;
     *) die "Option inconnue : $argument (voir --help)" ;;
@@ -86,6 +89,17 @@ ask() {
   printf '%s?%s %s [O/n] ' "$BOLD" "$RESET" "$1" >/dev/tty
   read -r answer </dev/tty || answer=""
   [[ -z "$answer" || "$answer" =~ ^[oOyY] ]]
+}
+
+# The same, for changes the user must choose explicitly: "no" by default and with --yes.
+ask_no() {
+  local answer=""
+  if ((assume_yes)) || ! has_tty; then
+    return 1
+  fi
+  printf '%s?%s %s [o/N] ' "$BOLD" "$RESET" "$1" >/dev/tty
+  read -r answer </dev/tty || answer=""
+  [[ "$answer" =~ ^[oOyY] ]]
 }
 
 # --- Checks -------------------------------------------------------------------------
@@ -115,6 +129,13 @@ available() { apt-cache show "$1" >/dev/null 2>&1; }
 # --- System packages (apt) ----------------------------------------------------------------
 
 python="$(find_python || true)"
+# KDE Plasma: the taskbar widget and the start menu search replace the bubble.
+plasma=""
+if ((plasma_integration)) && [[ "${XDG_CURRENT_DESKTOP:-}" == *KDE* || -n "${KDE_SESSION_VERSION:-}" ]]; then
+  plasma="${KDE_SESSION_VERSION:-6}"
+  bubble=0
+fi
+
 packages=()
 if [[ -z "$python" ]]; then
   packages+=(python3.11 python3.11-venv) # Ubuntu 22.04: Python 3.10 by default
@@ -130,6 +151,11 @@ if ! command -v pkexec >/dev/null; then
   else
     packages+=(pkexec)
   fi
+fi
+if [[ "$plasma" == 5 ]]; then
+  packages+=(qml-module-qtwebengine) # the taskbar widget shows the assistant with it
+elif [[ -n "$plasma" ]]; then
+  packages+=(qml6-module-qtwebengine)
 fi
 if ((bubble)); then
   packages+=(python3-gi python3-gi-cairo gir1.2-gtk-3.0)
@@ -196,6 +222,18 @@ if ((bubble)); then
   "${kreafinity[@]}" setup
 else
   "${kreafinity[@]}" setup --no-bubble
+fi
+
+if [[ -n "$plasma" ]]; then
+  say "KDE Plasma $plasma détecté : recherche « Demander à Kreafinity » et widget de la barre des tâches"
+  desktop=(desktop install --plasma "$plasma")
+  if ask "Appliquer le thème Kreafinity (couleurs et fond d'écran) ?"; then
+    desktop+=(--theme)
+  fi
+  if ask_no "Réorganiser le bureau à la façon de Windows (vos panneaux actuels seront remplacés) ?"; then
+    desktop+=(--layout --yes)
+  fi
+  "${kreafinity[@]}" "${desktop[@]}" || warn "Intégration à Plasma incomplète : « kreafinity desktop install » plus tard."
 fi
 
 # --- Choice of the AI ----------------------------------------------------------------------------
@@ -271,7 +309,9 @@ fi
 
 echo
 say "${BOLD}Kreafinity est installé !${RESET}"
-if ((bubble)); then
+if [[ -n "$plasma" ]]; then
+  echo "  • Le bouton ∞ de la barre des tâches, ou tapez votre question dans le menu démarrer"
+elif ((bubble)); then
   echo "  • La bulle en bas à droite de l'écran : un clic pour poser une question"
 fi
 echo "  • L'interface complète : « Kreafinity » dans le menu des applications, ou : kreafinity ui"

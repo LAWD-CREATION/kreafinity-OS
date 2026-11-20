@@ -15,7 +15,9 @@ import json
 import logging
 import os
 import pwd
+import time
 import uuid
+from collections import deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -73,6 +75,8 @@ APPROVAL_TIMEOUT = 600.0
 EVENT_QUEUE_SIZE = 5000
 #: Length of the tool output excerpt sent with ``tool_finished`` events.
 TOOL_RESULT_EXCERPT = 2000
+#: A request to show a conversation is ignored by panels after this many seconds.
+UI_REQUEST_MAX_AGE = 60.0
 
 ErrorCode = Literal[
     "not_found",
@@ -107,10 +111,16 @@ def _now() -> str:
 
 
 class Subscription:
-    """The events received by one client (e.g. one WebSocket connection)."""
+    """The events received by one client (e.g. one WebSocket connection).
 
-    def __init__(self, maxsize: int = EVENT_QUEUE_SIZE) -> None:
+    Attributes:
+        panel: The client is a compact assistant panel (desktop bubble, Plasma
+            widget), able to show a conversation when asked.
+    """
+
+    def __init__(self, maxsize: int = EVENT_QUEUE_SIZE, *, panel: bool = False) -> None:
         self._queue: asyncio.Queue[Event] = asyncio.Queue(maxsize)
+        self.panel = panel
 
     async def get(self) -> Event:
         """Wait for the next event."""
@@ -125,11 +135,15 @@ class EventHub:
         self._queue_size = queue_size
         self._seq = 0
 
-    def subscribe(self) -> Subscription:
-        """Start receiving events."""
-        subscription = Subscription(self._queue_size)
+    def subscribe(self, *, panel: bool = False) -> Subscription:
+        """Start receiving events (`panel`: the client is an assistant panel)."""
+        subscription = Subscription(self._queue_size, panel=panel)
         self._subscribers.add(subscription)
         return subscription
+
+    def panel_count(self) -> int:
+        """Number of assistant panels currently listening."""
+        return sum(1 for subscription in self._subscribers if subscription.panel)
 
     def unsubscribe(self, subscription: Subscription) -> None:
         """Stop receiving events."""
@@ -151,6 +165,51 @@ class EventHub:
                 while not subscription._queue.empty():
                     subscription._queue.get_nowait()
                 subscription._queue.put_nowait({"seq": self._seq, "type": "resync_required"})
+
+
+class UiRequests:
+    """Requests to show a conversation, for panels polling over HTTP (Plasma widget).
+
+    Each request is numbered; a panel asks for the requests after the last
+    number it saw, waiting until one arrives.
+    """
+
+    def __init__(self, keep: int = 20) -> None:
+        self._items: deque[tuple[int, float, Event]] = deque(maxlen=keep)
+        self._seq = 0
+        self._changed = asyncio.Condition()
+        self.waiting = 0
+
+    @property
+    def last(self) -> int:
+        return self._seq
+
+    async def push(self, request: Event) -> None:
+        async with self._changed:
+            self._seq += 1
+            self._items.append((self._seq, time.monotonic(), {"seq": self._seq, **request}))
+            self._changed.notify_all()
+
+    async def wait(self, after: int | None, timeout: float) -> tuple[list[Event], int]:
+        """Requests numbered after `after`, waiting up to `timeout` seconds for one.
+
+        Without `after` (a panel starting), nothing old is replayed: only the
+        current number is returned, to ask from.
+        """
+        if after is None or after > self._seq:  # starting, or the daemon restarted
+            return [], self._seq
+        self.waiting += 1
+        try:
+            async with self._changed:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(
+                        self._changed.wait_for(lambda: self._seq > after), timeout
+                    )
+                oldest = time.monotonic() - UI_REQUEST_MAX_AGE
+                fresh = [event for seq, at, event in self._items if seq > after and at >= oldest]
+                return fresh, self._seq
+        finally:
+            self.waiting -= 1
 
 
 # --- Runs and approvals --------------------------------------------------------------------
@@ -233,6 +292,7 @@ class AssistantService:
         """
         self.store = store
         self.events = EventHub()
+        self.ui_requests = UiRequests()
         self.approval_timeout = approval_timeout
         self._load_settings = settings_loader
         self._provider_factory = provider_factory
@@ -417,6 +477,24 @@ class AssistantService:
         info = self._info(conversation_id)
         info["messages"] = [message_to_dict(m) for m in self.store.messages(conversation_id)]
         return info
+
+    async def show_conversation(self, conversation_id: str) -> Event:
+        """Ask the assistant panels to show a conversation (e.g. after a desktop search).
+
+        Returns:
+            ``delivered``: how many panels were listening (0: nobody will show it).
+        """
+        self._info(conversation_id)  # must exist
+        request = {"type": "show_conversation", "conversation_id": conversation_id}
+        delivered = self.events.panel_count() + self.ui_requests.waiting
+        self.events.publish(request)
+        await self.ui_requests.push(request)
+        return {"delivered": delivered}
+
+    async def wait_ui_requests(self, after: int | None, timeout: float) -> Event:
+        """Requests to show a conversation, for a panel polling over HTTP."""
+        requests, last = await self.ui_requests.wait(after, timeout)
+        return {"requests": requests, "last": last}
 
     def rename_conversation(self, conversation_id: str, title: str) -> Event:
         """Change the title of a conversation."""
