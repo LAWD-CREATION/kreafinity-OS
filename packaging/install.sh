@@ -8,9 +8,11 @@
 #
 # Options :
 #   --yes, -y                 répondre oui à toutes les questions
-#   --provider=NOM            IA à configurer : ollama, anthropic, openai, mistral, later
+#   --provider=NOM            IA à configurer : ollama, ollama-cloud, anthropic, openai,
+#                             mistral, openrouter, later
 #   --no-system-packages      ne pas installer de paquets système (apt)
 #   --no-bubble               ne pas afficher la bulle sur le bureau
+#   --no-plasma               ne pas intégrer Kreafinity à KDE Plasma (recherche, widget, thème)
 #   --allow-root              autoriser l'installation pour root (conteneurs de test)
 #   --help, -h                afficher cette aide
 #
@@ -33,6 +35,7 @@ provider=""
 system_packages=1
 bubble=1
 allow_root=0
+plasma_integration=1
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m' VIOLET=$'\033[1;35m' YELLOW=$'\033[1;33m' RED=$'\033[1;31m' RESET=$'\033[0m'
@@ -51,7 +54,7 @@ usage() {
   if [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   else # read from a pipe (curl … | bash -s -- --help)
-    echo "Options : --yes, --provider=NOM, --no-system-packages, --no-bubble, --allow-root"
+    echo "Options : --yes, --provider=NOM, --no-system-packages, --no-bubble, --no-plasma, --allow-root"
     echo "Aide complète : $REPOSITORY/blob/main/docs/installation.md"
   fi
   exit 0
@@ -63,6 +66,7 @@ for argument in "$@"; do
     --provider=*) provider="${argument#--provider=}" ;;
     --no-system-packages) system_packages=0 ;;
     --no-bubble) bubble=0 ;;
+    --no-plasma) plasma_integration=0 ;;
     --allow-root) allow_root=1 ;;
     --help | -h) usage ;;
     *) die "Option inconnue : $argument (voir --help)" ;;
@@ -70,8 +74,8 @@ for argument in "$@"; do
 done
 
 case "$provider" in
-  "" | ollama | anthropic | openai | mistral | later) ;;
-  *) die "IA inconnue : $provider (ollama, anthropic, openai, mistral ou later)" ;;
+  "" | ollama | ollama-cloud | anthropic | openai | mistral | openrouter | later) ;;
+  *) die "IA inconnue : $provider (ollama, ollama-cloud, anthropic, openai, mistral, openrouter ou later)" ;;
 esac
 
 # Questions are read from the terminal, even when this script comes through a pipe.
@@ -85,6 +89,17 @@ ask() {
   printf '%s?%s %s [O/n] ' "$BOLD" "$RESET" "$1" >/dev/tty
   read -r answer </dev/tty || answer=""
   [[ -z "$answer" || "$answer" =~ ^[oOyY] ]]
+}
+
+# The same, for changes the user must choose explicitly: "no" by default and with --yes.
+ask_no() {
+  local answer=""
+  if ((assume_yes)) || ! has_tty; then
+    return 1
+  fi
+  printf '%s?%s %s [o/N] ' "$BOLD" "$RESET" "$1" >/dev/tty
+  read -r answer </dev/tty || answer=""
+  [[ "$answer" =~ ^[oOyY] ]]
 }
 
 # --- Checks -------------------------------------------------------------------------
@@ -111,9 +126,30 @@ find_python() {
 installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
 available() { apt-cache show "$1" >/dev/null 2>&1; }
 
+# Current commit of a branch on GitHub ("owner/name" "branch"); empty if unknown.
+latest_commit() {
+  "$VENV/bin/python" -c '
+import sys, urllib.request
+request = urllib.request.Request(
+    "https://api.github.com/repos/%s/commits/%s" % (sys.argv[1], sys.argv[2]),
+    headers={"Accept": "application/vnd.github.sha", "User-Agent": "Kreafinity"},
+)
+commit = urllib.request.urlopen(request, timeout=20).read().decode().strip()
+if len(commit) == 40 and all(char in "0123456789abcdef" for char in commit):
+    print(commit)
+' "$1" "$2" 2>/dev/null || true
+}
+
 # --- System packages (apt) ----------------------------------------------------------------
 
 python="$(find_python || true)"
+# KDE Plasma: the taskbar widget and the start menu search replace the bubble.
+plasma=""
+if ((plasma_integration)) && [[ "${XDG_CURRENT_DESKTOP:-}" == *KDE* || -n "${KDE_SESSION_VERSION:-}" ]]; then
+  plasma="${KDE_SESSION_VERSION:-6}"
+  bubble=0
+fi
+
 packages=()
 if [[ -z "$python" ]]; then
   packages+=(python3.11 python3.11-venv) # Ubuntu 22.04: Python 3.10 by default
@@ -122,6 +158,19 @@ elif ! "$python" -c 'import ensurepip, venv' 2>/dev/null; then
   packages+=("python$version-venv")
 fi
 packages+=(libglib2.0-bin xdg-utils)
+# Administrator rights for software installation, through polkit's password dialog.
+if ! command -v pkexec >/dev/null; then
+  if command -v apt-cache >/dev/null && ! available pkexec; then
+    packages+=(policykit-1) # Ubuntu 22.04, Debian 11
+  else
+    packages+=(pkexec)
+  fi
+fi
+if [[ "$plasma" == 5 ]]; then
+  packages+=(qml-module-qtwebengine) # the taskbar widget shows the assistant with it
+elif [[ -n "$plasma" ]]; then
+  packages+=(qml6-module-qtwebengine)
+fi
 if ((bubble)); then
   packages+=(python3-gi python3-gi-cairo gir1.2-gtk-3.0)
   if command -v apt-cache >/dev/null && ! available gir1.2-webkit2-4.1 && available gir1.2-webkit2-4.0; then
@@ -168,11 +217,26 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   "$python" -m venv "$VENV"
 fi
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade pip
+
+# From GitHub, install the branch's current commit exactly, and remember it:
+# Kreafinity then knows when an update is available.
+commit=""
+if [[ -z "${KREAFINITY_SOURCE:-}" ]]; then
+  commit="$(latest_commit "${REPOSITORY#https://github.com/}" "$REF")"
+  if [[ -n "$commit" ]]; then
+    SOURCE="$REPOSITORY/archive/$commit.tar.gz"
+  fi
+fi
+
 say "Installation de Kreafinity et de ses dépendances (quelques minutes)…"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade "$SOURCE"
-# A local folder keeps the same version number: make sure its latest code is used.
-if [[ -d "$SOURCE" ]]; then
-  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --force-reinstall --no-deps "$SOURCE"
+# Versions share their number between releases: when Kreafinity was already
+# installed, pip keeps the old files. Make sure the new code is used.
+"$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --force-reinstall --no-deps "$SOURCE"
+if [[ -z "${KREAFINITY_SOURCE:-}" ]]; then
+  "$VENV/bin/python" -m kreafinity.update record "$REPOSITORY" "$REF" "$commit"
+else
+  rm -f "$DATA_DIR/install.json" # your own copy: you update it yourself
 fi
 
 mkdir -p "$BIN_DIR"
@@ -189,6 +253,18 @@ else
   "${kreafinity[@]}" setup --no-bubble
 fi
 
+if [[ -n "$plasma" ]]; then
+  say "KDE Plasma $plasma détecté : recherche « Demander à Kreafinity » et widget de la barre des tâches"
+  desktop=(desktop install --plasma "$plasma")
+  if ask "Appliquer le thème Kreafinity (couleurs et fond d'écran) ?"; then
+    desktop+=(--theme)
+  fi
+  if ask_no "Réorganiser le bureau à la façon de Windows (vos panneaux actuels seront remplacés) ?"; then
+    desktop+=(--layout --yes)
+  fi
+  "${kreafinity[@]}" "${desktop[@]}" || warn "Intégration à Plasma incomplète : « kreafinity desktop install » plus tard."
+fi
+
 # --- Choice of the AI ----------------------------------------------------------------------------
 
 if [[ -z "$provider" ]]; then
@@ -199,18 +275,22 @@ if [[ -z "$provider" ]]; then
 
 ${BOLD}Quelle intelligence artificielle voulez-vous utiliser ?${RESET}
   1) Ollama — sur cet ordinateur : gratuit, privé, hors ligne (environ 5 Go à télécharger)
-  2) Claude (Anthropic) — en ligne, avec une clé API
-  3) GPT (OpenAI) — en ligne, avec une clé API
-  4) Mistral AI — en ligne, avec une clé API
-  5) Plus tard
+  2) Ollama Cloud — les grands modèles d'Ollama en ligne, avec une clé API
+  3) Claude (Anthropic) — en ligne, avec une clé API
+  4) GPT (OpenAI) — en ligne, avec une clé API
+  5) Mistral AI — en ligne, avec une clé API
+  6) OpenRouter — des centaines de modèles avec une seule clé API
+  7) Plus tard
 EOF
-    printf '%s?%s Votre choix [1-5] : ' "$BOLD" "$RESET" >/dev/tty
-    read -r choice </dev/tty || choice=5
+    printf '%s?%s Votre choix [1-7] : ' "$BOLD" "$RESET" >/dev/tty
+    read -r choice </dev/tty || choice=7
     case "$choice" in
       1) provider="ollama" ;;
-      2) provider="anthropic" ;;
-      3) provider="openai" ;;
-      4) provider="mistral" ;;
+      2) provider="ollama-cloud" ;;
+      3) provider="anthropic" ;;
+      4) provider="openai" ;;
+      5) provider="mistral" ;;
+      6) provider="openrouter" ;;
       *) provider="later" ;;
     esac
   fi
@@ -237,7 +317,7 @@ case "$provider" in
     fi
     "${kreafinity[@]}" provider use "ollama/$OLLAMA_MODEL"
     ;;
-  anthropic | openai | mistral)
+  ollama-cloud | anthropic | openai | mistral | openrouter)
     if has_tty; then
       "${kreafinity[@]}" provider key "$provider" </dev/tty || warn "Clé non enregistrée : « kreafinity provider key $provider » plus tard."
     else
@@ -258,7 +338,9 @@ fi
 
 echo
 say "${BOLD}Kreafinity est installé !${RESET}"
-if ((bubble)); then
+if [[ -n "$plasma" ]]; then
+  echo "  • Le bouton ∞ de la barre des tâches, ou tapez votre question dans le menu démarrer"
+elif ((bubble)); then
   echo "  • La bulle en bas à droite de l'écran : un clic pour poser une question"
 fi
 echo "  • L'interface complète : « Kreafinity » dans le menu des applications, ou : kreafinity ui"

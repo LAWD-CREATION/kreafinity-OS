@@ -80,6 +80,11 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:27494/api/conversations
 | `GET` | `/api/tools` | Outils, niveau de risque, activé ou non |
 | `GET` | `/api/config` | Réglages |
 | `PATCH` | `/api/config` | Modifier des réglages (validés ensemble) : `{"language": "en", …}` |
+| `GET` | `/api/update` | Version installée, mise à jour disponible (`available`, `latest`, `changes`), progression (`status`) |
+| `POST` | `/api/update/check` | Chercher une mise à jour maintenant (`400` pour une copie de développement, `503` si GitHub ne répond pas) |
+| `POST` | `/api/update` | Installer la mise à jour disponible → `202` ; le démon redémarre ensuite |
+| `POST` | `/api/ui/show` | Demander aux panneaux (bulle, widget Plasma) d'afficher une conversation : `{"conversation_id": "…"}` → `{"delivered": n}` (0 : aucun panneau n'écoute) |
+| `GET` | `/api/ui/requests?after=N&wait=25` | Pour un panneau sans WebSocket : attend la prochaine demande d'affichage après la n° `N` (sans `after` : renvoie seulement le dernier numéro) → `{"requests": […], "last": N}` |
 
 Envoyer un message accepte aussi `"provider": "anthropic/claude-opus-5-5"` : la conversation
 continue avec ce fournisseur, qui est mémorisé pour elle. Une seule demande à la fois par
@@ -97,6 +102,8 @@ renvoient `422`.
 
 Après l'authentification, le démon envoie `ready` (avec les demandes en cours et les
 validations en attente), puis tous les événements, numérotés dans l'ordre (`seq`).
+Un panneau d'assistant compact (bulle, widget Plasma) se connecte à `/api/events?panel=1` :
+il compte alors parmi les panneaux capables d'afficher une conversation (`/api/ui/show`).
 
 | `type` | Contenu principal |
 |---|---|
@@ -112,6 +119,9 @@ validations en attente), puis tous les événements, numérotés dans l'ordre (`
 | `conversation_updated` / `conversation_deleted` | Conversation modifiée (titre, état…) / supprimée |
 | `config_updated` | Nouveaux réglages |
 | `providers_updated` | Clé API enregistrée ou retirée (`provider`, `api_key`) |
+| `update_available` | `update` : une nouvelle version est publiée (même contenu que `GET /api/update`) |
+| `update_started` | `target` : installation lancée ; le démon va redémarrer |
+| `show_conversation` | `conversation_id` : une recherche du bureau a posé une question, les panneaux l'affichent |
 | `resync_required` | Client trop lent : se reconnecter et recharger l'état |
 
 Les événements des demandes portent `conversation_id` et `run_id`.

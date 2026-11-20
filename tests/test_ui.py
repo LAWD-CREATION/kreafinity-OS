@@ -24,6 +24,18 @@ from fake_ollama import FakeOllama, tool_call, words
 playwright_api = pytest.importorskip("playwright.sync_api")
 
 SERVE = "from kreafinity.api.server import main; main()"
+SLOW_ANSWER = "Voici une réponse donnée lentement, mot après mot, jusqu'à la fin de la phrase."
+
+
+class SlowWords(list[dict[str, Any]]):
+    """Answer pieces streamed with a pause between them (a slow model)."""
+
+    def __iter__(self) -> Iterator[dict[str, Any]]:
+        for piece in super().__iter__():
+            time.sleep(0.15)
+            yield piece
+
+
 XSS_TEXT = (
     'Voici <img src=x onerror="window.__xss=1"> et '
     "[un lien](javascript:window.__xss=2) puis [Kreafinity](https://kreafinity.com)."
@@ -37,6 +49,8 @@ def scenario(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     results = [m for m in messages[last_user:] if m["role"] == "tool"]
     if "XSS" in request:
         return words(XSS_TEXT)
+    if "lentement" in request:
+        return SlowWords(words(SLOW_ANSWER))
     if "plus gros fichiers" not in request:
         return words("Bonjour ! Je suis **Kreafinity**, votre assistant.")
     if not results:
@@ -237,3 +251,152 @@ def test_compact_panel_of_the_desktop_bubble(browser: Any, daemon: str, download
     assert messages()[-1] == {"type": "close"}
     assert errors == []
     context.close()
+
+
+def test_panel_shows_a_question_from_the_desktop_search(
+    browser: Any, daemon: str, tmp_path: Path
+) -> None:
+    """A desktop search asks while the answer streams: the panel shows all of it."""
+    context = browser.new_context(viewport={"width": 400, "height": 620}, locale="fr-FR")
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.add_init_script(
+        "window.__messages = [];"
+        "window.webkit = {messageHandlers: {kreafinity: {"
+        "postMessage: (message) => window.__messages.push(JSON.parse(message))}}};"
+    )
+    page.goto(f"{daemon}/?compact=1")
+    page.wait_for_selector("#connection.online")
+
+    token = (tmp_path / "xdg-data" / "kreafinity" / "token").read_text().strip()
+    auth = {"Authorization": f"Bearer {token}"}
+    conversation = httpx.post(f"{daemon}/api/conversations", headers=auth, timeout=5).json()
+    httpx.post(
+        f"{daemon}/api/conversations/{conversation['id']}/messages",
+        json={"content": "Réponds lentement"},
+        headers=auth,
+        timeout=5,
+    )
+    time.sleep(0.6)  # the answer has started streaming
+    shown = httpx.post(
+        f"{daemon}/api/ui/show",
+        json={"conversation_id": conversation["id"]},
+        headers=auth,
+        timeout=5,
+    )
+    assert shown.json() == {"delivered": 1}  # this panel listens
+
+    page.wait_for_selector(f"text={SLOW_ANSWER}", timeout=15_000)
+    assistant = page.locator(".message.assistant .body")
+    assert assistant.count() == 1 and assistant.inner_text().strip() == SLOW_ANSWER
+    assert page.locator(".message.user").inner_text().strip() == "Réponds lentement"
+    assert {"type": "show"} in page.evaluate("window.__messages")  # the bubble pops up
+
+    # Opened directly on the conversation (what the Plasma widget does).
+    other = context.new_page()
+    other.goto(f"{daemon}/?compact=1&conversation={conversation['id']}")
+    other.wait_for_selector(f"text={SLOW_ANSWER}")
+    assert errors == []
+    context.close()
+
+
+class FakeGitHub:
+    """A tiny GitHub: the compare API finds two changes; downloads are missing."""
+
+    def __init__(self, installed: str, latest: str) -> None:
+        import http.server
+        import threading
+
+        compare = {
+            "status": "ahead",
+            "commits": [
+                {"sha": "b" * 40, "commit": {"message": "feat: memory that improves"}},
+                {"sha": latest, "commit": {"message": "fix: faster search"}},
+            ],
+        }
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                if self.path == f"/api/repos/k/os/compare/{installed}...main":
+                    body = json.dumps(compare).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self.send_error(404)
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def test_update_banner(browser: Any, daemon: str, tmp_path: Path) -> None:
+    installed, latest = "a" * 40, "c" * 40
+    github = FakeGitHub(installed, latest)
+    record = {
+        "repository": f"{github.url}/k/os",
+        "api": f"{github.url}/api/repos/k/os",
+        "ref": "main",
+        "commit": installed,
+    }
+    (tmp_path / "xdg-data" / "kreafinity" / "install.json").write_text(json.dumps(record))
+    token = (tmp_path / "xdg-data" / "kreafinity" / "token").read_text().strip()
+    auth = {"Authorization": f"Bearer {token}"}
+    try:
+        found = httpx.post(f"{daemon}/api/update/check", headers=auth, timeout=10).json()
+        assert found["available"] and found["latest"] == latest
+
+        context = browser.new_context(viewport={"width": 1280, "height": 860}, locale="fr-FR")
+        page = context.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(daemon)
+        banner = page.locator("#update-banner")
+        banner.wait_for()
+        assert "Une mise à jour de Kreafinity est disponible" in banner.inner_text()
+        assert "2 nouveautés." in banner.inner_text()
+        page.click("#update-changes summary")
+        assert page.locator("#update-list li").all_inner_texts() == [
+            "fix: faster search",
+            "feat: memory that improves",
+        ]
+
+        # The button starts the installation; here the download is missing.
+        page.click("#update-install")
+        page.wait_for_selector("#update-banner.working")
+        assert "Mise à jour en cours" in banner.inner_text()
+        page.wait_for_selector("#update-banner.failed", timeout=60_000)
+        assert "La mise à jour a échoué" in banner.inner_text()
+        assert page.inner_text("#update-install") == "Réessayer"
+        status = httpx.get(f"{daemon}/api/update", headers=auth, timeout=5).json()["status"]
+        assert status["state"] == "failed" and status["target"] == latest
+
+        # Settings: installed version and « Rechercher maintenant ».
+        page.click("#open-settings")
+        page.wait_for_selector("text=Version installée : aaaaaaa (branche main)")
+        page.click("#settings-update-check")
+        page.wait_for_selector("text=Une mise à jour est disponible.")
+        page.keyboard.press("Escape")
+
+        # « Plus tard »: hidden, and still hidden after a reload.
+        page.click("#update-later")
+        assert banner.is_hidden()
+        page.reload()
+        page.wait_for_selector("#connection.online")
+        page.wait_for_timeout(500)
+        assert banner.is_hidden()
+        assert errors == []
+        context.close()
+    finally:
+        github.close()

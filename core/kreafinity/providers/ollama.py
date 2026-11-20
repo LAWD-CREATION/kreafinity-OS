@@ -15,6 +15,7 @@ from kreafinity.providers.base import (
     LLMProvider,
     Message,
     ModelInfo,
+    ProviderAuthError,
     ProviderError,
     ProviderUnavailableError,
     ResponseDone,
@@ -48,6 +49,7 @@ class OllamaProvider(LLMProvider):
         base_url: str = DEFAULT_BASE_URL,
         default_model: str = DEFAULT_MODEL,
         client: httpx.AsyncClient | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """Create the adapter.
 
@@ -55,9 +57,11 @@ class OllamaProvider(LLMProvider):
             base_url: URL of the Ollama server.
             default_model: Model used when `chat` is not given one.
             client: HTTP client to use instead of creating one (for tests).
+            headers: Extra HTTP headers sent with every request (authentication).
         """
         super().__init__(default_model=default_model)
         self.base_url = base_url.rstrip("/")
+        self._headers = dict(headers or {})
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
 
@@ -81,15 +85,11 @@ class OllamaProvider(LLMProvider):
         tool_calls: list[ToolCall] = []
         try:
             async with self._client.stream(
-                "POST", f"{self.base_url}/api/chat", json=payload
+                "POST", f"{self.base_url}/api/chat", json=payload, headers=self._request_headers()
             ) as response:
                 if response.status_code >= 400:
                     await response.aread()
-                    raise ProviderError(
-                        f"Ollama returned HTTP {response.status_code}: {_error_detail(response)}",
-                        provider=self.name,
-                        retryable=response.status_code >= 500,
-                    )
+                    raise self._http_error(response)
                 async for line in response.aiter_lines():
                     if not line.strip():
                         continue
@@ -114,22 +114,23 @@ class OllamaProvider(LLMProvider):
                         return
         except httpx.TransportError as exc:
             raise ProviderUnavailableError(
-                f"Cannot reach Ollama at {self.base_url}: {exc}", provider=self.name
+                f"Cannot reach {self.display_name} at {self.base_url}: {exc}", provider=self.name
             ) from exc
-        raise ProviderError("Ollama closed the stream before finishing", provider=self.name)
+        raise ProviderError(
+            f"{self.display_name} closed the stream before finishing", provider=self.name
+        )
 
     async def list_models(self) -> list[ModelInfo]:
         try:
-            response = await self._client.get(f"{self.base_url}/api/tags")
+            response = await self._client.get(
+                f"{self.base_url}/api/tags", headers=self._request_headers()
+            )
         except httpx.TransportError as exc:
             raise ProviderUnavailableError(
-                f"Cannot reach Ollama at {self.base_url}: {exc}", provider=self.name
+                f"Cannot reach {self.display_name} at {self.base_url}: {exc}", provider=self.name
             ) from exc
         if response.status_code >= 400:
-            raise ProviderError(
-                f"Ollama returned HTTP {response.status_code}: {_error_detail(response)}",
-                provider=self.name,
-            )
+            raise self._http_error(response)
         return [
             ModelInfo(id=entry["name"], provider=self.name, display_name=entry["name"])
             for entry in response.json().get("models", [])
@@ -138,6 +139,17 @@ class OllamaProvider(LLMProvider):
     async def aclose(self) -> None:
         if self._owns_client:
             await self._client.aclose()
+
+    def _request_headers(self) -> dict[str, str]:
+        """Headers of each request; subclasses may refuse to send one (missing key)."""
+        return self._headers
+
+    def _http_error(self, response: httpx.Response) -> ProviderError:
+        message = f"{self.display_name} returned HTTP {response.status_code}: "
+        message += _error_detail(response)
+        if response.status_code in (401, 403):
+            return ProviderAuthError(message, provider=self.name)
+        return ProviderError(message, provider=self.name, retryable=response.status_code >= 500)
 
 
 def _to_ollama_message(message: Message) -> dict[str, Any]:

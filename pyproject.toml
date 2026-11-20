@@ -36,6 +36,7 @@ dependencies = [
     "uvicorn>=0.30",
     "websockets>=13",
     "keyring>=25",
+    "dbus-fast>=5.0",  # screen brightness via systemd-logind (D-Bus)
 ]
 
 [project.optional-dependencies]
@@ -67,6 +68,7 @@ packages = ["core/kreafinity"]
 # The web interface ships inside the package (kreafinity/web).
 "ui/web" = "kreafinity/web"
 "ui/desktop" = "kreafinity/desktop"
+"ui/plasma" = "kreafinity/plasma_assets"
 
 # --- Quality tools -----------------------------------------------------------
 
@@ -94,4 +96,5 @@ follow_imports_for_stubs = true
 testpaths = ["tests"]
 addopts = "-ra"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 timeout = 60

@@ -15,15 +15,19 @@ import json
 import logging
 import os
 import pwd
+import time
 import uuid
-from collections.abc import Callable
+from collections import deque
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
-from kreafinity import __version__
+import httpx
+
+from kreafinity import __version__, update
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -37,7 +41,9 @@ from kreafinity.agent import (
     ToolCallFinished,
     ToolCallStarted,
     complete_unanswered_calls,
+    review,
 )
+from kreafinity.agent.review import ReviewState
 from kreafinity.config import (
     ConfigError,
     SecretStoreError,
@@ -51,6 +57,7 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language
+from kreafinity.memory import MAX_SECTION, MEMORY_TOOLS, MemoryRefusedError, MemoryStore
 from kreafinity.providers import (
     LLMProvider,
     Message,
@@ -63,6 +70,7 @@ from kreafinity.providers import (
     get_provider_class,
     parse_model_spec,
 )
+from kreafinity.system.notifications import send_notification
 from kreafinity.tools import ToolContext, ToolRegistry, printable
 
 logger = logging.getLogger(__name__)
@@ -73,6 +81,10 @@ APPROVAL_TIMEOUT = 600.0
 EVENT_QUEUE_SIZE = 5000
 #: Length of the tool output excerpt sent with ``tool_finished`` events.
 TOOL_RESULT_EXCERPT = 2000
+#: A request to show a conversation is ignored by panels after this many seconds.
+UI_REQUEST_MAX_AGE = 60.0
+#: A conversation quiet for this long is reviewed to improve the memory.
+REVIEW_DELAY = 120.0
 
 ErrorCode = Literal[
     "not_found",
@@ -83,6 +95,7 @@ ErrorCode = Literal[
     "provider_auth",
     "provider_error",
     "keyring_unavailable",
+    "update_unavailable",
 ]
 Event = dict[str, Any]
 
@@ -107,10 +120,16 @@ def _now() -> str:
 
 
 class Subscription:
-    """The events received by one client (e.g. one WebSocket connection)."""
+    """The events received by one client (e.g. one WebSocket connection).
 
-    def __init__(self, maxsize: int = EVENT_QUEUE_SIZE) -> None:
+    Attributes:
+        panel: The client is a compact assistant panel (desktop bubble, Plasma
+            widget), able to show a conversation when asked.
+    """
+
+    def __init__(self, maxsize: int = EVENT_QUEUE_SIZE, *, panel: bool = False) -> None:
         self._queue: asyncio.Queue[Event] = asyncio.Queue(maxsize)
+        self.panel = panel
 
     async def get(self) -> Event:
         """Wait for the next event."""
@@ -125,11 +144,15 @@ class EventHub:
         self._queue_size = queue_size
         self._seq = 0
 
-    def subscribe(self) -> Subscription:
-        """Start receiving events."""
-        subscription = Subscription(self._queue_size)
+    def subscribe(self, *, panel: bool = False) -> Subscription:
+        """Start receiving events (`panel`: the client is an assistant panel)."""
+        subscription = Subscription(self._queue_size, panel=panel)
         self._subscribers.add(subscription)
         return subscription
+
+    def panel_count(self) -> int:
+        """Number of assistant panels currently listening."""
+        return sum(1 for subscription in self._subscribers if subscription.panel)
 
     def unsubscribe(self, subscription: Subscription) -> None:
         """Stop receiving events."""
@@ -151,6 +174,51 @@ class EventHub:
                 while not subscription._queue.empty():
                     subscription._queue.get_nowait()
                 subscription._queue.put_nowait({"seq": self._seq, "type": "resync_required"})
+
+
+class UiRequests:
+    """Requests to show a conversation, for panels polling over HTTP (Plasma widget).
+
+    Each request is numbered; a panel asks for the requests after the last
+    number it saw, waiting until one arrives.
+    """
+
+    def __init__(self, keep: int = 20) -> None:
+        self._items: deque[tuple[int, float, Event]] = deque(maxlen=keep)
+        self._seq = 0
+        self._changed = asyncio.Condition()
+        self.waiting = 0
+
+    @property
+    def last(self) -> int:
+        return self._seq
+
+    async def push(self, request: Event) -> None:
+        async with self._changed:
+            self._seq += 1
+            self._items.append((self._seq, time.monotonic(), {"seq": self._seq, **request}))
+            self._changed.notify_all()
+
+    async def wait(self, after: int | None, timeout: float) -> tuple[list[Event], int]:
+        """Requests numbered after `after`, waiting up to `timeout` seconds for one.
+
+        Without `after` (a panel starting), nothing old is replayed: only the
+        current number is returned, to ask from.
+        """
+        if after is None or after > self._seq:  # starting, or the daemon restarted
+            return [], self._seq
+        self.waiting += 1
+        try:
+            async with self._changed:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(
+                        self._changed.wait_for(lambda: self._seq > after), timeout
+                    )
+                oldest = time.monotonic() - UI_REQUEST_MAX_AGE
+                fresh = [event for seq, at, event in self._items if seq > after and at >= oldest]
+                return fresh, self._seq
+        finally:
+            self.waiting -= 1
 
 
 # --- Runs and approvals --------------------------------------------------------------------
@@ -219,6 +287,9 @@ class AssistantService:
         context: ToolContext | None = None,
         action_log: ActionLog | None = None,
         approval_timeout: float = APPROVAL_TIMEOUT,
+        notifier: Callable[[str, str], Awaitable[bool]] | None = send_notification,
+        update_launcher: Callable[[str], None] = update.launch,
+        update_client: httpx.AsyncClient | None = None,
     ) -> None:
         """Create the service.
 
@@ -230,9 +301,13 @@ class AssistantService:
             context: Sandbox of the tools; by default built from the settings.
             action_log: Journal of the actions (by default the user's one).
             approval_timeout: Seconds after which an unanswered approval is denied.
+            notifier: Shows a desktop notification (summary, body).
+            update_launcher: Starts installing an update (a commit) in its own process.
+            update_client: HTTP client used to ask GitHub for updates (for tests).
         """
         self.store = store
         self.events = EventHub()
+        self.ui_requests = UiRequests()
         self.approval_timeout = approval_timeout
         self._load_settings = settings_loader
         self._provider_factory = provider_factory
@@ -242,6 +317,16 @@ class AssistantService:
         self._retired: list[LLMProvider] = []
         self._runs: dict[str, Run] = {}
         self._approvals: dict[str, PendingApproval] = {}
+        self.updates = update.UpdateManager(
+            publish=self.events.publish,
+            enabled=lambda: self.settings().check_updates,
+            notify=notifier,
+            launcher=update_launcher,
+            client=update_client,
+        )
+        self._background: list[asyncio.Task[None]] = []
+        self._reviews: dict[str, asyncio.Task[None]] = {}
+        self.review_delay = REVIEW_DELAY
 
     # --- Settings and providers --------------------------------------------------------
 
@@ -418,6 +503,24 @@ class AssistantService:
         info["messages"] = [message_to_dict(m) for m in self.store.messages(conversation_id)]
         return info
 
+    async def show_conversation(self, conversation_id: str) -> Event:
+        """Ask the assistant panels to show a conversation (e.g. after a desktop search).
+
+        Returns:
+            ``delivered``: how many panels were listening (0: nobody will show it).
+        """
+        self._info(conversation_id)  # must exist
+        request = {"type": "show_conversation", "conversation_id": conversation_id}
+        delivered = self.events.panel_count() + self.ui_requests.waiting
+        self.events.publish(request)
+        await self.ui_requests.push(request)
+        return {"delivered": delivered}
+
+    async def wait_ui_requests(self, after: int | None, timeout: float) -> Event:
+        """Requests to show a conversation, for a panel polling over HTTP."""
+        requests, last = await self.ui_requests.wait(after, timeout)
+        return {"requests": requests, "last": last}
+
     def rename_conversation(self, conversation_id: str, title: str) -> Event:
         """Change the title of a conversation."""
         try:
@@ -477,7 +580,7 @@ class AssistantService:
         )
         agent = Agent(
             llm,
-            ToolRegistry.load(settings.tools),
+            ToolRegistry.load(settings.tools, exclude=() if settings.memory else MEMORY_TOOLS),
             self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
             model=model,
             language=settings.language,
@@ -485,7 +588,11 @@ class AssistantService:
             approver=partial(self._ask_approval, run),
             action_log=self._action_log,
             fallback=fallback,
+            memory=MemoryStore() if settings.memory else None,
         )
+        pending = self._reviews.pop(conversation_id, None)
+        if pending is not None:  # the conversation goes on: review it later
+            pending.cancel()
         self._runs[conversation_id] = run
         run.task = asyncio.create_task(self._process(run, agent, text))
         return {"run_id": run.id, "provider": run.provider, "model": run.model}
@@ -529,10 +636,12 @@ class AssistantService:
                 "content": text,
             }
         )
+        completed = False
         try:
             async for event in agent.run(conversation, text):
                 persist()
                 self.events.publish({**base, **_event_to_dict(event)})
+            completed = True
         except asyncio.CancelledError:
             persist()
             self.events.publish({"type": "run_finished", **base, "reason": "cancelled"})
@@ -565,6 +674,125 @@ class AssistantService:
                 self.events.publish(
                     {"type": "conversation_updated", "conversation": self._info(conversation_id)}
                 )
+            if completed:
+                self._schedule_review(conversation_id, f"{run.provider}/{run.model}")
+
+    # --- Memory: learning from conversations ---------------------------------------------
+
+    def _schedule_review(self, conversation_id: str, spec: str) -> None:
+        settings = self.settings()
+        if not (settings.memory and settings.memory_review):
+            return
+        previous = self._reviews.pop(conversation_id, None)
+        if previous is not None:
+            previous.cancel()
+
+        async def later() -> None:
+            await asyncio.sleep(self.review_delay)
+            try:
+                await self.review_conversation(conversation_id, spec)
+            except Exception:
+                logger.exception("Review of conversation %s failed", conversation_id)
+            finally:
+                if self._reviews.get(conversation_id) is task:
+                    del self._reviews[conversation_id]
+
+        task = asyncio.create_task(later())
+        self._reviews[conversation_id] = task
+
+    async def review_conversation(self, conversation_id: str, spec: str | None = None) -> int:
+        """Reread what is new in a conversation and improve the memory from it.
+
+        Returns:
+            How many changes were made to the memory and skills.
+        """
+        settings = self.settings()
+        if not settings.memory:
+            return 0
+        state = ReviewState()
+        try:
+            messages = self.store.messages(conversation_id)
+        except ConversationNotFoundError:
+            return 0
+        new = messages[state.reviewed(conversation_id) :]
+        if not any(message.role == "user" for message in new):
+            return 0
+        try:
+            llm, model = self._provider(settings, spec or settings.provider)
+        except ServiceError as exc:
+            logger.info("No review of %s: %s", conversation_id, exc)
+            return 0
+        memory = MemoryStore()
+        agent = Agent(
+            llm,
+            ToolRegistry.load(sorted(MEMORY_TOOLS)),
+            self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
+            model=model,
+            language=settings.language,
+            max_iterations=6,
+            action_log=self._action_log,
+            memory=memory,
+            instructions=review.instructions(settings.language),
+        )
+        changes = 0
+        try:
+            async for event in agent.run(Conversation(), review.transcript(new, settings.language)):
+                if isinstance(event, ToolCallFinished) and event.status == "ok":
+                    changes += 1
+        except ProviderError as exc:
+            logger.info("Review of %s failed: %s", conversation_id, exc)
+            return 0  # retried after the next exchange
+        state.mark(conversation_id, len(messages))
+        if changes:
+            self.events.publish(
+                {"type": "memory_updated", "conversation_id": conversation_id, "changes": changes}
+            )
+        return changes
+
+    def memory_info(self) -> Event:
+        """What the assistant remembers (for the settings)."""
+        settings = self.settings()
+        store = MemoryStore()
+        return {
+            "enabled": settings.memory,
+            "review": settings.memory_review,
+            "user": store.read("user"),
+            "notes": store.read("notes"),
+            "skills": [
+                {
+                    "name": skill.name,
+                    "title": skill.title,
+                    "description": skill.description,
+                    "uses": skill.uses,
+                    "updated": skill.updated,
+                }
+                for skill in store.skills()
+            ],
+            "limit": MAX_SECTION,
+        }
+
+    def write_memory(self, section: str, content: str) -> Event:
+        """Replace a notebook with the user's text."""
+        try:
+            MemoryStore().write(section, content)
+        except MemoryRefusedError as exc:
+            raise ServiceError(str(exc), code="invalid") from exc
+        result = self.memory_info()
+        self.events.publish({"type": "memory_updated", "changes": 1})
+        return result
+
+    def delete_skill(self, name: str) -> Event:
+        try:
+            MemoryStore().delete_skill(name)
+        except MemoryRefusedError as exc:
+            raise ServiceError(str(exc), code="not_found") from exc
+        return self.memory_info()
+
+    def forget_memory(self) -> Event:
+        """Erase everything the assistant remembers."""
+        MemoryStore().forget_all()
+        self.events.publish({"type": "memory_updated", "changes": 1})
+        return self.memory_info()
 
     # --- Approvals ------------------------------------------------------------------------
 
@@ -630,8 +858,41 @@ class AssistantService:
 
     # --- Shutdown ---------------------------------------------------------------------------
 
+    # --- Updates ------------------------------------------------------------------------------
+
+    def start_background_tasks(self) -> None:
+        """Start the daily update check (called by the daemon once running)."""
+        self._background.append(asyncio.create_task(self.updates.watch()))
+
+    def update_info(self) -> Event:
+        """Installed version, available update, progress of an installation."""
+        return self.updates.info()
+
+    async def check_updates(self) -> Event:
+        """Look for an update now."""
+        try:
+            return await self.updates.check()
+        except update.UpdateError as exc:
+            raise _update_error(exc) from exc
+
+    def start_update(self) -> Event:
+        """Install the available update (the daemon then restarts)."""
+        try:
+            return self.updates.start()
+        except update.UpdateError as exc:
+            raise _update_error(exc) from exc
+
     async def aclose(self) -> None:
         """Stop running requests and release the providers."""
+        for review_task in list(self._reviews.values()):
+            review_task.cancel()
+        self._reviews.clear()
+        for background in self._background:
+            background.cancel()
+        for background in self._background:
+            with contextlib.suppress(asyncio.CancelledError):
+                await background
+        self._background.clear()
         tasks = [run.task for run in self._runs.values() if run.task is not None]
         for task in tasks:
             task.cancel()
@@ -696,3 +957,8 @@ def _service_error(exc: ProviderError) -> ServiceError:
     if isinstance(exc, ProviderAuthError):
         return ServiceError(str(exc), code="provider_auth")
     return ServiceError(str(exc), code="provider_error")
+
+
+def _update_error(exc: update.UpdateError) -> ServiceError:
+    codes: dict[str, ErrorCode] = {"busy": "busy", "network": "update_unavailable"}
+    return ServiceError(str(exc), code=codes.get(exc.code, "invalid"))

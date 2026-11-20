@@ -78,6 +78,12 @@ app = typer.Typer(
 )
 provider_app = typer.Typer(help="Choisir et gérer les fournisseurs d'IA.", no_args_is_help=True)
 app.add_typer(provider_app, name="provider")
+desktop_app = typer.Typer(
+    help="Intégrer Kreafinity au bureau KDE Plasma : recherche, barre des tâches, thème.",
+    no_args_is_help=True,
+)
+app.add_typer(desktop_app, name="desktop")
+app.add_typer(desktop_app, name="bureau", hidden=True)
 console = Console()
 err_console = Console(stderr=True)
 
@@ -102,7 +108,93 @@ def main() -> None:
 @app.command()
 def version() -> None:
     """Affiche la version de Kreafinity OS."""
-    console.print(f"Kreafinity OS [bold]{__version__}[/bold]")
+    from kreafinity.update import installation
+
+    record = installation()
+    detail = ""
+    if record is not None and record.commit:
+        detail = f" ({record.commit[:7]}, {record.ref})"
+    console.print(f"Kreafinity OS [bold]{__version__}[/bold]{detail}")
+
+
+@app.command("memory")
+def memory_command(
+    forget: Annotated[
+        bool, typer.Option("--forget", "--oublier", help="Tout effacer (notes et savoir-faire).")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+) -> None:
+    """Montre ce dont Kreafinity se souvient de vous, ou l'efface."""
+    from kreafinity.memory import MemoryStore
+
+    _load_settings()
+    store = MemoryStore()
+    if forget:
+        if not yes and not typer.confirm(t("memory.cli.forget_confirm"), default=False):
+            raise typer.Exit(1)
+        store.forget_all()
+        console.print(Text(t("memory.cli.forgotten"), style="green"))
+        return
+    if store.is_empty():
+        console.print(t("memory.cli.empty"))
+        return
+    for section in ("user", "notes"):
+        entries = store.entries(section)
+        if entries:
+            console.print(Text(t(f"memory.cli.{section}"), style="bold"))
+            for entry in entries:
+                console.print(Text(f"  • {entry}"))
+    skills = store.skills()
+    if skills:
+        console.print(Text(t("memory.cli.skills"), style="bold"))
+        for skill in skills:
+            console.print(Text(f"  • {skill.title} — {skill.description}"))
+    console.print(Text(t("memory.cli.where", path=store.folder), style="dim"))
+
+
+@app.command("update")
+def update_command(
+    check_only: Annotated[
+        bool, typer.Option("--check", help="Seulement dire si une mise à jour existe.")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+) -> None:
+    """Met à jour Kreafinity depuis GitHub (la page web propose aussi un bouton)."""
+    from kreafinity import update as updates
+
+    _load_settings()
+    record = updates.installation()
+    if record is None:
+        err_console.print(Text(t("update.cli.dev"), style="yellow"))
+        raise typer.Exit(1)
+    try:
+        result = asyncio.run(updates.check(record))
+    except updates.UpdateError as exc:
+        err_console.print(Text(t("update.cli.check_failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    result.notified = updates.load_check().notified
+    updates.save_check(result)
+    if not result.available or result.latest is None:
+        console.print(Text(t("update.cli.up_to_date"), style="green"))
+        return
+    console.print(Text(t("update.cli.available", count=len(result.changes)), style="bold"))
+    for change in result.changes:
+        console.print(Text(f"  • {change.title}"))
+    if check_only:
+        console.print(Text(t("update.cli.hint"), style="dim"))
+        return
+    if not yes and not typer.confirm(t("update.cli.confirm"), default=True):
+        raise typer.Exit(1)
+    try:
+        updates.apply(result.latest, log=lambda line: console.print(Text(line, style="dim")))
+    except updates.UpdateError as exc:
+        err_console.print(Text(t("update.cli.failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    console.print(Text(t("update.cli.done"), style="green"))
 
 
 @app.command()
@@ -381,7 +473,7 @@ def ui(
 
 def _running_daemon_url(settings: Settings) -> str | None:
     """Address of the running daemon, if it answers."""
-    from kreafinity.api.server import HOST, read_daemon_info
+    from kreafinity.api.daemon_info import HOST, read_daemon_info
 
     info = read_daemon_info()
     url = info["url"] if info and isinstance(info.get("url"), str) else None
@@ -399,23 +491,11 @@ def _start_daemon(settings: Settings) -> str:
     Through its systemd user service when it is installed, so that it stays
     managed by systemd; otherwise as a detached process.
     """
+    from kreafinity.api.client import launch_daemon
+
     log_path = data_dir() / "daemon.log"
-    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     console.print(Text(t("ui.starting"), style="dim"))
-    started = False
-    if integration.service_installed() and integration.systemd_available():
-        integration.import_session_environment()
-        started = integration.systemctl("start", integration.SERVICE_NAME)
-    if not started:
-        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(fd, "ab") as log:
-            subprocess.Popen(
-                [sys.executable, "-m", "kreafinity.api.server"],
-                stdin=subprocess.DEVNULL,
-                stdout=log,
-                stderr=log,
-                start_new_session=True,
-            )
+    launch_daemon()
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         url = _running_daemon_url(settings)
@@ -526,9 +606,18 @@ def setup(
         bool,
         typer.Option("--bubble/--no-bubble", help="Afficher la bulle à l'ouverture de session."),
     ] = True,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            "--refresh", hidden=True, help="Après une mise à jour : réécrire ce qui est installé."
+        ),
+    ] = False,
 ) -> None:
     """Intègre Kreafinity à votre session : démarrage automatique, menu, bulle."""
-    _load_settings()
+    settings = _load_settings()
+    if refresh:
+        _refresh_integration(settings.port)
+        return
     if uninstall:
         report = integration.uninstall()
         for key, values in report.done:
@@ -552,6 +641,24 @@ def setup(
     console.print(Text(t("setup.done"), style="green"))
 
 
+def _refresh_integration(port: int) -> None:
+    """Rewrite the installed session files with this version, keeping the user's choices."""
+    from kreafinity.api.web import web_root
+    from kreafinity.plasma import install as plasma
+
+    root = web_root()
+    if integration.service_installed() or integration.menu_entry_path().exists():
+        integration.install(
+            bubble=integration.autostart_path().exists(),
+            icon_source=root / "img" / "logo.svg" if root else None,
+            autostart_comment=t("bubble.autostart_comment"),
+            restart=False,  # the updater restarts everything afterwards
+        )
+    version = plasma.plasma_version()
+    if plasma.is_installed() and version in plasma.SUPPORTED_VERSIONS:
+        plasma.install(version, port=port, add_widget=False)
+
+
 @app.command()
 def uninstall(
     purge: Annotated[
@@ -570,6 +677,11 @@ def uninstall(
     if not yes and not typer.confirm(t(question), default=False):
         raise typer.Exit(1)
 
+    from kreafinity.plasma import install as plasma
+
+    if plasma.is_installed():
+        for key, values in plasma.remove(plasma.plasma_version()).done:
+            console.print(t(key, **values))
     for key, values in integration.uninstall().done:
         console.print(t(key, **values))
     venv = data_dir() / "venv"
@@ -594,6 +706,58 @@ def uninstall(
         shutil.rmtree(venv, ignore_errors=True)
         console.print(t("setup.removed", path=venv))
     console.print(Text(t("uninstall.done" if not purge else "uninstall.done_purge"), style="green"))
+
+
+@desktop_app.command("install")
+def desktop_install(
+    theme: Annotated[
+        bool, typer.Option("--theme", help="Appliquer aussi les couleurs et le fond d'écran.")
+    ] = False,
+    layout: Annotated[
+        bool,
+        typer.Option(
+            "--layout", help="Réorganiser le bureau à la façon de Windows (remplace vos panneaux)."
+        ),
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+    plasma_version: Annotated[
+        int | None,
+        typer.Option("--plasma", help="Version de Plasma (5 ou 6), si elle n'est pas détectée."),
+    ] = None,
+) -> None:
+    """Ajoute Kreafinity à KDE Plasma : recherche du menu démarrer, widget, thème."""
+    from kreafinity.plasma import install as plasma
+
+    settings = _load_settings()
+    version = plasma_version or plasma.plasma_version()
+    if version is None:
+        err_console.print(Text(t("desktop.no_plasma"), style="red"))
+        raise typer.Exit(1)
+    if layout and not yes and not typer.confirm(t("desktop.confirm_layout"), default=False):
+        raise typer.Exit(1)
+    try:
+        report = plasma.install(version, port=settings.port)
+    except plasma.PlasmaError as exc:
+        err_console.print(Text(t("desktop.error", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    if theme or layout:
+        report.done += plasma.apply_theme(version, layout=layout).done
+    for key, values in report.done:
+        console.print(t(key, **values))
+    console.print(Text(t("desktop.done"), style="green"))
+
+
+@desktop_app.command("remove")
+def desktop_remove() -> None:
+    """Retire l'intégration à KDE Plasma (recherche, widget, thème)."""
+    from kreafinity.plasma import install as plasma
+
+    _load_settings()
+    for key, values in plasma.remove(plasma.plasma_version()).done:
+        console.print(t(key, **values))
+    console.print(Text(t("desktop.removed"), style="green"))
 
 
 @app.command()
@@ -746,15 +910,18 @@ def _build_agent(settings: Settings, provider_spec: str | None) -> Agent:
     except _UserError as exc:
         err_console.print(Text(str(exc), style="red"))
         raise typer.Exit(2) from exc
+    from kreafinity.memory import MEMORY_TOOLS, MemoryStore
+
     return Agent(
         provider,
-        ToolRegistry.load(settings.tools),
+        ToolRegistry.load(settings.tools, exclude=() if settings.memory else MEMORY_TOOLS),
         ToolContext.create(allowed_paths=settings.allowed_paths),
         model=model,
         language=settings.language,
         max_iterations=settings.max_iterations,
         action_log=ActionLog(),
         fallback=fallback,
+        memory=MemoryStore() if settings.memory else None,
     )
 
 

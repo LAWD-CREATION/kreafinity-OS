@@ -13,8 +13,9 @@
 Kreafinity OS est une distribution Linux open source dont l'intelligence artificielle est au cœur de l'expérience. Vous parlez à votre ordinateur pour lancer des applications, ranger vos fichiers ou régler votre système, dans une interface familière inspirée de Windows.
 
 ### Pourquoi Kreafinity OS ?
-- 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
+- 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral, Ollama Cloud, les centaines de modèles d'OpenRouter, ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
 - 🛡️ **Vous gardez le contrôle** : aucune action sensible (suppression, commande système, installation) sans votre validation.
+- 🧠 **Une mémoire qui s'améliore** : Kreafinity se souvient de vous et apprend de chaque conversation, comme Hermes Agent ; vous pouvez tout lire, corriger ou effacer ([docs/memoire.md](docs/memoire.md)).
 - 🔒 **Vie privée** : fonctionne entièrement hors ligne avec un modèle local.
 - 🪟 **Interface familière** : barre des tâches, menu démarrer, fenêtres… avec l'IA intégrée partout.
 - 🌍 **Open source** : construit sur Linux (Debian), ouvert aux contributions.
@@ -31,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 ```
 Kreafinity s'installe dans votre dossier personnel, démarre avec votre session, s'ajoute au menu
 des applications et vous demande quelle IA utiliser : Ollama (sur l'ordinateur, gratuit et privé),
-Claude, GPT ou Mistral. Options, emplacements, mise à jour et dépannage :
+Ollama Cloud, Claude, GPT, Mistral ou OpenRouter. Options, emplacements, mise à jour et dépannage :
 [docs/installation.md](docs/installation.md). Pour désinstaller : `kreafinity uninstall`
 (`--purge` efface aussi vos réglages et conversations).
 
@@ -56,6 +57,16 @@ kreafinity bubble                         # affiche la bulle (kreafinity bulle m
 kreafinity bubble --autostart             # l'afficher à chaque ouverture de session
 ```
 
+**Sur KDE Plasma** (étape 2, en cours), Kreafinity s'intègre au bureau : une question tapée dans
+le menu démarrer est envoyée à l'assistant, un bouton ∞ dans la barre des tâches ouvre le
+panneau, et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
+[docs/bureau-kde.md](docs/bureau-kde.md).
+```bash
+kreafinity desktop install --theme        # recherche, bouton de la barre des tâches, couleurs
+```
+
+![Une question posée depuis le menu démarrer de KDE Plasma](docs/img/plasma-panneau.jpg)
+
 En ligne de commande :
 ```bash
 kreafinity ask "Quels sont les 5 plus gros fichiers de mon dossier Téléchargements ?"
@@ -66,16 +77,18 @@ kreafinity history                        # vos conversations ; chat --reprendre
 Avec une IA en ligne, enregistrez votre clé dans le **trousseau système** (jamais dans un fichier),
 depuis les réglages de l'interface ou ainsi :
 ```bash
-kreafinity provider key anthropic         # Claude (ou openai, mistral)
+kreafinity provider key anthropic         # Claude (ou openai, mistral, ollama-cloud, openrouter)
 kreafinity provider use anthropic         # IA par défaut
 kreafinity provider list                  # fournisseurs, clés, IA par défaut et de secours
 ```
 Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, choisissez une IA
 de secours dans les réglages (ou `fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`).
 
-Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, mettre à la corbeille…) vous est
-d'abord présentée et ne s'exécute qu'avec votre accord. Journal des actions :
-`~/.local/share/kreafinity/actions.log`. API locale du démon : [docs/api.md](docs/api.md).
+Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, régler le volume ou la luminosité,
+mettre à la corbeille, exécuter une commande, installer un logiciel…) vous est d'abord présentée
+et ne s'exécute qu'avec votre accord. Liste des outils et garde-fous : [docs/outils.md](docs/outils.md).
+Journal des actions : `~/.local/share/kreafinity/actions.log`. API locale du démon :
+[docs/api.md](docs/api.md).
 
 ### Contribuer
 Le projet démarre : idées, retours et contributions sont les bienvenus via les *issues* et *pull requests*.
@@ -85,7 +98,7 @@ git clone https://github.com/LAWD-CREATION/kreafinity-OS && cd kreafinity-OS
 python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 pytest
 ```
-Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
+Guides : [bureau KDE Plasma](docs/bureau-kde.md), [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
 [ajouter un outil](docs/ajouter-un-outil.md), [interface web](docs/interface-web.md).
 
 ---
@@ -96,8 +109,9 @@ Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
 Kreafinity OS is an open source Linux distribution with artificial intelligence at the heart of the experience. Talk to your computer to launch apps, organize files or adjust settings, in a familiar Windows-inspired desktop.
 
 ### Why Kreafinity OS?
-- 🔓 **Freedom of AI provider**: Claude, GPT, Mistral or a fully local model via Ollama. Switch anytime.
+- 🔓 **Freedom of AI provider**: Claude, GPT, Mistral, Ollama Cloud, hundreds of models through OpenRouter, or a fully local model via Ollama. Switch anytime.
 - 🛡️ **You stay in control**: no sensitive action (deletion, shell command, install) without your approval.
+- 🧠 **A memory that improves**: Kreafinity remembers you and learns from each conversation, like Hermes Agent; you can read, fix or erase it all.
 - 🔒 **Privacy**: runs fully offline with a local model.
 - 🪟 **Familiar interface**: taskbar, start menu, windows… with AI built in everywhere.
 - 🌍 **Open source**: built on Linux (Debian), open to contributions.
@@ -121,11 +135,13 @@ Uninstall with `kreafinity uninstall` (`--purge` also erases settings and conver
 kreafinity ui                             # opens the web interface in your browser
 kreafinity ask "What are the 5 largest files in my Downloads folder?"
 kreafinity provider key anthropic         # store an API key in the system keyring
-kreafinity chat --provider anthropic      # or openai, mistral
+kreafinity chat --provider anthropic      # or openai, mistral, ollama-cloud, openrouter
 ```
 The web interface streams answers, lets you pick the AI and shows every action on the computer
 before it happens. `kreafinity bubble` adds a small round button at the bottom right of the desktop:
-click it to ask something in a compact panel. `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
+click it to ask something in a compact panel. On KDE Plasma, `kreafinity desktop install` adds an
+"Ask Kreafinity" result to the start menu search, an assistant button to the taskbar and a
+Windows-like Kreafinity theme (see `docs/bureau-kde.md`). `kreafinity history` lists past conversations and `kreafinity chat --resume <id>`
 resumes one. Set `language: en` in `~/.config/kreafinity/config.yaml` (or in the settings) for
 English. The daemon's local API is described in `docs/api.md`.
 

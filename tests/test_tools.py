@@ -163,7 +163,15 @@ async def test_search_does_not_follow_symlinks(
 
 async def test_system_info(context: ToolContext) -> None:
     info = payload(await SystemInfo().run({}, context))
-    assert set(info) == {"os", "cpu", "memory", "disks", "battery"}
+    assert set(info) == {
+        "os",
+        "cpu",
+        "memory",
+        "disks",
+        "battery",
+        "sound",
+        "screen_brightness_percent",
+    }
     assert info["cpu"]["logical_cores"] >= 1
     assert info["memory"]["total_gib"] > 0
 

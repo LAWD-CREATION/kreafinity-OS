@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [{"Email": "contact@kreafinity.com", "Name": "Kreafinity"}],
+        "Category": "",
+        "Description": "Bureau Kreafinity : barre des tâches en bas, menu démarrer, assistant IA intégré",
+        "Description[en]": "Kreafinity desktop: bottom taskbar, start menu, built-in AI assistant",
+        "Id": "org.kreafinity.desktop",
+        "License": "GPL-3.0-or-later",
+        "Name": "Kreafinity",
+        "ServiceTypes": ["Plasma/LookAndFeel"],
+        "Version": "0.1",
+        "Website": "https://kreafinity.com"
+    },
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "X-Plasma-APIVersion": "2",
+    "X-Plasma-MainScript": "defaults"
+}

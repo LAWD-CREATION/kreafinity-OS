@@ -57,6 +57,7 @@ STATUS_BY_CODE: dict[ErrorCode, int] = {
     "provider_auth": status.HTTP_502_BAD_GATEWAY,
     "provider_error": status.HTTP_502_BAD_GATEWAY,
     "keyring_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "update_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 PeerLookup = Callable[[Address | None, Address | None], int | None]
@@ -83,6 +84,14 @@ class ConversationUpdate(BaseModel):
 class NewMessage(BaseModel):
     content: str = Field(min_length=1, max_length=100_000)
     provider: str | None = Field(None, min_length=1, max_length=200)
+
+
+class MemoryText(BaseModel):
+    content: str = Field(max_length=20_000)
+
+
+class ShowRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=100)
 
 
 class ApprovalDecision(BaseModel):
@@ -145,6 +154,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service = service_factory()
         app.state.service = service
+        service.start_background_tasks()
         try:
             yield
         finally:
@@ -221,6 +231,56 @@ def create_app(
     async def cancel(service: Service, conversation_id: str) -> dict[str, str]:
         await service.cancel_run(conversation_id)
         return {"status": "cancelled"}
+
+    # --- Memory ------------------------------------------------------------------------
+
+    @api.get("/memory")
+    async def memory(service: Service) -> dict[str, Any]:
+        return service.memory_info()
+
+    @api.put("/memory/{section}")
+    async def write_memory(service: Service, section: str, body: MemoryText) -> dict[str, Any]:
+        if section not in ("user", "notes"):
+            raise ServiceError("Unknown memory section", code="not_found")
+        return service.write_memory(section, body.content)
+
+    @api.delete("/memory/skills/{name}")
+    async def delete_skill(service: Service, name: str) -> dict[str, Any]:
+        return service.delete_skill(name)
+
+    @api.delete("/memory")
+    async def forget_memory(service: Service) -> dict[str, Any]:
+        return service.forget_memory()
+
+    # --- Updates -----------------------------------------------------------------------
+
+    @api.get("/update")
+    async def update_info(service: Service) -> dict[str, Any]:
+        return service.update_info()
+
+    @api.post("/update/check")
+    async def check_updates(service: Service) -> dict[str, Any]:
+        return await service.check_updates()
+
+    @api.post("/update", status_code=status.HTTP_202_ACCEPTED)
+    async def start_update(service: Service) -> dict[str, Any]:
+        return service.start_update()
+
+    # --- Assistant panels (bubble, Plasma widget) ---------------------------------------
+
+    @api.post("/ui/show")
+    async def show_conversation(service: Service, body: ShowRequest) -> dict[str, Any]:
+        """Ask the panels to show a conversation; ``delivered`` says if one listens."""
+        return await service.show_conversation(body.conversation_id)
+
+    @api.get("/ui/requests")
+    async def ui_requests(
+        service: Service,
+        after: Annotated[int | None, Query(ge=0)] = None,
+        wait: Annotated[float, Query(ge=0, le=60)] = 25,
+    ) -> dict[str, Any]:
+        """Long polling for panels without a WebSocket: the requests after `after`."""
+        return await service.wait_ui_requests(after, wait)
 
     # --- Approvals ---------------------------------------------------------------------
 
@@ -299,7 +359,8 @@ def create_app(
             return
 
         service: AssistantService = websocket.app.state.service
-        subscription = service.events.subscribe()
+        # ?panel=1: a compact assistant panel, which can show a conversation when asked.
+        subscription = service.events.subscribe(panel=websocket.query_params.get("panel") == "1")
         try:
             await websocket.send_json(
                 {

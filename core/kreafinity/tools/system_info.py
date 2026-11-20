@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 
 import psutil
 
+from kreafinity.system import audio, brightness
 from kreafinity.tools.base import RiskLevel, Tool, ToolContext, ToolResult
 from kreafinity.tools.registry import register_tool
 
@@ -24,7 +25,7 @@ class SystemInfo(Tool):
     name = "system_info"
     description = (
         "Get information about the computer: operating system, CPU (model, cores, current "
-        "usage), memory, disk space and battery."
+        "usage), memory, disk space, battery, sound volume and screen brightness."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -45,6 +46,8 @@ def collect_system_info() -> dict[str, Any]:
         "memory": _memory_info(),
         "disks": _disks_info(),
         "battery": _battery_info(),
+        "sound": _sound_info(),
+        "screen_brightness_percent": _brightness_percent(),
     }
 
 
@@ -133,3 +136,18 @@ def _battery_info() -> dict[str, Any] | None:
         if isinstance(seconds, int) and seconds > 0
         else None,
     }
+
+
+def _sound_info() -> dict[str, Any] | None:
+    try:
+        volume = audio.get_volume()
+    except audio.AudioError:
+        return None
+    return {"volume_percent": volume.percent, "muted": volume.muted}
+
+
+def _brightness_percent() -> int | None:
+    try:
+        return brightness.find_backlight().percent
+    except brightness.BrightnessError:
+        return None

@@ -6,13 +6,17 @@ import { el, hydrateIcons, icon, relativeTime, shortenPath } from "./dom.js";
 import { language, setLanguage, t, translatePage } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
+import { UpdateBanner } from "./update.js";
 
 const api = new Api();
 const $ = (id) => document.getElementById(id);
 
-// Compact mode: the panel of the desktop bubble (?compact=1). When shown by
-// the bubble, the page can talk to it (pending approvals, close, expand).
-const compact = new URLSearchParams(location.search).has("compact");
+// Compact mode: the panel of the desktop bubble or of the Plasma widget
+// (?compact=1). When shown by the bubble, the page can talk to it (pending
+// approvals, close, expand, show). ?conversation=<id> opens a conversation.
+const params = new URLSearchParams(location.search);
+const compact = params.has("compact");
+const initialConversation = params.get("conversation");
 const bubble = window.webkit?.messageHandlers?.kreafinity ?? null;
 
 function tellBubble(message) {
@@ -38,6 +42,7 @@ const state = {
 
 let welcome;
 let settings;
+let updates;
 
 // --- Start -----------------------------------------------------------------------------
 
@@ -97,7 +102,8 @@ async function start() {
     await setLanguage(state.config.language);
     translatePage();
   }
-  settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast });
+  updates = new UpdateBanner(api, { toast });
+  settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast, updates });
   bindInterface();
   renderWelcome();
   renderPicker();
@@ -105,7 +111,9 @@ async function start() {
   $("loading").hidden = true;
   $("app").hidden = false;
   $("prompt").focus();
-  new EventStream(api, { onEvent, onStatus: setConnected }).connect();
+  if (initialConversation) await openConversation(initialConversation);
+  updates.refresh();
+  new EventStream(api, { onEvent, onStatus: setConnected, panel: compact }).connect();
 }
 
 function bindInterface() {
@@ -378,7 +386,7 @@ function renderConversation() {
     }
   }
   if (state.running.has(conversation.id)) {
-    state.live = newLive(conversation.id, state.running.get(conversation.id), assistant ?? appendAssistant(container));
+    state.live = newLive(conversation.id, state.running.get(conversation.id), assistant ?? appendAssistant(container), true);
     showThinking(state.live);
   }
   for (const approval of state.approvals.values()) {
@@ -554,15 +562,20 @@ async function stopRequest() {
 
 // --- Live events -----------------------------------------------------------------------------------
 
-function newLive(conversationId, runId, assistant) {
-  return { conversationId, runId, assistant, segment: null, text: "", frame: 0, thinking: null };
+/**
+ * What is displayed of a running request. `partial`: the display joined after the
+ * request started (conversation opened meanwhile), so the beginning of the answer
+ * is missing until the saved conversation is reloaded when the request ends.
+ */
+function newLive(conversationId, runId, assistant, partial = false) {
+  return { conversationId, runId, assistant, segment: null, text: "", frame: 0, thinking: null, partial };
 }
 
 /** The live display for an event of the open conversation (created on demand). */
 function liveFor(event) {
   if (!state.current || event.conversation_id !== state.current.id) return null;
   if (!state.live || state.live.runId !== event.run_id) {
-    state.live = newLive(event.conversation_id, event.run_id, appendAssistant($("messages")));
+    state.live = newLive(event.conversation_id, event.run_id, appendAssistant($("messages")), true);
   }
   return state.live;
 }
@@ -685,6 +698,19 @@ function onEvent(event) {
       else renderSidebar();
       break;
     }
+    case "show_conversation":
+      // A desktop search asked the assistant: panels show the answer.
+      if (!compact) return;
+      tellBubble({ type: "show" });
+      return openConversation(event.conversation_id);
+    case "memory_updated":
+      // Learned something from a finished conversation (not the user's own edit).
+      if (event.conversation_id && !compact) toast(t("memory.updated"));
+      break;
+    case "update_available":
+    case "update_started":
+      updates?.onEvent(event);
+      break;
     case "config_updated":
       state.config = event.config;
       break;
@@ -706,9 +732,26 @@ function finishRun(event) {
     if (notice) live.assistant.body.append(notice);
     state.live = null;
     scrollToBottom();
+    if (live.partial) reloadConversation(event.conversation_id, notice);
   }
   updateComposer();
   renderSidebar();
+}
+
+/** Show the saved conversation in full (its live display had missed the beginning). */
+async function reloadConversation(id, notice) {
+  let conversation;
+  try {
+    conversation = await api.get(`/api/conversations/${id}`);
+  } catch {
+    return; // keep the partial display
+  }
+  if (state.current?.id !== id || state.running.has(id)) return;
+  state.current = conversation;
+  renderConversation();
+  const assistants = $("messages").querySelectorAll(".message.assistant .body");
+  if (notice && assistants.length) assistants[assistants.length - 1].append(notice);
+  scrollToBottom();
 }
 
 function runNotice(event) {

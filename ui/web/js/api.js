@@ -58,16 +58,19 @@ export class Api {
 
 /** Live events over a WebSocket, reconnecting automatically. */
 export class EventStream {
-  constructor(api, { onEvent, onStatus }) {
+  /** `panel`: this page is a compact assistant panel, able to show a conversation on request. */
+  constructor(api, { onEvent, onStatus, panel = false }) {
     this.api = api;
     this.onEvent = onEvent;
     this.onStatus = onStatus;
+    this.panel = panel;
     this.delay = 1000;
     this.closed = false;
   }
 
   connect() {
-    const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/events`;
+    const query = this.panel ? "?panel=1" : "";
+    const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/events${query}`;
     const socket = new WebSocket(url);
     this.socket = socket;
     socket.addEventListener("open", () => {

@@ -17,16 +17,21 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 Lancez cette commande **sans** `sudo`. Le script :
 
 1. installe les paquets système manquants, après votre accord : `python3-venv`, `xdg-utils` et
-   `libglib2.0-bin` (ouvrir des applications, la corbeille), plus GTK et WebKitGTK pour la bulle ;
+   `libglib2.0-bin` (ouvrir des applications, la corbeille), `pkexec` (fenêtre de mot de passe
+   pour installer des logiciels), plus GTK et WebKitGTK pour la bulle ;
 2. crée un environnement Python dédié dans `~/.local/share/kreafinity/venv` et y installe
    Kreafinity ;
 3. ajoute les commandes `kreafinity` et `kreafinity-core` dans `~/.local/bin` ;
 4. intègre Kreafinity à votre session (`kreafinity setup`) : démarrage automatique du démon, entrée
    « Kreafinity » dans le menu des applications, bulle en bas à droite de l'écran à chaque
    ouverture de session ;
-5. vous demande quelle IA utiliser : Ollama (sur l'ordinateur), Claude, GPT ou Mistral (en ligne,
-   avec une clé API), ou plus tard ;
+5. vous demande quelle IA utiliser : Ollama (sur l'ordinateur), ou en ligne avec une clé API :
+   Ollama Cloud, Claude, GPT, Mistral ou OpenRouter ; ou plus tard ;
 6. affiche la bulle.
+
+Sur **KDE Plasma**, la bulle est remplacée par l'intégration au bureau (recherche dans le menu
+démarrer, bouton ∞ dans la barre des tâches) ; le script propose aussi le thème Kreafinity et,
+si vous le voulez, une disposition à la façon de Windows. Voir [bureau-kde.md](bureau-kde.md).
 
 Ensuite, essayez par exemple : « Montre-moi les 5 plus gros fichiers de mon dossier
 Téléchargements et mets-les à la corbeille ». L'IA liste les fichiers, vous montre ce qu'elle
@@ -43,9 +48,10 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 | Option | Effet |
 |---|---|
 | `--yes`, `-y` | répondre oui à toutes les questions (installation sans surveillance) |
-| `--provider=NOM` | IA à configurer : `ollama`, `anthropic`, `openai`, `mistral` ou `later` |
+| `--provider=NOM` | IA à configurer : `ollama`, `ollama-cloud`, `anthropic`, `openai`, `mistral`, `openrouter` ou `later` |
 | `--no-system-packages` | ne rien installer avec apt (les paquets absents sont seulement signalés) |
 | `--no-bubble` | pas de bulle sur le bureau (serveur, session sans écran) |
+| `--no-plasma` | ne pas intégrer Kreafinity à KDE Plasma (recherche, bouton, thème) |
 | `--allow-root` | autoriser l'installation pour root (conteneurs de test uniquement) |
 | `--help` | afficher l'aide |
 
@@ -104,15 +110,40 @@ kreafinity provider list                  # fournisseurs disponibles, clés, IA 
 kreafinity provider use ollama/llama3.1   # un modèle local (installez Ollama : https://ollama.com)
 kreafinity provider key anthropic         # enregistrer une clé dans le trousseau
 kreafinity provider use anthropic         # Claude par défaut
+kreafinity provider key ollama-cloud      # Ollama Cloud (clé créée sur ollama.com)
+kreafinity provider use ollama-cloud/gpt-oss:120b
+kreafinity provider key openrouter        # OpenRouter (clé créée sur openrouter.ai)
+kreafinity provider use openrouter/anthropic/claude-opus-5.5
 ```
 
 Tout cela se règle aussi dans l'écran **Réglages** de l'interface (`kreafinity ui`).
 
 ## Mettre à jour
 
-Relancez la commande d'installation : elle met Kreafinity à jour sans toucher à vos réglages ni à
-vos conversations. Redémarrez ensuite le démon (`systemctl --user restart kreafinity`, ou fermez
-puis rouvrez votre session).
+![Le bandeau de mise à jour](img/mise-a-jour.jpg)
+
+Kreafinity vérifie une fois par jour si une nouvelle version est publiée sur GitHub. Quand
+c'est le cas, une notification apparaît sur le bureau et un bandeau **« Une mise à jour de
+Kreafinity est disponible »** s'affiche dans l'interface et dans le panneau de l'assistant, avec
+la liste des nouveautés. Un clic sur **Mettre à jour** installe la nouvelle version en
+arrière-plan, puis redémarre Kreafinity ; la page se recharge toute seule. Vos réglages, clés API
+et conversations sont conservés.
+
+En ligne de commande :
+
+```bash
+kreafinity update --check     # y a-t-il une mise à jour ?
+kreafinity update             # l'installer
+kreafinity version            # version installée (et son commit)
+```
+
+La vérification envoie une requête anonyme à `api.github.com` (aucune donnée personnelle). Pour
+la désactiver : Réglages › Général › « Rechercher les mises à jour chaque jour », ou
+`check_updates: false` dans `~/.config/kreafinity/config.yaml`. Les éléments du bureau KDE (bouton
+de la barre des tâches) prennent la nouvelle version à la prochaine ouverture de session.
+
+Une copie de développement (`KREAFINITY_SOURCE`, ou `pip install -e .`) se met à jour avec
+`git pull`.
 
 ## Désinstaller
 

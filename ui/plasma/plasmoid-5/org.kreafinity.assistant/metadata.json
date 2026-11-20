@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Authors": [{"Email": "contact@kreafinity.com", "Name": "Kreafinity"}],
+        "Category": "Utilities",
+        "Description": "Votre assistant IA dans la barre des tâches",
+        "Description[en]": "Your AI assistant in the taskbar",
+        "EnabledByDefault": true,
+        "Icon": "kreafinity",
+        "Id": "org.kreafinity.assistant",
+        "License": "GPL-3.0-or-later",
+        "Name": "Kreafinity",
+        "ServiceTypes": ["Plasma/Applet"],
+        "Version": "0.1",
+        "Website": "https://kreafinity.com"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}
