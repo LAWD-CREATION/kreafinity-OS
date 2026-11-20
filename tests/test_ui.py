@@ -400,3 +400,31 @@ def test_update_banner(browser: Any, daemon: str, tmp_path: Path) -> None:
         context.close()
     finally:
         github.close()
+
+
+def test_soul_in_the_settings(page: Any, tmp_path: Path) -> None:
+    soul_file = tmp_path / "xdg-data" / "kreafinity" / "memory" / "soul.md"
+    page.click("#open-settings")
+    page.wait_for_selector("#settings[open]")
+    page.wait_for_selector("#settings-soul")
+    assert page.input_value("#settings-soul").startswith("Je suis Kreafinity")
+    assert page.is_visible("#settings-soul-seed") and not page.is_visible("#settings-soul-reset")
+    page.locator("#settings-soul-evolution").scroll_into_view_if_needed()
+    page.screenshot(path=str(tmp_path / "soul.png"))
+
+    page.fill("#settings-soul", "Je suis Kreafinity, taquin et très bref.")
+    page.uncheck("#settings-soul-evolution")
+    page.click("#settings button[type=submit]")
+    page.wait_for_selector("#settings", state="hidden")
+    assert soul_file.read_text() == "Je suis Kreafinity, taquin et très bref.\n"
+    config = (tmp_path / "xdg-config" / "kreafinity" / "config.yaml").read_text()
+    assert "soul_evolution: false" in config
+
+    page.click("#open-settings")
+    page.wait_for_selector("#settings-soul-reset:visible")
+    assert not page.is_visible("#settings-soul-seed")
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.click("#settings-soul-reset")
+    page.wait_for_selector("#settings-soul-seed:visible")
+    assert page.input_value("#settings-soul").startswith("Je suis Kreafinity, l'assistant")
+    assert not soul_file.exists()

@@ -168,5 +168,8 @@
   "files.dialog_title": "Ask Kreafinity",
   "files.dialog_label": "Your question about the selection:",
   "plasma.files_menu": "Right-click in the file manager: Actions › Kreafinity.",
-  "plasma.shortcut": "Assistant keyboard shortcut: {shortcut}."
+  "plasma.shortcut": "Assistant keyboard shortcut: {shortcut}.",
+  "memory.cli.soul": "Its soul (the personality it built itself):",
+  "memory.cli.soul_seed": "Its soul (starting personality, which it will grow):",
+  "memory.cli.soul_reset": "Kreafinity is back to its original personality."
 }

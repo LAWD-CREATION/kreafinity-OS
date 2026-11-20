@@ -705,7 +705,7 @@ function onEvent(event) {
       return openConversation(event.conversation_id);
     case "memory_updated":
       // Learned something from a finished conversation (not the user's own edit).
-      if (event.conversation_id && !compact) toast(t("memory.updated"));
+      if (event.conversation_id && !compact) toast(t(event.soul ? "memory.soul_updated" : "memory.updated"));
       break;
     case "update_available":
     case "update_started":

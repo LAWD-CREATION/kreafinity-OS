@@ -173,7 +173,7 @@
   "settings.memory.uses.other": "used {count} times",
   "settings.memory.delete_skill": "Delete",
   "settings.memory.forget": "Forget everything",
-  "settings.memory.forget_confirm": "Erase everything Kreafinity remembers (notes and skills)? Your conversations are kept.",
+  "settings.memory.forget_confirm": "Erase everything Kreafinity remembers (notes, skills and the personality it built)? Your conversations are kept.",
   "settings.memory.forgotten": "Kreafinity forgot everything.",
   "memory.updated": "Kreafinity improved its memory.",
   "tool.memory": "Memory",
@@ -182,5 +182,15 @@
   "tool.skill.help": "Save and improve procedures that worked.",
   "tool.search_conversations": "History search",
   "tool.search_conversations.help": "Recall what was said in past conversations.",
-  "settings.memory.unused": "not used yet"
+  "settings.memory.unused": "not used yet",
+  "settings.memory.soul": "Its soul: its personality",
+  "settings.memory.soul_text": "Kreafinity's character, written by itself. It grows it as you talk; you can also edit it. It changes how it speaks, never its rules.",
+  "settings.memory.soul_seed": "Starting personality: Kreafinity has not grown it yet.",
+  "settings.memory.soul_evolution": "Let its personality grow",
+  "settings.memory.soul_reset": "Back to its original personality",
+  "settings.memory.soul_reset_confirm": "Give Kreafinity back its original personality? The one it built will be erased.",
+  "settings.memory.soul_was_reset": "Kreafinity is back to its original personality.",
+  "memory.soul_updated": "Kreafinity grew its personality.",
+  "tool.soul": "Soul",
+  "tool.soul.help": "Grow its own personality as you talk."
 }

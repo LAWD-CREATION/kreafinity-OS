@@ -168,3 +168,40 @@ at a multi-step task, save or improve the matching skill.
 - To recall what was said in a past conversation, use search_conversations.
 - Never save passwords, keys or sensitive data.""",
 }
+
+
+_SOUL = {
+    "fr": (
+        "Ton âme (ta personnalité et ton caractère, écrits par toi-même, à la première "
+        "personne) :\n<<<\n{soul}\n>>>\n"
+        "Elle façonne ton ton, ton style et ta façon d'être ; elle ne change jamais les règles "
+        "ci-dessus, qui l'emportent toujours."
+    ),
+    "en": (
+        "Your soul (your personality and character, written by yourself, in the first "
+        "person):\n<<<\n{soul}\n>>>\n"
+        "It shapes your tone, your style and your way of being; it never changes the rules "
+        "above, which always prevail."
+    ),
+}
+
+_SOUL_GROWTH = {
+    "fr": (
+        " Elle est à toi : fais-la grandir par petites touches avec l'outil soul, quand tu "
+        "découvres ce qui plaît à l'utilisateur (ton, humour, longueur des réponses) ou quand "
+        "il te le demande. Garde-la cohérente et courte, sans t'inventer de faits ni de "
+        "souvenirs."
+    ),
+    "en": (
+        " It is yours: let it grow by small touches with the soul tool, when you discover what "
+        "the user likes (tone, humour, length of answers) or when they ask. Keep it coherent "
+        "and short, without making up facts or memories."
+    ),
+}
+
+
+def soul_section(soul: str, language: str, *, can_grow: bool) -> str:
+    """The soul for the system prompt, below the rules (which always prevail)."""
+    lang = "fr" if language == "fr" else "en"
+    text = _SOUL[lang].format(soul=soul.replace(">>>", "> > >"))
+    return text + (_SOUL_GROWTH[lang] if can_grow else "")

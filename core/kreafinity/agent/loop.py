@@ -11,7 +11,7 @@ from typing import Any, Literal
 import jsonschema
 
 from kreafinity.agent.action_log import ActionLog, ActionStatus
-from kreafinity.agent.prompts import build_system_prompt
+from kreafinity.agent.prompts import build_system_prompt, soul_section
 from kreafinity.memory import MemoryStore
 from kreafinity.paths import user_dirs
 from kreafinity.providers.base import (
@@ -183,6 +183,7 @@ class Agent:
         fallback: tuple[LLMProvider, str | None] | None = None,
         memory: MemoryStore | None = None,
         instructions: str | None = None,
+        soul: str | None = None,
     ) -> None:
         """Create an agent.
 
@@ -203,6 +204,8 @@ class Agent:
                 every request (none: no memory).
             instructions: System prompt to use instead of the assistant's
                 usual one (e.g. for the review of a conversation).
+            soul: The assistant's personality (none: no particular one). It
+                may grow when the soul tool is available.
         """
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -217,6 +220,7 @@ class Agent:
         self.fallback = fallback
         self.memory = memory
         self.instructions = instructions
+        self.soul = soul
         self._system: tuple[tuple[object, ...], Message] | None = None
 
     def use_provider(self, provider: LLMProvider, model: str | None = None) -> None:
@@ -235,8 +239,13 @@ class Agent:
             provider=self.provider.display_name,
             model=self.model or self.provider.default_model,
         )
-        snapshot = self.memory.snapshot(self.language) if self.memory else ""
-        return f"{prompt}\n\n{snapshot}" if snapshot else prompt
+        parts = [prompt]
+        if self.soul:
+            can_grow = self.tools.get("soul") is not None
+            parts.append(soul_section(self.soul, self.language, can_grow=can_grow))
+        if self.memory and (snapshot := self.memory.snapshot(self.language)):
+            parts.append(snapshot)
+        return "\n\n".join(parts)
 
     async def run(self, conversation: Conversation, user_text: str) -> AsyncIterator[AgentEvent]:
         """Handle one user request, appending every message to `conversation`.

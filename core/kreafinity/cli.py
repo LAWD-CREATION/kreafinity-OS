@@ -120,23 +120,38 @@ def version() -> None:
 @app.command("memory")
 def memory_command(
     forget: Annotated[
-        bool, typer.Option("--forget", "--oublier", help="Tout effacer (notes et savoir-faire).")
+        bool,
+        typer.Option("--forget", "--oublier", help="Tout effacer (notes, savoir-faire, âme)."),
+    ] = False,
+    soul_reset: Annotated[
+        bool,
+        typer.Option(
+            "--reset-soul", "--nouvelle-ame", help="Rendre à Kreafinity sa personnalité d'origine."
+        ),
     ] = False,
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
     ] = False,
 ) -> None:
-    """Montre ce dont Kreafinity se souvient de vous, ou l'efface."""
+    """Montre ce dont Kreafinity se souvient de vous et son âme (sa personnalité), ou l'efface."""
     from kreafinity.memory import MemoryStore
 
-    _load_settings()
+    settings = _load_settings()
     store = MemoryStore()
+    if soul_reset:
+        store.reset_soul()
+        console.print(Text(t("memory.cli.soul_reset"), style="green"))
+        return
     if forget:
         if not yes and not typer.confirm(t("memory.cli.forget_confirm"), default=False):
             raise typer.Exit(1)
         store.forget_all()
         console.print(Text(t("memory.cli.forgotten"), style="green"))
         return
+    title = "memory.cli.soul" if store.has_own_soul() else "memory.cli.soul_seed"
+    console.print(Text(t(title), style="bold"))
+    for line in store.soul(settings.language).splitlines():
+        console.print(Text(f"  {line}"))
     if store.is_empty():
         console.print(t("memory.cli.empty"))
         return

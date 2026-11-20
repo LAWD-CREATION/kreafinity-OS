@@ -57,7 +57,13 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language
-from kreafinity.memory import MAX_SECTION, MEMORY_TOOLS, MemoryRefusedError, MemoryStore
+from kreafinity.memory import (
+    MAX_SECTION,
+    MAX_SOUL,
+    MEMORY_TOOLS,
+    MemoryRefusedError,
+    MemoryStore,
+)
 from kreafinity.providers import (
     LLMProvider,
     Message,
@@ -114,6 +120,13 @@ class ServiceError(Exception):
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds")
+
+
+def _left_out_tools(settings: Settings) -> frozenset[str]:
+    """Memory tools the settings turn off (all with the memory, the soul's alone)."""
+    if not settings.memory:
+        return MEMORY_TOOLS
+    return frozenset() if settings.soul_evolution else frozenset({"soul"})
 
 
 # --- Events ---------------------------------------------------------------------------
@@ -580,7 +593,7 @@ class AssistantService:
         )
         agent = Agent(
             llm,
-            ToolRegistry.load(settings.tools, exclude=() if settings.memory else MEMORY_TOOLS),
+            ToolRegistry.load(settings.tools, exclude=_left_out_tools(settings)),
             self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
             model=model,
             language=settings.language,
@@ -589,6 +602,7 @@ class AssistantService:
             action_log=self._action_log,
             fallback=fallback,
             memory=MemoryStore() if settings.memory else None,
+            soul=MemoryStore().soul(settings.language),
         )
         pending = self._reviews.pop(conversation_id, None)
         if pending is not None:  # the conversation goes on: review it later
@@ -725,7 +739,7 @@ class AssistantService:
         memory = MemoryStore()
         agent = Agent(
             llm,
-            ToolRegistry.load(sorted(MEMORY_TOOLS)),
+            ToolRegistry.load(sorted(MEMORY_TOOLS), exclude=_left_out_tools(settings)),
             self._context or ToolContext.create(allowed_paths=settings.allowed_paths),
             model=model,
             language=settings.language,
@@ -733,19 +747,27 @@ class AssistantService:
             action_log=self._action_log,
             memory=memory,
             instructions=review.instructions(settings.language),
+            soul=memory.soul(settings.language),
         )
         changes = 0
+        soul_changed = False
         try:
             async for event in agent.run(Conversation(), review.transcript(new, settings.language)):
                 if isinstance(event, ToolCallFinished) and event.status == "ok":
                     changes += 1
+                    soul_changed = soul_changed or event.call.name == "soul"
         except ProviderError as exc:
             logger.info("Review of %s failed: %s", conversation_id, exc)
             return 0  # retried after the next exchange
         state.mark(conversation_id, len(messages))
         if changes:
             self.events.publish(
-                {"type": "memory_updated", "conversation_id": conversation_id, "changes": changes}
+                {
+                    "type": "memory_updated",
+                    "conversation_id": conversation_id,
+                    "changes": changes,
+                    "soul": soul_changed,
+                }
             )
         return changes
 
@@ -756,6 +778,10 @@ class AssistantService:
         return {
             "enabled": settings.memory,
             "review": settings.memory_review,
+            "soul": store.soul(settings.language),
+            "soul_is_seed": not store.has_own_soul(),
+            "soul_evolution": settings.soul_evolution,
+            "soul_limit": MAX_SOUL,
             "user": store.read("user"),
             "notes": store.read("notes"),
             "skills": [
@@ -773,8 +799,12 @@ class AssistantService:
 
     def write_memory(self, section: str, content: str) -> Event:
         """Replace a notebook with the user's text."""
+        store = MemoryStore()
         try:
-            MemoryStore().write(section, content)
+            if section == "soul":
+                store.write_soul(content)
+            else:
+                store.write(section, content)
         except MemoryRefusedError as exc:
             raise ServiceError(str(exc), code="invalid") from exc
         result = self.memory_info()
@@ -786,6 +816,12 @@ class AssistantService:
             MemoryStore().delete_skill(name)
         except MemoryRefusedError as exc:
             raise ServiceError(str(exc), code="not_found") from exc
+        return self.memory_info()
+
+    def reset_soul(self) -> Event:
+        """Give the assistant back the personality it started with."""
+        MemoryStore().reset_soul()
+        self.events.publish({"type": "memory_updated", "changes": 1, "soul": True})
         return self.memory_info()
 
     def forget_memory(self) -> Event:
