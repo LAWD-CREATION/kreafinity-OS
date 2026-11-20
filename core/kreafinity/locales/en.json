@@ -171,5 +171,10 @@
   "plasma.shortcut": "Assistant keyboard shortcut: {shortcut}.",
   "memory.cli.soul": "Its soul (the personality it built itself):",
   "memory.cli.soul_seed": "Its soul (starting personality, which it will grow):",
-  "memory.cli.soul_reset": "Kreafinity is back to its original personality."
+  "memory.cli.soul_reset": "Kreafinity is back to its original personality.",
+  "tool.set_appearance.theme.dark": "Switch the desktop to the dark theme",
+  "tool.set_appearance.theme.light": "Switch the desktop to the light theme",
+  "tool.set_appearance.theme.kreafinity": "Apply the Kreafinity colors to the desktop",
+  "tool.set_appearance.wallpaper": "change the wallpaper",
+  "tool.set_appearance.and": " and "
 }

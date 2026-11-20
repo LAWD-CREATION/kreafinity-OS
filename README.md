@@ -61,7 +61,8 @@ kreafinity bubble --autostart             # l'afficher à chaque ouverture de se
 **Sur KDE Plasma** (étape 2, en cours), Kreafinity s'intègre au bureau : une question tapée dans
 le menu démarrer est envoyée à l'assistant, un bouton ∞ dans la barre des tâches (ou Meta+C)
 ouvre le panneau, un clic droit sur des fichiers propose de les expliquer, les résumer ou les
-ranger, et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
+ranger, l'assistant change le thème (clair, sombre, Kreafinity) et le fond d'écran à la demande,
+et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
 [docs/bureau-kde.md](docs/bureau-kde.md).
 ```bash
 kreafinity desktop install --theme        # recherche, bouton de la barre des tâches, couleurs
@@ -86,7 +87,7 @@ kreafinity provider list                  # fournisseurs, clés, IA par défaut 
 Pour basculer automatiquement sur un modèle local quand Internet ne répond pas, choisissez une IA
 de secours dans les réglages (ou `fallback: ollama/llama3.1` dans `~/.config/kreafinity/config.yaml`).
 
-Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, régler le volume ou la luminosité,
+Toute action qui modifie l'ordinateur (créer, déplacer, ouvrir, régler le volume ou la luminosité, changer le thème ou le fond d'écran,
 mettre à la corbeille, exécuter une commande, installer un logiciel…) vous est d'abord présentée
 et ne s'exécute qu'avec votre accord. Liste des outils et garde-fous : [docs/outils.md](docs/outils.md).
 Journal des actions : `~/.local/share/kreafinity/actions.log`. API locale du démon :

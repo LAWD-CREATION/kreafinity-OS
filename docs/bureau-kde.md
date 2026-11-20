@@ -44,6 +44,11 @@ souhaitez, une disposition à la façon de Windows : une seule barre en bas avec
 démarrer (logo ∞), les applications ouvertes, l'assistant, la zone de notification et
 l'horloge.
 
+**L'apparence à la voix… ou presque.** Demandez « passe en mode sombre », « mets la photo
+Plage.jpg en fond d'écran » ou « remets le thème Kreafinity » : l'assistant change le thème et
+le fond d'écran, après votre validation, sans toucher à la disposition du bureau (voir
+[outils.md](outils.md#apparence-du-bureau-set_appearance)).
+
 Sur Plasma, ce bouton remplace la bulle flottante utilisée sur les autres bureaux.
 
 ## Installer
