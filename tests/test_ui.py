@@ -299,3 +299,104 @@ def test_panel_shows_a_question_from_the_desktop_search(
     other.wait_for_selector(f"text={SLOW_ANSWER}")
     assert errors == []
     context.close()
+
+
+class FakeGitHub:
+    """A tiny GitHub: the compare API finds two changes; downloads are missing."""
+
+    def __init__(self, installed: str, latest: str) -> None:
+        import http.server
+        import threading
+
+        compare = {
+            "status": "ahead",
+            "commits": [
+                {"sha": "b" * 40, "commit": {"message": "feat: memory that improves"}},
+                {"sha": latest, "commit": {"message": "fix: faster search"}},
+            ],
+        }
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                if self.path == f"/api/repos/k/os/compare/{installed}...main":
+                    body = json.dumps(compare).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                else:
+                    self.send_error(404)
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def test_update_banner(browser: Any, daemon: str, tmp_path: Path) -> None:
+    installed, latest = "a" * 40, "c" * 40
+    github = FakeGitHub(installed, latest)
+    record = {
+        "repository": f"{github.url}/k/os",
+        "api": f"{github.url}/api/repos/k/os",
+        "ref": "main",
+        "commit": installed,
+    }
+    (tmp_path / "xdg-data" / "kreafinity" / "install.json").write_text(json.dumps(record))
+    token = (tmp_path / "xdg-data" / "kreafinity" / "token").read_text().strip()
+    auth = {"Authorization": f"Bearer {token}"}
+    try:
+        found = httpx.post(f"{daemon}/api/update/check", headers=auth, timeout=10).json()
+        assert found["available"] and found["latest"] == latest
+
+        context = browser.new_context(viewport={"width": 1280, "height": 860}, locale="fr-FR")
+        page = context.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(daemon)
+        banner = page.locator("#update-banner")
+        banner.wait_for()
+        assert "Une mise à jour de Kreafinity est disponible" in banner.inner_text()
+        assert "2 nouveautés." in banner.inner_text()
+        page.click("#update-changes summary")
+        assert page.locator("#update-list li").all_inner_texts() == [
+            "fix: faster search",
+            "feat: memory that improves",
+        ]
+
+        # The button starts the installation; here the download is missing.
+        page.click("#update-install")
+        page.wait_for_selector("#update-banner.working")
+        assert "Mise à jour en cours" in banner.inner_text()
+        page.wait_for_selector("#update-banner.failed", timeout=60_000)
+        assert "La mise à jour a échoué" in banner.inner_text()
+        assert page.inner_text("#update-install") == "Réessayer"
+        status = httpx.get(f"{daemon}/api/update", headers=auth, timeout=5).json()["status"]
+        assert status["state"] == "failed" and status["target"] == latest
+
+        # Settings: installed version and « Rechercher maintenant ».
+        page.click("#open-settings")
+        page.wait_for_selector("text=Version installée : aaaaaaa (branche main)")
+        page.click("#settings-update-check")
+        page.wait_for_selector("text=Une mise à jour est disponible.")
+        page.keyboard.press("Escape")
+
+        # « Plus tard »: hidden, and still hidden after a reload.
+        page.click("#update-later")
+        assert banner.is_hidden()
+        page.reload()
+        page.wait_for_selector("#connection.online")
+        page.wait_for_timeout(500)
+        assert banner.is_hidden()
+        assert errors == []
+        context.close()
+    finally:
+        github.close()

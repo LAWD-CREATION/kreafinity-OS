@@ -57,6 +57,7 @@ STATUS_BY_CODE: dict[ErrorCode, int] = {
     "provider_auth": status.HTTP_502_BAD_GATEWAY,
     "provider_error": status.HTTP_502_BAD_GATEWAY,
     "keyring_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "update_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 PeerLookup = Callable[[Address | None, Address | None], int | None]
@@ -149,6 +150,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service = service_factory()
         app.state.service = service
+        service.start_background_tasks()
         try:
             yield
         finally:
@@ -225,6 +227,20 @@ def create_app(
     async def cancel(service: Service, conversation_id: str) -> dict[str, str]:
         await service.cancel_run(conversation_id)
         return {"status": "cancelled"}
+
+    # --- Updates -----------------------------------------------------------------------
+
+    @api.get("/update")
+    async def update_info(service: Service) -> dict[str, Any]:
+        return service.update_info()
+
+    @api.post("/update/check")
+    async def check_updates(service: Service) -> dict[str, Any]:
+        return await service.check_updates()
+
+    @api.post("/update", status_code=status.HTTP_202_ACCEPTED)
+    async def start_update(service: Service) -> dict[str, Any]:
+        return service.start_update()
 
     # --- Assistant panels (bubble, Plasma widget) ---------------------------------------
 

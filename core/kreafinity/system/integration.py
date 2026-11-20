@@ -168,8 +168,13 @@ class Report:
         self.done.append((key, values))
 
 
-def install(*, bubble: bool, icon_source: Path | None, autostart_comment: str) -> Report:
-    """Add the service, the menu entry and (if `bubble`) the bubble at login."""
+def install(
+    *, bubble: bool, icon_source: Path | None, autostart_comment: str, restart: bool = True
+) -> Report:
+    """Add the service, the menu entry and (if `bubble`) the bubble at login.
+
+    With `restart`, the daemon is (re)started in the current graphical session.
+    """
     report = Report()
 
     unit = service_path()
@@ -180,11 +185,12 @@ def install(*, bubble: bool, icon_source: Path | None, autostart_comment: str) -
         systemctl("daemon-reload")
         if systemctl("enable", SERVICE_NAME):
             report.add("setup.service_enabled")
-        if systemctl("is-active", "graphical-session.target"):
+        in_session = systemctl("is-active", "graphical-session.target")
+        if restart and in_session:
             import_session_environment()
             if systemctl("restart", SERVICE_NAME):
                 report.add("setup.service_started")
-        else:
+        elif not in_session:
             report.add("setup.service_next_login")
     else:
         report.add("setup.no_systemd")

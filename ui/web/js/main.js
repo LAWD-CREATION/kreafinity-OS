@@ -6,6 +6,7 @@ import { el, hydrateIcons, icon, relativeTime, shortenPath } from "./dom.js";
 import { language, setLanguage, t, translatePage } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
+import { UpdateBanner } from "./update.js";
 
 const api = new Api();
 const $ = (id) => document.getElementById(id);
@@ -41,6 +42,7 @@ const state = {
 
 let welcome;
 let settings;
+let updates;
 
 // --- Start -----------------------------------------------------------------------------
 
@@ -100,7 +102,8 @@ async function start() {
     await setLanguage(state.config.language);
     translatePage();
   }
-  settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast });
+  updates = new UpdateBanner(api, { toast });
+  settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast, updates });
   bindInterface();
   renderWelcome();
   renderPicker();
@@ -109,6 +112,7 @@ async function start() {
   $("app").hidden = false;
   $("prompt").focus();
   if (initialConversation) await openConversation(initialConversation);
+  updates.refresh();
   new EventStream(api, { onEvent, onStatus: setConnected, panel: compact }).connect();
 }
 
@@ -699,6 +703,10 @@ function onEvent(event) {
       if (!compact) return;
       tellBubble({ type: "show" });
       return openConversation(event.conversation_id);
+    case "update_available":
+    case "update_started":
+      updates?.onEvent(event);
+      break;
     case "config_updated":
       state.config = event.config;
       break;

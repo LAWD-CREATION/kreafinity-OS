@@ -140,5 +140,17 @@
   "desktop.confirm_layout": "Réorganiser le bureau à la façon de Windows ? Vos panneaux actuels seront remplacés.",
   "desktop.error": "Impossible d'intégrer Kreafinity à Plasma : {detail}",
   "desktop.done": "Kreafinity est intégré à KDE Plasma.",
-  "desktop.removed": "Intégration à KDE Plasma retirée."
+  "desktop.removed": "Intégration à KDE Plasma retirée.",
+  "update.notification.title": "Mise à jour de Kreafinity disponible",
+  "update.notification.body.one": "{count} nouveauté. Ouvrez Kreafinity pour l'installer.",
+  "update.notification.body.other": "{count} nouveautés. Ouvrez Kreafinity pour l'installer.",
+  "update.cli.dev": "Copie de développement : mettez-la à jour avec git (git pull).",
+  "update.cli.check_failed": "Impossible de vérifier les mises à jour : {detail}",
+  "update.cli.up_to_date": "Kreafinity est à jour.",
+  "update.cli.available.one": "Une mise à jour est disponible ({count} nouveauté) :",
+  "update.cli.available.other": "Une mise à jour est disponible ({count} nouveautés) :",
+  "update.cli.hint": "Pour l'installer : kreafinity update",
+  "update.cli.confirm": "Installer la mise à jour maintenant ?",
+  "update.cli.failed": "La mise à jour a échoué : {detail}",
+  "update.cli.done": "Kreafinity est à jour. Les éléments du bureau KDE seront rafraîchis à la prochaine session."
 }

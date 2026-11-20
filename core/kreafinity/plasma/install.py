@@ -175,8 +175,11 @@ def evaluate_script(script: str) -> str | None:
 # --- Install / remove ---------------------------------------------------------------------------
 
 
-def install(version: int, *, port: int) -> Report:
+def install(version: int, *, port: int, add_widget: bool = True) -> Report:
     """Install the search plugin, the taskbar widget and the theme files for `version`.
+
+    With `add_widget`, the widget is also put on the taskbar (an update only
+    refreshes the files: a widget the user removed stays removed).
 
     Raises:
         PlasmaError: Unsupported version, or the files are missing.
@@ -225,6 +228,8 @@ def install(version: int, *, port: int) -> Report:
         shutil.copyfile(logo, icon)
 
     _run(f"kquitapp{version}", "krunner")  # restarted on next use, with the new plugin
+    if not add_widget:
+        return report
     answer = evaluate_script(ADD_WIDGET_SCRIPT % {"id": WIDGET_ID})
     if answer is not None and answer.strip() in ("added", "present"):
         report.add("plasma.widget_added")

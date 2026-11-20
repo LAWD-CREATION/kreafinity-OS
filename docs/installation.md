@@ -120,9 +120,28 @@ Tout cela se règle aussi dans l'écran **Réglages** de l'interface (`kreafinit
 
 ## Mettre à jour
 
-Relancez la commande d'installation : elle met Kreafinity à jour sans toucher à vos réglages ni à
-vos conversations. Redémarrez ensuite le démon (`systemctl --user restart kreafinity`, ou fermez
-puis rouvrez votre session).
+Kreafinity vérifie une fois par jour si une nouvelle version est publiée sur GitHub. Quand
+c'est le cas, une notification apparaît sur le bureau et un bandeau **« Une mise à jour de
+Kreafinity est disponible »** s'affiche dans l'interface et dans le panneau de l'assistant, avec
+la liste des nouveautés. Un clic sur **Mettre à jour** installe la nouvelle version en
+arrière-plan, puis redémarre Kreafinity ; la page se recharge toute seule. Vos réglages, clés API
+et conversations sont conservés.
+
+En ligne de commande :
+
+```bash
+kreafinity update --check     # y a-t-il une mise à jour ?
+kreafinity update             # l'installer
+kreafinity version            # version installée (et son commit)
+```
+
+La vérification envoie une requête anonyme à `api.github.com` (aucune donnée personnelle). Pour
+la désactiver : Réglages › Général › « Rechercher les mises à jour chaque jour », ou
+`check_updates: false` dans `~/.config/kreafinity/config.yaml`. Les éléments du bureau KDE (bouton
+de la barre des tâches) prennent la nouvelle version à la prochaine ouverture de session.
+
+Une copie de développement (`KREAFINITY_SOURCE`, ou `pip install -e .`) se met à jour avec
+`git pull`.
 
 ## Désinstaller
 

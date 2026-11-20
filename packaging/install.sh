@@ -126,6 +126,20 @@ find_python() {
 installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
 available() { apt-cache show "$1" >/dev/null 2>&1; }
 
+# Current commit of a branch on GitHub ("owner/name" "branch"); empty if unknown.
+latest_commit() {
+  "$VENV/bin/python" -c '
+import sys, urllib.request
+request = urllib.request.Request(
+    "https://api.github.com/repos/%s/commits/%s" % (sys.argv[1], sys.argv[2]),
+    headers={"Accept": "application/vnd.github.sha", "User-Agent": "Kreafinity"},
+)
+commit = urllib.request.urlopen(request, timeout=20).read().decode().strip()
+if len(commit) == 40 and all(char in "0123456789abcdef" for char in commit):
+    print(commit)
+' "$1" "$2" 2>/dev/null || true
+}
+
 # --- System packages (apt) ----------------------------------------------------------------
 
 python="$(find_python || true)"
@@ -203,11 +217,27 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   "$python" -m venv "$VENV"
 fi
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade pip
+
+# From GitHub, install the branch's current commit exactly, and remember it:
+# Kreafinity then knows when an update is available.
+commit=""
+if [[ -z "${KREAFINITY_SOURCE:-}" ]]; then
+  commit="$(latest_commit "${REPOSITORY#https://github.com/}" "$REF")"
+  if [[ -n "$commit" ]]; then
+    SOURCE="$REPOSITORY/archive/$commit.tar.gz"
+  fi
+fi
+
 say "Installation de Kreafinity et de ses dépendances (quelques minutes)…"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade "$SOURCE"
 # A local folder keeps the same version number: make sure its latest code is used.
 if [[ -d "$SOURCE" ]]; then
   "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --force-reinstall --no-deps "$SOURCE"
+fi
+if [[ -z "${KREAFINITY_SOURCE:-}" ]]; then
+  "$VENV/bin/python" -m kreafinity.update record "$REPOSITORY" "$REF" "$commit"
+else
+  rm -f "$DATA_DIR/install.json" # your own copy: you update it yourself
 fi
 
 mkdir -p "$BIN_DIR"

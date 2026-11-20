@@ -108,7 +108,56 @@ def main() -> None:
 @app.command()
 def version() -> None:
     """Affiche la version de Kreafinity OS."""
-    console.print(f"Kreafinity OS [bold]{__version__}[/bold]")
+    from kreafinity.update import installation
+
+    record = installation()
+    detail = ""
+    if record is not None and record.commit:
+        detail = f" ({record.commit[:7]}, {record.ref})"
+    console.print(f"Kreafinity OS [bold]{__version__}[/bold]{detail}")
+
+
+@app.command("update")
+def update_command(
+    check_only: Annotated[
+        bool, typer.Option("--check", help="Seulement dire si une mise à jour existe.")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Ne pas demander de confirmation.")
+    ] = False,
+) -> None:
+    """Met à jour Kreafinity depuis GitHub (la page web propose aussi un bouton)."""
+    from kreafinity import update as updates
+
+    _load_settings()
+    record = updates.installation()
+    if record is None:
+        err_console.print(Text(t("update.cli.dev"), style="yellow"))
+        raise typer.Exit(1)
+    try:
+        result = asyncio.run(updates.check(record))
+    except updates.UpdateError as exc:
+        err_console.print(Text(t("update.cli.check_failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    result.notified = updates.load_check().notified
+    updates.save_check(result)
+    if not result.available or result.latest is None:
+        console.print(Text(t("update.cli.up_to_date"), style="green"))
+        return
+    console.print(Text(t("update.cli.available", count=len(result.changes)), style="bold"))
+    for change in result.changes:
+        console.print(Text(f"  • {change.title}"))
+    if check_only:
+        console.print(Text(t("update.cli.hint"), style="dim"))
+        return
+    if not yes and not typer.confirm(t("update.cli.confirm"), default=True):
+        raise typer.Exit(1)
+    try:
+        updates.apply(result.latest, log=lambda line: console.print(Text(line, style="dim")))
+    except updates.UpdateError as exc:
+        err_console.print(Text(t("update.cli.failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    console.print(Text(t("update.cli.done"), style="green"))
 
 
 @app.command()
@@ -520,9 +569,18 @@ def setup(
         bool,
         typer.Option("--bubble/--no-bubble", help="Afficher la bulle à l'ouverture de session."),
     ] = True,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            "--refresh", hidden=True, help="Après une mise à jour : réécrire ce qui est installé."
+        ),
+    ] = False,
 ) -> None:
     """Intègre Kreafinity à votre session : démarrage automatique, menu, bulle."""
-    _load_settings()
+    settings = _load_settings()
+    if refresh:
+        _refresh_integration(settings.port)
+        return
     if uninstall:
         report = integration.uninstall()
         for key, values in report.done:
@@ -544,6 +602,24 @@ def setup(
     for key, values in report.done:
         console.print(t(key, **values))
     console.print(Text(t("setup.done"), style="green"))
+
+
+def _refresh_integration(port: int) -> None:
+    """Rewrite the installed session files with this version, keeping the user's choices."""
+    from kreafinity.api.web import web_root
+    from kreafinity.plasma import install as plasma
+
+    root = web_root()
+    if integration.service_installed() or integration.menu_entry_path().exists():
+        integration.install(
+            bubble=integration.autostart_path().exists(),
+            icon_source=root / "img" / "logo.svg" if root else None,
+            autostart_comment=t("bubble.autostart_comment"),
+            restart=False,  # the updater restarts everything afterwards
+        )
+    version = plasma.plasma_version()
+    if plasma.is_installed() and version in plasma.SUPPORTED_VERSIONS:
+        plasma.install(version, port=port, add_widget=False)
 
 
 @app.command()

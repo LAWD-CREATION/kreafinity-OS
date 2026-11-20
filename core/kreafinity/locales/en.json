@@ -140,5 +140,17 @@
   "desktop.confirm_layout": "Rearrange the desktop like Windows? Your current panels will be replaced.",
   "desktop.error": "Cannot integrate Kreafinity with Plasma: {detail}",
   "desktop.done": "Kreafinity is integrated with KDE Plasma.",
-  "desktop.removed": "KDE Plasma integration removed."
+  "desktop.removed": "KDE Plasma integration removed.",
+  "update.notification.title": "Kreafinity update available",
+  "update.notification.body.one": "{count} change. Open Kreafinity to install it.",
+  "update.notification.body.other": "{count} changes. Open Kreafinity to install it.",
+  "update.cli.dev": "Development copy: update it with git (git pull).",
+  "update.cli.check_failed": "Cannot check for updates: {detail}",
+  "update.cli.up_to_date": "Kreafinity is up to date.",
+  "update.cli.available.one": "An update is available ({count} change):",
+  "update.cli.available.other": "An update is available ({count} changes):",
+  "update.cli.hint": "To install it: kreafinity update",
+  "update.cli.confirm": "Install the update now?",
+  "update.cli.failed": "The update failed: {detail}",
+  "update.cli.done": "Kreafinity is up to date. KDE desktop parts refresh at the next session."
 }

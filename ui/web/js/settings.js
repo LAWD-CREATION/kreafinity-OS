@@ -34,11 +34,12 @@ function joinSpec(name, model) {
 }
 
 export class SettingsDialog {
-  constructor({ api, info, onSaved, toast }) {
+  constructor({ api, info, onSaved, toast, updates }) {
     this.api = api;
     this.info = info;
     this.onSaved = onSaved;
     this.toast = toast;
+    this.updates = updates;
     this.dialog = document.getElementById("settings");
     this.dialog.addEventListener("click", (event) => {
       if (event.target === this.dialog) this.dialog.close(); // click on the backdrop
@@ -95,6 +96,7 @@ export class SettingsDialog {
           el("option", { value, selected: applyTheme() === value }, t(`settings.theme.${value}`)),
         ),
       ),
+      checkUpdates: el("input", { id: "settings-check-updates", type: "checkbox", checked: config.check_updates !== false }),
     };
     this.fields.folders.value = config.allowed_paths.join("\n");
     this.toolBoxes = new Map();
@@ -146,6 +148,8 @@ export class SettingsDialog {
           el("div", { class: "field-row two" }, el("label", { for: "settings-language" }, t("settings.general.language")), this.fields.language),
           el("div", { class: "field-row two" }, el("label", { for: "settings-iterations" }, t("settings.general.iterations")), this.fields.iterations),
           el("div", { class: "field-row two" }, el("label", { for: "settings-theme" }, t("settings.general.theme")), this.fields.theme),
+          el("div", { class: "field-row two" }, el("label", { for: "settings-check-updates" }, t("settings.updates.auto")), el("div", {}, this.fields.checkUpdates)),
+          this.renderUpdates(),
         ),
         this.error,
       ),
@@ -171,6 +175,33 @@ export class SettingsDialog {
       checkbox,
       el("label", { for: id }, el("div", { class: "tool-name" }, label === `tool.${tool.name}` ? tool.name : label), el("div", { class: "hint" }, t(`tool.${tool.name}.help`) === `tool.${tool.name}.help` ? tool.description : t(`tool.${tool.name}.help`))),
       el("span", { class: `risk ${tool.risk}` }, t(`risk.${tool.risk}`)),
+    );
+  }
+
+  /** Installed version and « Rechercher maintenant » (updates). */
+  renderUpdates() {
+    const info = this.updates?.info;
+    if (!info) return null;
+    if (!info.supported) return el("p", { class: "hint" }, t("settings.updates.dev"));
+    const result = el("span", { class: "hint", id: "settings-update-result" });
+    const button = el("button", { class: "button small", type: "button", id: "settings-update-check" }, t("settings.updates.check"));
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const answer = await this.updates.check();
+        result.textContent = t(answer.available ? "settings.updates.available" : "settings.updates.up_to_date");
+      } catch (error) {
+        result.textContent = error instanceof ApiError ? error.message : String(error);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    const commit = info.current?.commit ? info.current.commit.slice(0, 7) : "?";
+    return el(
+      "div",
+      { class: "field-row two" },
+      el("span", {}, t("settings.updates.current", { commit, ref: info.current?.ref ?? "" })),
+      el("div", { class: "update-check" }, button, result),
     );
   }
 
@@ -245,6 +276,9 @@ export class SettingsDialog {
     if (fields.language.value !== this.config.language) changes.language = fields.language.value;
     const iterations = Number(fields.iterations.value);
     if (iterations !== this.config.max_iterations) changes.max_iterations = iterations;
+    if (fields.checkUpdates.checked !== (this.config.check_updates !== false)) {
+      changes.check_updates = fields.checkUpdates.checked;
+    }
 
     const theme = fields.theme.value;
     try {

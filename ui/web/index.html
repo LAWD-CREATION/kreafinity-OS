@@ -70,6 +70,22 @@
         <button id="key-warning-button" class="button small" type="button" data-i18n="picker.add_key">Ajouter la clé</button>
       </div>
 
+      <div id="update-banner" class="update-banner" role="status" hidden>
+        <span data-icon="download"></span>
+        <div class="update-text">
+          <strong id="update-title"></strong>
+          <span id="update-detail"></span>
+          <details id="update-changes" hidden>
+            <summary data-i18n="update.changes">Voir les nouveautés</summary>
+            <ul id="update-list"></ul>
+          </details>
+        </div>
+        <div class="update-actions">
+          <button id="update-later" class="button small ghost" type="button" data-i18n="update.later">Plus tard</button>
+          <button id="update-install" class="button small primary" type="button" data-i18n="update.install">Mettre à jour</button>
+        </div>
+      </div>
+
       <section id="messages" class="messages" aria-live="polite">
         <div id="welcome" class="welcome">
           <span class="logo-mark huge"></span>

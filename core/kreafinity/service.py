@@ -18,14 +18,16 @@ import pwd
 import time
 import uuid
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
-from kreafinity import __version__
+import httpx
+
+from kreafinity import __version__, update
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -65,6 +67,7 @@ from kreafinity.providers import (
     get_provider_class,
     parse_model_spec,
 )
+from kreafinity.system.notifications import send_notification
 from kreafinity.tools import ToolContext, ToolRegistry, printable
 
 logger = logging.getLogger(__name__)
@@ -87,6 +90,7 @@ ErrorCode = Literal[
     "provider_auth",
     "provider_error",
     "keyring_unavailable",
+    "update_unavailable",
 ]
 Event = dict[str, Any]
 
@@ -278,6 +282,9 @@ class AssistantService:
         context: ToolContext | None = None,
         action_log: ActionLog | None = None,
         approval_timeout: float = APPROVAL_TIMEOUT,
+        notifier: Callable[[str, str], Awaitable[bool]] | None = send_notification,
+        update_launcher: Callable[[str], None] = update.launch,
+        update_client: httpx.AsyncClient | None = None,
     ) -> None:
         """Create the service.
 
@@ -289,6 +296,9 @@ class AssistantService:
             context: Sandbox of the tools; by default built from the settings.
             action_log: Journal of the actions (by default the user's one).
             approval_timeout: Seconds after which an unanswered approval is denied.
+            notifier: Shows a desktop notification (summary, body).
+            update_launcher: Starts installing an update (a commit) in its own process.
+            update_client: HTTP client used to ask GitHub for updates (for tests).
         """
         self.store = store
         self.events = EventHub()
@@ -302,6 +312,14 @@ class AssistantService:
         self._retired: list[LLMProvider] = []
         self._runs: dict[str, Run] = {}
         self._approvals: dict[str, PendingApproval] = {}
+        self.updates = update.UpdateManager(
+            publish=self.events.publish,
+            enabled=lambda: self.settings().check_updates,
+            notify=notifier,
+            launcher=update_launcher,
+            client=update_client,
+        )
+        self._background: list[asyncio.Task[None]] = []
 
     # --- Settings and providers --------------------------------------------------------
 
@@ -708,8 +726,38 @@ class AssistantService:
 
     # --- Shutdown ---------------------------------------------------------------------------
 
+    # --- Updates ------------------------------------------------------------------------------
+
+    def start_background_tasks(self) -> None:
+        """Start the daily update check (called by the daemon once running)."""
+        self._background.append(asyncio.create_task(self.updates.watch()))
+
+    def update_info(self) -> Event:
+        """Installed version, available update, progress of an installation."""
+        return self.updates.info()
+
+    async def check_updates(self) -> Event:
+        """Look for an update now."""
+        try:
+            return await self.updates.check()
+        except update.UpdateError as exc:
+            raise _update_error(exc) from exc
+
+    def start_update(self) -> Event:
+        """Install the available update (the daemon then restarts)."""
+        try:
+            return self.updates.start()
+        except update.UpdateError as exc:
+            raise _update_error(exc) from exc
+
     async def aclose(self) -> None:
         """Stop running requests and release the providers."""
+        for background in self._background:
+            background.cancel()
+        for background in self._background:
+            with contextlib.suppress(asyncio.CancelledError):
+                await background
+        self._background.clear()
         tasks = [run.task for run in self._runs.values() if run.task is not None]
         for task in tasks:
             task.cancel()
@@ -774,3 +822,8 @@ def _service_error(exc: ProviderError) -> ServiceError:
     if isinstance(exc, ProviderAuthError):
         return ServiceError(str(exc), code="provider_auth")
     return ServiceError(str(exc), code="provider_error")
+
+
+def _update_error(exc: update.UpdateError) -> ServiceError:
+    codes: dict[str, ErrorCode] = {"busy": "busy", "network": "update_unavailable"}
+    return ServiceError(str(exc), code=codes.get(exc.code, "invalid"))
