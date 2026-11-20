@@ -13,7 +13,7 @@
 Kreafinity OS est une distribution Linux open source dont l'intelligence artificielle est au cœur de l'expérience. Vous parlez à votre ordinateur pour lancer des applications, ranger vos fichiers ou régler votre système, dans une interface familière inspirée de Windows.
 
 ### Pourquoi Kreafinity OS ?
-- 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
+- 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral, Ollama Cloud, les centaines de modèles d'OpenRouter, ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
 - 🛡️ **Vous gardez le contrôle** : aucune action sensible (suppression, commande système, installation) sans votre validation.
 - 🔒 **Vie privée** : fonctionne entièrement hors ligne avec un modèle local.
 - 🪟 **Interface familière** : barre des tâches, menu démarrer, fenêtres… avec l'IA intégrée partout.
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 ```
 Kreafinity s'installe dans votre dossier personnel, démarre avec votre session, s'ajoute au menu
 des applications et vous demande quelle IA utiliser : Ollama (sur l'ordinateur, gratuit et privé),
-Claude, GPT ou Mistral. Options, emplacements, mise à jour et dépannage :
+Ollama Cloud, Claude, GPT, Mistral ou OpenRouter. Options, emplacements, mise à jour et dépannage :
 [docs/installation.md](docs/installation.md). Pour désinstaller : `kreafinity uninstall`
 (`--purge` efface aussi vos réglages et conversations).
 
@@ -66,7 +66,7 @@ kreafinity history                        # vos conversations ; chat --reprendre
 Avec une IA en ligne, enregistrez votre clé dans le **trousseau système** (jamais dans un fichier),
 depuis les réglages de l'interface ou ainsi :
 ```bash
-kreafinity provider key anthropic         # Claude (ou openai, mistral)
+kreafinity provider key anthropic         # Claude (ou openai, mistral, ollama-cloud, openrouter)
 kreafinity provider use anthropic         # IA par défaut
 kreafinity provider list                  # fournisseurs, clés, IA par défaut et de secours
 ```
@@ -98,7 +98,7 @@ Guides : [ajouter un fournisseur d'IA](docs/ajouter-un-fournisseur.md),
 Kreafinity OS is an open source Linux distribution with artificial intelligence at the heart of the experience. Talk to your computer to launch apps, organize files or adjust settings, in a familiar Windows-inspired desktop.
 
 ### Why Kreafinity OS?
-- 🔓 **Freedom of AI provider**: Claude, GPT, Mistral or a fully local model via Ollama. Switch anytime.
+- 🔓 **Freedom of AI provider**: Claude, GPT, Mistral, Ollama Cloud, hundreds of models through OpenRouter, or a fully local model via Ollama. Switch anytime.
 - 🛡️ **You stay in control**: no sensitive action (deletion, shell command, install) without your approval.
 - 🔒 **Privacy**: runs fully offline with a local model.
 - 🪟 **Familiar interface**: taskbar, start menu, windows… with AI built in everywhere.
@@ -123,7 +123,7 @@ Uninstall with `kreafinity uninstall` (`--purge` also erases settings and conver
 kreafinity ui                             # opens the web interface in your browser
 kreafinity ask "What are the 5 largest files in my Downloads folder?"
 kreafinity provider key anthropic         # store an API key in the system keyring
-kreafinity chat --provider anthropic      # or openai, mistral
+kreafinity chat --provider anthropic      # or openai, mistral, ollama-cloud, openrouter
 ```
 The web interface streams answers, lets you pick the AI and shows every action on the computer
 before it happens. `kreafinity bubble` adds a small round button at the bottom right of the desktop:

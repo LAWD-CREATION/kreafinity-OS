@@ -25,8 +25,8 @@ Lancez cette commande **sans** `sudo`. Le script :
 4. intègre Kreafinity à votre session (`kreafinity setup`) : démarrage automatique du démon, entrée
    « Kreafinity » dans le menu des applications, bulle en bas à droite de l'écran à chaque
    ouverture de session ;
-5. vous demande quelle IA utiliser : Ollama (sur l'ordinateur), Claude, GPT ou Mistral (en ligne,
-   avec une clé API), ou plus tard ;
+5. vous demande quelle IA utiliser : Ollama (sur l'ordinateur), ou en ligne avec une clé API :
+   Ollama Cloud, Claude, GPT, Mistral ou OpenRouter ; ou plus tard ;
 6. affiche la bulle.
 
 Ensuite, essayez par exemple : « Montre-moi les 5 plus gros fichiers de mon dossier
@@ -44,7 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/main/pa
 | Option | Effet |
 |---|---|
 | `--yes`, `-y` | répondre oui à toutes les questions (installation sans surveillance) |
-| `--provider=NOM` | IA à configurer : `ollama`, `anthropic`, `openai`, `mistral` ou `later` |
+| `--provider=NOM` | IA à configurer : `ollama`, `ollama-cloud`, `anthropic`, `openai`, `mistral`, `openrouter` ou `later` |
 | `--no-system-packages` | ne rien installer avec apt (les paquets absents sont seulement signalés) |
 | `--no-bubble` | pas de bulle sur le bureau (serveur, session sans écran) |
 | `--allow-root` | autoriser l'installation pour root (conteneurs de test uniquement) |
@@ -105,6 +105,10 @@ kreafinity provider list                  # fournisseurs disponibles, clés, IA 
 kreafinity provider use ollama/llama3.1   # un modèle local (installez Ollama : https://ollama.com)
 kreafinity provider key anthropic         # enregistrer une clé dans le trousseau
 kreafinity provider use anthropic         # Claude par défaut
+kreafinity provider key ollama-cloud      # Ollama Cloud (clé créée sur ollama.com)
+kreafinity provider use ollama-cloud/gpt-oss:120b
+kreafinity provider key openrouter        # OpenRouter (clé créée sur openrouter.ai)
+kreafinity provider use openrouter/anthropic/claude-opus-5.5
 ```
 
 Tout cela se règle aussi dans l'écran **Réglages** de l'interface (`kreafinity ui`).

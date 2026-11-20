@@ -46,6 +46,8 @@ class OpenAIProvider(LLMProvider):
     display_name = "GPT (OpenAI)"
     requires_api_key = True
     api_key_env_var = "OPENAI_API_KEY"
+    #: Name of the response length parameter in this API.
+    max_tokens_parameter = "max_completion_tokens"
 
     def __init__(
         self,
@@ -55,6 +57,7 @@ class OpenAIProvider(LLMProvider):
         default_model: str = DEFAULT_MODEL,
         max_tokens: int | None = None,
         client: openai.AsyncOpenAI | None = None,
+        http_client: Any = None,
     ) -> None:
         """Create the adapter.
 
@@ -64,19 +67,23 @@ class OpenAIProvider(LLMProvider):
             default_model: Model used when `chat` is not given one.
             max_tokens: Maximum length of a response (no limit by default).
             client: SDK client to use instead of creating one (for tests).
+            http_client: HTTP client given to the SDK (``openai.DefaultAsyncHttpxClient``).
         """
         super().__init__(default_model=default_model)
         self.max_tokens = max_tokens
         self._api_key = api_key
         self._base_url = base_url
         self._client = client
+        self._http_client = http_client
 
     @property
     def client(self) -> openai.AsyncOpenAI:
         """The SDK client, created on first use."""
         if self._client is None:
             try:
-                self._client = openai.AsyncOpenAI(api_key=self._api_key, base_url=self._base_url)
+                self._client = openai.AsyncOpenAI(
+                    api_key=self._api_key, base_url=self._base_url, http_client=self._http_client
+                )
             except openai.OpenAIError as exc:
                 raise ProviderAuthError(str(exc), provider=self.name) from exc
         return self._client
@@ -98,7 +105,7 @@ class OpenAIProvider(LLMProvider):
         if tools:
             params["tools"] = to_chat_tools(tools)
         if self.max_tokens:
-            params["max_completion_tokens"] = self.max_tokens
+            params[self.max_tokens_parameter] = self.max_tokens
 
         text: list[str] = []
         calls = ToolCallAccumulator()
@@ -130,7 +137,7 @@ class OpenAIProvider(LLMProvider):
                         )
                     finish_reason = choice.finish_reason or finish_reason
         except openai.APIError as exc:
-            raise _map_error(exc) from exc
+            raise _map_error(exc, self) from exc
 
         tool_calls = calls.calls()
         yield ResponseDone(
@@ -144,7 +151,7 @@ class OpenAIProvider(LLMProvider):
         try:
             ids = sorted([m.id async for m in self.client.models.list()])
         except openai.APIError as exc:
-            raise _map_error(exc) from exc
+            raise _map_error(exc, self) from exc
         if self._base_url is None:
             ids = [i for i in ids if i.startswith(CHAT_MODEL_PREFIXES)]
         return [ModelInfo(id=i, provider=self.name, display_name=i) for i in ids]
@@ -154,13 +161,13 @@ class OpenAIProvider(LLMProvider):
             await self._client.close()
 
 
-def _map_error(exc: openai.APIError) -> ProviderError:
-    provider = OpenAIProvider.name
+def _map_error(exc: openai.APIError, adapter: LLMProvider) -> ProviderError:
+    provider, label = adapter.name, adapter.display_name
     if isinstance(exc, openai.APIConnectionError):
-        return ProviderUnavailableError(f"Cannot reach the OpenAI API: {exc}", provider=provider)
+        return ProviderUnavailableError(f"Cannot reach {label}: {exc}", provider=provider)
     if isinstance(exc, openai.AuthenticationError | openai.PermissionDeniedError):
-        return ProviderAuthError(f"OpenAI rejected the credentials: {exc}", provider=provider)
+        return ProviderAuthError(f"{label} rejected the credentials: {exc}", provider=provider)
     if isinstance(exc, openai.APIStatusError):
         retryable = exc.status_code == 429 or exc.status_code >= 500
-        return ProviderError(f"OpenAI API error: {exc}", provider=provider, retryable=retryable)
-    return ProviderError(f"OpenAI API error: {exc}", provider=provider)
+        return ProviderError(f"{label} API error: {exc}", provider=provider, retryable=retryable)
+    return ProviderError(f"{label} API error: {exc}", provider=provider)

@@ -8,7 +8,8 @@
 #
 # Options :
 #   --yes, -y                 répondre oui à toutes les questions
-#   --provider=NOM            IA à configurer : ollama, anthropic, openai, mistral, later
+#   --provider=NOM            IA à configurer : ollama, ollama-cloud, anthropic, openai,
+#                             mistral, openrouter, later
 #   --no-system-packages      ne pas installer de paquets système (apt)
 #   --no-bubble               ne pas afficher la bulle sur le bureau
 #   --allow-root              autoriser l'installation pour root (conteneurs de test)
@@ -70,8 +71,8 @@ for argument in "$@"; do
 done
 
 case "$provider" in
-  "" | ollama | anthropic | openai | mistral | later) ;;
-  *) die "IA inconnue : $provider (ollama, anthropic, openai, mistral ou later)" ;;
+  "" | ollama | ollama-cloud | anthropic | openai | mistral | openrouter | later) ;;
+  *) die "IA inconnue : $provider (ollama, ollama-cloud, anthropic, openai, mistral, openrouter ou later)" ;;
 esac
 
 # Questions are read from the terminal, even when this script comes through a pipe.
@@ -207,18 +208,22 @@ if [[ -z "$provider" ]]; then
 
 ${BOLD}Quelle intelligence artificielle voulez-vous utiliser ?${RESET}
   1) Ollama — sur cet ordinateur : gratuit, privé, hors ligne (environ 5 Go à télécharger)
-  2) Claude (Anthropic) — en ligne, avec une clé API
-  3) GPT (OpenAI) — en ligne, avec une clé API
-  4) Mistral AI — en ligne, avec une clé API
-  5) Plus tard
+  2) Ollama Cloud — les grands modèles d'Ollama en ligne, avec une clé API
+  3) Claude (Anthropic) — en ligne, avec une clé API
+  4) GPT (OpenAI) — en ligne, avec une clé API
+  5) Mistral AI — en ligne, avec une clé API
+  6) OpenRouter — des centaines de modèles avec une seule clé API
+  7) Plus tard
 EOF
-    printf '%s?%s Votre choix [1-5] : ' "$BOLD" "$RESET" >/dev/tty
-    read -r choice </dev/tty || choice=5
+    printf '%s?%s Votre choix [1-7] : ' "$BOLD" "$RESET" >/dev/tty
+    read -r choice </dev/tty || choice=7
     case "$choice" in
       1) provider="ollama" ;;
-      2) provider="anthropic" ;;
-      3) provider="openai" ;;
-      4) provider="mistral" ;;
+      2) provider="ollama-cloud" ;;
+      3) provider="anthropic" ;;
+      4) provider="openai" ;;
+      5) provider="mistral" ;;
+      6) provider="openrouter" ;;
       *) provider="later" ;;
     esac
   fi
@@ -245,7 +250,7 @@ case "$provider" in
     fi
     "${kreafinity[@]}" provider use "ollama/$OLLAMA_MODEL"
     ;;
-  anthropic | openai | mistral)
+  ollama-cloud | anthropic | openai | mistral | openrouter)
     if has_tty; then
       "${kreafinity[@]}" provider key "$provider" </dev/tty || warn "Clé non enregistrée : « kreafinity provider key $provider » plus tard."
     else
