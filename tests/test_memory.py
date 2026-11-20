@@ -347,7 +347,7 @@ async def test_learning_after_a_conversation(home: Path) -> None:
     messages, tools, _ = harness.provider.requests[1]
     assert "Tu relis une conversation" in messages[0].content
     assert "Utilisateur : Je m'appelle David" in messages[1].content
-    assert sorted(spec.name for spec in tools) == ["memory", "skill"]
+    assert sorted(spec.name for spec in tools) == ["memory", "skill", "soul"]
     # The next conversation starts with the memory.
     assert ReviewState().reviewed(conversation["id"]) == 2
     assert await harness.service.review_conversation(conversation["id"]) == 0  # nothing new
@@ -382,7 +382,7 @@ async def test_memory_turned_off(home: Path) -> None:
     await harness.next("run_finished")
     messages, tools, _ = harness.provider.requests[0]
     assert "S'appelle David" not in messages[0].content
-    assert not {"memory", "skill"} & {spec.name for spec in tools}
+    assert not {"memory", "skill", "soul"} & {spec.name for spec in tools}
     assert "search_conversations" in {spec.name for spec in tools}
     await asyncio.sleep(0.1)
     assert len(harness.provider.requests) == 1  # no review

@@ -17,6 +17,7 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `search_conversations` | safe | Chercher dans les conversations passées |
 | `memory` | safe | Retenir ou corriger une note de sa mémoire (voir [memoire.md](memoire.md)) |
 | `skill` | safe | Lire, enregistrer ou améliorer un savoir-faire |
+| `soul` | safe | Faire grandir sa propre personnalité, son âme (voir [memoire.md](memoire.md#son-âme-sa-personnalité)) |
 | `create_folder` | confirm | Créer un dossier |
 | `create_file` | confirm | Créer un fichier texte (sans jamais écraser) |
 | `move_file` | confirm | Déplacer ou renommer |

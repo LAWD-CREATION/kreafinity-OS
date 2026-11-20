@@ -103,7 +103,10 @@ export class SettingsDialog {
       memoryReview: el("input", { id: "settings-memory-review", type: "checkbox", checked: config.memory_review !== false }),
       memoryUser: el("textarea", { id: "settings-memory-user", class: "prose", rows: 4, spellcheck: "true" }),
       memoryNotes: el("textarea", { id: "settings-memory-notes", class: "prose", rows: 4, spellcheck: "true" }),
+      soul: el("textarea", { id: "settings-soul", class: "prose", rows: 7, spellcheck: "true", maxlength: this.memory?.soul_limit ?? 1500 }),
+      soulEvolution: el("input", { id: "settings-soul-evolution", type: "checkbox", checked: config.soul_evolution !== false }),
     };
+    this.fields.soul.value = this.memory?.soul ?? "";
     this.fields.memoryUser.value = this.memory?.user ?? "";
     this.fields.memoryNotes.value = this.memory?.notes ?? "";
     this.fields.folders.value = config.allowed_paths.join("\n");
@@ -199,7 +202,30 @@ export class SettingsDialog {
       el("div", { class: "field-row two" }, el("label", { for: "settings-memory-review" }, t("settings.memory.review")), el("div", {}, this.fields.memoryReview)),
     );
     if (!memory) return section;
+    const soulHint = el("p", { class: "hint", id: "settings-soul-seed", hidden: !memory.soul_is_seed }, t("settings.memory.soul_seed"));
+    const resetSoul = el("button", { class: "button small ghost", type: "button", id: "settings-soul-reset", hidden: memory.soul_is_seed }, t("settings.memory.soul_reset"));
+    const showSoul = () => {
+      this.fields.soul.value = this.memory.soul;
+      soulHint.hidden = !this.memory.soul_is_seed;
+      resetSoul.hidden = this.memory.soul_is_seed;
+    };
+    resetSoul.addEventListener("click", async () => {
+      if (!confirm(t("settings.memory.soul_reset_confirm"))) return;
+      try {
+        this.memory = await this.api.delete("/api/memory/soul");
+        showSoul();
+        this.toast(t("settings.memory.soul_was_reset"));
+      } catch (error) {
+        this.toast(error.message, "error");
+      }
+    });
     section.append(
+      el("h4", {}, t("settings.memory.soul")),
+      el("p", { class: "hint" }, t("settings.memory.soul_text")),
+      soulHint,
+      this.fields.soul,
+      el("div", { class: "field-row two" }, el("label", { for: "settings-soul-evolution" }, t("settings.memory.soul_evolution")), el("div", {}, this.fields.soulEvolution)),
+      el("div", {}, resetSoul),
       el("label", { for: "settings-memory-user" }, t("settings.memory.user")),
       this.fields.memoryUser,
       el("label", { for: "settings-memory-notes" }, t("settings.memory.notes")),
@@ -233,6 +259,7 @@ export class SettingsDialog {
         this.memory = await this.api.delete("/api/memory");
         this.fields.memoryUser.value = "";
         this.fields.memoryNotes.value = "";
+        showSoul();
         section.querySelectorAll(".skill-row").forEach((row) => row.remove());
         this.toast(t("settings.memory.forgotten"));
       } catch (error) {
@@ -348,6 +375,9 @@ export class SettingsDialog {
     if (fields.memoryReview.checked !== (this.config.memory_review !== false)) {
       changes.memory_review = fields.memoryReview.checked;
     }
+    if (fields.soulEvolution.checked !== (this.config.soul_evolution !== false)) {
+      changes.soul_evolution = fields.soulEvolution.checked;
+    }
 
     const theme = fields.theme.value;
     try {
@@ -363,6 +393,9 @@ export class SettingsDialog {
         if (this.memory && field.value.trim() !== this.memory[section].trim()) {
           await this.api.put(`/api/memory/${section}`, { content: field.value });
         }
+      }
+      if (this.memory && fields.soul.value.trim() !== this.memory.soul.trim()) {
+        await this.api.put("/api/memory/soul", { content: fields.soul.value });
       }
       const config = Object.keys(changes).length ? await this.api.patch("/api/config", changes) : this.config;
       this.dialog.close();

@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+X-KDE-ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/all;
+X-KDE-Submenu=Kreafinity
+Icon=kreafinity
+Actions=ask;explain;
+
+[Desktop Action ask]
+Name=Ask a question…
+Name[fr]=Poser une question…
+Icon=kreafinity
+Exec=@COMMAND@ ask %F
+
+[Desktop Action explain]
+Name=What is it?
+Name[fr]=Qu'est-ce que c'est ?
+Icon=kreafinity
+Exec=@COMMAND@ explain %F

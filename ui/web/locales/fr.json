@@ -173,7 +173,7 @@
   "settings.memory.uses.other": "utilisé {count} fois",
   "settings.memory.delete_skill": "Supprimer",
   "settings.memory.forget": "Tout oublier",
-  "settings.memory.forget_confirm": "Effacer tout ce dont Kreafinity se souvient (notes et savoir-faire) ? Vos conversations sont gardées.",
+  "settings.memory.forget_confirm": "Effacer tout ce dont Kreafinity se souvient (notes, savoir-faire et la personnalité qu'il s'est construite) ? Vos conversations sont gardées.",
   "settings.memory.forgotten": "Kreafinity a tout oublié.",
   "memory.updated": "Kreafinity a enrichi sa mémoire.",
   "tool.memory": "Mémoire",
@@ -182,5 +182,15 @@
   "tool.skill.help": "Enregistrer et améliorer les procédures qui ont marché.",
   "tool.search_conversations": "Recherche dans l'historique",
   "tool.search_conversations.help": "Retrouver ce qui a été dit dans les conversations passées.",
-  "settings.memory.unused": "pas encore utilisé"
+  "settings.memory.unused": "pas encore utilisé",
+  "settings.memory.soul": "Son âme : sa personnalité",
+  "settings.memory.soul_text": "Le caractère de Kreafinity, écrit par lui-même. Il le fait grandir au fil de vos échanges ; vous pouvez aussi le modifier. Il change sa façon de parler, jamais ses règles.",
+  "settings.memory.soul_seed": "Personnalité de départ : Kreafinity ne l'a pas encore fait évoluer.",
+  "settings.memory.soul_evolution": "Laisser sa personnalité évoluer",
+  "settings.memory.soul_reset": "Revenir à sa personnalité d'origine",
+  "settings.memory.soul_reset_confirm": "Rendre à Kreafinity sa personnalité d'origine ? Celle qu'il s'est construite sera effacée.",
+  "settings.memory.soul_was_reset": "Kreafinity a retrouvé sa personnalité d'origine.",
+  "memory.soul_updated": "Kreafinity a fait évoluer sa personnalité.",
+  "tool.soul": "Âme",
+  "tool.soul.help": "Faire grandir sa propre personnalité au fil des échanges."
 }

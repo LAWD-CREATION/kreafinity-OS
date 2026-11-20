@@ -1,7 +1,8 @@
 """Installing the Plasma integration for the user (no root needed).
 
 - the search plugin: « Demander à Kreafinity » in the start menu and KRunner;
-- the taskbar widget opening the assistant panel;
+- the taskbar widget opening the assistant panel, with a keyboard shortcut;
+- « Kreafinity » in the file manager's right-click menu (Dolphin);
 - the Kreafinity global theme: colors, wallpaper and a Windows-like layout.
 
 Files go to ``~/.local/share`` (KDE's standard places for user add-ons);
@@ -35,22 +36,31 @@ THEME_ID = "org.kreafinity.desktop"
 COLOR_SCHEME = "Kreafinity"
 WALLPAPER = "Kreafinity"
 SUPPORTED_VERSIONS = (5, 6)
+#: Opens the assistant, like Copilot's Windows+C (changeable in the widget's settings).
+SHORTCUT = "Meta+C"
+SERVICE_MENUS = ("kreafinity-files", "kreafinity-text", "kreafinity-folder")
 
 # Plasma scripts (run inside plasmashell through D-Bus).
 ADD_WIDGET_SCRIPT = """
-var present = panels().some(function (panel) { return panel.widgets("%(id)s").length > 0; });
-if (present) {
-    print("present");
-} else {
+var found = [];
+panels().forEach(function (panel) { found = found.concat(panel.widgets("%(id)s")); });
+var state = "present";
+if (found.length == 0) {
     var bottom = panels().filter(function (panel) { return panel.location == "bottom"; });
     var panel = bottom.length ? bottom[0] : panels()[0];
     if (panel) {
-        panel.addWidget("%(id)s");
-        print("added");
+        found = [panel.addWidget("%(id)s")];
+        state = "added";
     } else {
-        print("no-panel");
+        state = "no-panel";
     }
 }
+// The keyboard shortcut, unless the user already chose one.
+var shortcut = found.length > 0 && !found[0].globalShortcut;
+if (shortcut) {
+    found[0].globalShortcut = "%(shortcut)s";
+}
+print(state + (shortcut ? " shortcut" : ""));
 """
 REMOVE_WIDGET_SCRIPT = """
 panels().forEach(function (panel) {
@@ -90,8 +100,14 @@ def wallpaper_path() -> Path:
     return xdg_data_home() / "wallpapers" / WALLPAPER
 
 
+def service_menu_paths() -> list[Path]:
+    folder = xdg_data_home() / "kio" / "servicemenus"
+    return [folder / f"{name}.desktop" for name in SERVICE_MENUS]
+
+
 def installed_paths() -> list[Path]:
     return [
+        *service_menu_paths(),
         krunner_plugin_path(),
         dbus_service_path(),
         widget_path(),
@@ -212,6 +228,15 @@ def install(version: int, *, port: int, add_widget: bool = True) -> Report:
     )
     report.add("plasma.widget", path=str(widget))
 
+    # File manager: « Kreafinity » submenu (the files must be executable for KDE to use them).
+    menu_command = shlex.join([sys.executable, "-m", "kreafinity.plasma.files_menu"])
+    for name, target in zip(SERVICE_MENUS, service_menu_paths(), strict=True):
+        text = (assets / "servicemenus" / f"{name}.desktop").read_text(encoding="utf-8")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text.replace("@COMMAND@", menu_command), encoding="utf-8")
+        target.chmod(0o755)
+    report.add("plasma.files_menu")
+
     # Theme: global theme, colors and wallpaper (applied by `apply_theme`).
     _replace_tree(assets / "look-and-feel" / THEME_ID, theme_path())
     color_scheme_path().parent.mkdir(parents=True, exist_ok=True)
@@ -230,9 +255,13 @@ def install(version: int, *, port: int, add_widget: bool = True) -> Report:
     _run(f"kquitapp{version}", "krunner")  # restarted on next use, with the new plugin
     if not add_widget:
         return report
-    answer = evaluate_script(ADD_WIDGET_SCRIPT % {"id": WIDGET_ID})
-    if answer is not None and answer.strip() in ("added", "present"):
+    answer = (
+        evaluate_script(ADD_WIDGET_SCRIPT % {"id": WIDGET_ID, "shortcut": SHORTCUT}) or ""
+    ).split()
+    if answer and answer[0] in ("added", "present"):
         report.add("plasma.widget_added")
+        if "shortcut" in answer:
+            report.add("plasma.shortcut", shortcut=SHORTCUT)
     else:
         report.add("plasma.widget_manual")
     return report

@@ -240,9 +240,13 @@ def create_app(
 
     @api.put("/memory/{section}")
     async def write_memory(service: Service, section: str, body: MemoryText) -> dict[str, Any]:
-        if section not in ("user", "notes"):
+        if section not in ("user", "notes", "soul"):
             raise ServiceError("Unknown memory section", code="not_found")
         return service.write_memory(section, body.content)
+
+    @api.delete("/memory/soul")
+    async def reset_soul(service: Service) -> dict[str, Any]:
+        return service.reset_soul()
 
     @api.delete("/memory/skills/{name}")
     async def delete_skill(service: Service, name: str) -> dict[str, Any]:

@@ -167,12 +167,7 @@ class Runner:
     async def run(self, question: str, action: str) -> None:
         """Send `question` to the assistant and show where the answer comes."""
         try:
-            url = await asyncio.to_thread(ensure_daemon, self.port)
-            client = DaemonClient(url)
-            conversation_id = await client.ask(question)
-            if action != ACTION_FULL and await client.show(conversation_id) > 0:
-                return  # a panel shows it
-            await asyncio.to_thread(open_in_browser, url, conversation_id)
+            await send_question(self.port, question, full=action == ACTION_FULL)
         except (DaemonUnavailableError, desktop.LaunchError, OSError, ValueError) as exc:
             logger.warning("Cannot ask Kreafinity: %s", exc)
             await notify(self.bus, t("plasma.search.failed"), str(exc))
@@ -181,6 +176,23 @@ class Runner:
             await notify(self.bus, t("plasma.search.failed"), str(exc))
         finally:
             self.last_use = time.monotonic()
+
+
+async def send_question(port: int, question: str, *, full: bool = False) -> None:
+    """Send `question` to the assistant (starting the daemon if needed) and show
+    the answer: in an assistant panel if one is open, else in the browser
+    (always the browser with `full`).
+
+    Raises:
+        DaemonUnavailableError, desktop.LaunchError, OSError: The question
+            cannot be sent or the answer cannot be shown.
+    """
+    url = await asyncio.to_thread(ensure_daemon, port)
+    client = DaemonClient(url)
+    conversation_id = await client.ask(question)
+    if not full and await client.show(conversation_id) > 0:
+        return  # a panel shows it
+    await asyncio.to_thread(open_in_browser, url, conversation_id)
 
 
 def open_in_browser(url: str, conversation_id: str) -> None:

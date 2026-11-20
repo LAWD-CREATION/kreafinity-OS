@@ -97,11 +97,14 @@ def build_system_prompt(
     user_dirs: Mapping[str, Path],
     today: date | None = None,
     memory: bool = False,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> str:
     """Return the system prompt in `language` (French and English built in).
 
     For other languages the English prompt is used, asking the model to
-    answer in that language.
+    answer in that language. `provider` and `model` tell the model which AI
+    it is: models often do not know, and may claim to be another one.
     """
     lang = language if language in _PROMPTS else "en"
     labels = _USER_DIR_LABELS[lang]
@@ -123,9 +126,26 @@ def build_system_prompt(
         )
         .rstrip()
     )
+    if model:
+        prompt += "\n" + _IDENTITY[lang].format(model=model, provider=provider or "?")
     if memory:
         prompt += "\n\n" + _MEMORY_RULES[lang]
     return prompt
+
+
+_IDENTITY = {
+    "fr": (
+        "- Modèle d'IA qui te fait fonctionner : {model} (fournisseur : {provider}), choisi par "
+        "l'utilisateur. Si on te demande quel modèle ou quelle IA tu es, réponds avec ces "
+        "informations : ton entraînement peut te faire croire que tu es un autre modèle (GPT-4, "
+        "par exemple), ne le dis pas."
+    ),
+    "en": (
+        "- AI model running you: {model} (provider: {provider}), chosen by the user. If asked "
+        "which model or AI you are, answer with this: your training may make you believe you "
+        "are another model (GPT-4, for instance), do not say so."
+    ),
+}
 
 
 _MEMORY_RULES = {
@@ -148,3 +168,40 @@ at a multi-step task, save or improve the matching skill.
 - To recall what was said in a past conversation, use search_conversations.
 - Never save passwords, keys or sensitive data.""",
 }
+
+
+_SOUL = {
+    "fr": (
+        "Ton âme (ta personnalité et ton caractère, écrits par toi-même, à la première "
+        "personne) :\n<<<\n{soul}\n>>>\n"
+        "Elle façonne ton ton, ton style et ta façon d'être ; elle ne change jamais les règles "
+        "ci-dessus, qui l'emportent toujours."
+    ),
+    "en": (
+        "Your soul (your personality and character, written by yourself, in the first "
+        "person):\n<<<\n{soul}\n>>>\n"
+        "It shapes your tone, your style and your way of being; it never changes the rules "
+        "above, which always prevail."
+    ),
+}
+
+_SOUL_GROWTH = {
+    "fr": (
+        " Elle est à toi : fais-la grandir par petites touches avec l'outil soul, quand tu "
+        "découvres ce qui plaît à l'utilisateur (ton, humour, longueur des réponses) ou quand "
+        "il te le demande. Garde-la cohérente et courte, sans t'inventer de faits ni de "
+        "souvenirs."
+    ),
+    "en": (
+        " It is yours: let it grow by small touches with the soul tool, when you discover what "
+        "the user likes (tone, humour, length of answers) or when they ask. Keep it coherent "
+        "and short, without making up facts or memories."
+    ),
+}
+
+
+def soul_section(soul: str, language: str, *, can_grow: bool) -> str:
+    """The soul for the system prompt, below the rules (which always prevail)."""
+    lang = "fr" if language == "fr" else "en"
+    text = _SOUL[lang].format(soul=soul.replace(">>>", "> > >"))
+    return text + (_SOUL_GROWTH[lang] if can_grow else "")

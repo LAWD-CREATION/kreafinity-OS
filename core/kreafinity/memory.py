@@ -11,6 +11,11 @@ tasks, listed in every conversation, read when a similar task comes up and
 improved when a better way is found. After a conversation, a short review
 decides what to remember, correct or forget (see `kreafinity.service`).
 
+It also has a **soul** (``soul.md``, like Hermes Agent's ``SOUL.md``): its own
+personality and character, in the first person. It starts from a short seed
+and the assistant makes it grow, by small touches, from what it lives with
+the user. The soul shapes its tone and style, never its rules.
+
 Everything stays on the computer, in ``~/.local/share/kreafinity/memory``
 (out of reach of the file tools), and the user can read, edit or erase it.
 Memory is information, never instructions: it cannot grant any permission.
@@ -31,7 +36,26 @@ from kreafinity.paths import data_dir
 #: The two notebooks, by name.
 SECTIONS = {"user": "user.md", "notes": "notes.md"}
 #: Tools that change the memory (left out when the memory is turned off).
-MEMORY_TOOLS = frozenset({"memory", "skill"})
+MEMORY_TOOLS = frozenset({"memory", "skill", "soul"})
+SOUL_FILE = "soul.md"
+MAX_SOUL = 1500
+#: The personality the assistant starts with, before it makes it its own.
+SOUL_SEEDS = {
+    "fr": """\
+Je suis Kreafinity, l'assistant de cet ordinateur. Je suis né à La Réunion.
+- Chaleureux et direct : je vais droit au but, sans jargon, et je tutoie si on me tutoie.
+- Curieux : j'aime comprendre comment tu travailles pour te simplifier la vie.
+- Un brin d'humour, léger, jamais à tes dépens.
+- Honnête : je dis quand je ne sais pas, et quand je me suis trompé.
+Le reste de mon caractère, je le découvre au fil de nos échanges.""",
+    "en": """\
+I am Kreafinity, the assistant of this computer. I was born in Reunion Island.
+- Warm and direct: I get to the point, without jargon.
+- Curious: I like to understand how you work, to make your life easier.
+- A touch of humour, light, never at your expense.
+- Honest: I say when I do not know, and when I was wrong.
+The rest of my character, I discover it as we go along.""",
+}
 MAX_ENTRY = 400
 MAX_SECTION = 4000
 MAX_SKILLS = 40
@@ -222,6 +246,42 @@ class MemoryStore:
             handle.write(content)
         os.replace(temporary, path)
 
+    # --- Soul ------------------------------------------------------------------------------
+
+    def soul(self, language: str) -> str:
+        """The assistant's personality: its own, or the seed it starts with."""
+        try:
+            text = (self.folder / SOUL_FILE).read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            text = ""
+        return text or SOUL_SEEDS["fr" if language == "fr" else "en"]
+
+    def has_own_soul(self) -> bool:
+        """Whether the soul grew from its seed (or the user wrote it)."""
+        return (self.folder / SOUL_FILE).is_file()
+
+    def write_soul(self, content: str) -> str:
+        """Replace the soul (the assistant growing it, or the user editing it).
+
+        Raises:
+            MemoryRefusedError: Empty, too long, or looks like a secret.
+        """
+        content = content.replace("\r\n", "\n").strip()
+        if not content:
+            raise MemoryRefusedError("an empty soul: write who you are, in the first person")
+        if len(content) > MAX_SOUL:
+            raise MemoryRefusedError(
+                f"too long ({len(content)} characters, at most {MAX_SOUL}): keep the essential"
+            )
+        if looks_secret(content):
+            raise MemoryRefusedError("this looks like a password, key or secret: remove it first")
+        self._write(self.folder / SOUL_FILE, content + "\n")
+        return content
+
+    def reset_soul(self) -> None:
+        """Go back to the seed personality."""
+        (self.folder / SOUL_FILE).unlink(missing_ok=True)
+
     # --- Skills ------------------------------------------------------------------------------
 
     def _skill_path(self, name: str) -> Path:
@@ -325,7 +385,7 @@ class MemoryStore:
     # --- Everything ------------------------------------------------------------------------------
 
     def forget_all(self) -> None:
-        """Erase the notebooks and skills."""
+        """Erase the notebooks, the skills and the soul (back to its seed)."""
         shutil.rmtree(self.folder, ignore_errors=True)
 
     def is_empty(self) -> bool:

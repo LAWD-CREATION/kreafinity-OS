@@ -16,6 +16,31 @@ début de chaque conversation, et les améliore avec le temps.
 - **Vos conversations passées** : il peut y chercher ce qui a été dit (« comme la dernière
   fois », « le fichier dont je t'ai parlé la semaine dernière »).
 
+## Son âme : sa personnalité
+
+![L'âme de Kreafinity dans les réglages](img/ame-reglages.jpg)
+
+Kreafinity a une **âme** : son caractère, écrit par lui-même, à la première personne (comme le
+fichier `SOUL.md` de Hermes Agent). Il naît avec une personnalité de départ : chaleureux,
+direct, curieux, un brin d'humour, honnête, et « né à La Réunion ». Le reste, **il le construit
+lui-même** au fil de vos échanges :
+
+- si vous aimez plaisanter, il devient plus taquin ; si vous voulez aller vite, plus bref ;
+- si vous lui demandez « sois plus formel » ou « tutoie-moi », il fait évoluer son âme en
+  conséquence ;
+- après une conversation, pendant la relecture, il peut y ajouter une petite touche, quand
+  c'est durable (pas à chaque fois).
+
+Il change sa façon de parler, jamais ses règles : son âme est placée **sous** les règles, qui
+l'emportent toujours. Elle ne contient ni faits sur vous (c'est le rôle des carnets) ni
+secrets, et elle reste courte (1 500 caractères).
+
+Dans Réglages › Mémoire › « Son âme », vous pouvez la lire, la réécrire vous-même, la figer
+(décochez « Laisser sa personnalité évoluer », ou `soul_evolution: false`) ou revenir à la
+personnalité d'origine. En ligne de commande : `kreafinity memory` l'affiche,
+`kreafinity memory --nouvelle-ame` la réinitialise. « Tout oublier » efface aussi la
+personnalité construite avec vous.
+
 ## Comment il s'améliore
 
 Pendant une conversation, Kreafinity enregistre ce qu'il apprend d'important. Puis, deux minutes
@@ -56,12 +81,13 @@ chaque conversation ».
 
 ## Pour les développeurs
 
-- `core/kreafinity/memory.py` : les carnets (`user.md`, `notes.md`) et les savoir-faire
-  (`skills/<nom>.md`), les limites et le refus des secrets.
+- `core/kreafinity/memory.py` : les carnets (`user.md`, `notes.md`), les savoir-faire
+  (`skills/<nom>.md`), l'âme (`soul.md`, personnalité de départ dans `SOUL_SEEDS`), les limites
+  et le refus des secrets.
 - Outils : `memory` (ajouter, remplacer, supprimer une note), `skill` (lire, enregistrer,
-  supprimer un savoir-faire), `search_conversations` (recherche plein texte dans l'historique,
+  supprimer un savoir-faire), `soul` (réécrire son âme), `search_conversations` (recherche plein texte dans l'historique,
   SQLite FTS5, accents ignorés).
 - `core/kreafinity/agent/review.py` : la relecture après une conversation (consignes, transcription,
   suivi de ce qui a déjà été relu) ; elle est lancée par le service du démon.
-- API : `GET /api/memory`, `PUT /api/memory/{user|notes}`, `DELETE /api/memory/skills/{nom}`,
-  `DELETE /api/memory` ; événement `memory_updated`.
+- API : `GET /api/memory`, `PUT /api/memory/{user|notes|soul}`, `DELETE /api/memory/soul`,
+  `DELETE /api/memory/skills/{nom}`, `DELETE /api/memory` ; événement `memory_updated`.

@@ -110,9 +110,17 @@ def test_install(tools: Path, tmp_path: Path, version: int) -> None:
     assert [key for key, _ in report.done] == [
         "plasma.search",
         "plasma.widget",
+        "plasma.files_menu",
         "plasma.theme_files",
         "plasma.widget_manual",  # plasmashell not running here
     ]
+    # File manager menu: executable (KDE ignores the others), running this Python.
+    for menu in plasma.service_menu_paths():
+        assert menu.stat().st_mode & 0o111
+        text = menu.read_text()
+        assert "@COMMAND@" not in text
+        assert f"{sys.executable} -m kreafinity.plasma.files_menu" in text
+        assert "X-KDE-Submenu=Kreafinity" in text
     plasma.install(version, port=27600)  # again: replaces in place
 
 
@@ -201,12 +209,33 @@ async def test_widget_added_through_plasmashell(session_bus: str) -> None:
     await bus.request_name("org.kde.plasmashell")
     bus.add_message_handler(plasmashell)
     try:
-        answer = await plasma._evaluate_script(plasma.ADD_WIDGET_SCRIPT % {"id": plasma.WIDGET_ID})
+        answer = await plasma._evaluate_script(
+            plasma.ADD_WIDGET_SCRIPT % {"id": plasma.WIDGET_ID, "shortcut": plasma.SHORTCUT}
+        )
     finally:
         bus.disconnect()
         await bus.wait_for_disconnect()  # type: ignore[no-untyped-call]
     assert answer == "added\n"
     assert 'panel.addWidget("org.kreafinity.assistant")' in scripts[0]
+    assert 'found[0].globalShortcut = "Meta+C"' in scripts[0]
+
+
+@pytest.mark.parametrize(
+    ("answer", "keys"),
+    [
+        ("added shortcut\n", ["plasma.widget_added", "plasma.shortcut"]),
+        ("present shortcut", ["plasma.widget_added", "plasma.shortcut"]),
+        ("present", ["plasma.widget_added"]),  # the user's own shortcut is kept
+        ("no-panel", ["plasma.widget_manual"]),
+        (None, ["plasma.widget_manual"]),
+    ],
+)
+def test_widget_and_shortcut_report(
+    tools: Path, monkeypatch: pytest.MonkeyPatch, answer: str | None, keys: list[str]
+) -> None:
+    monkeypatch.setattr(plasma, "evaluate_script", lambda script: answer)
+    report = plasma.install(6, port=27494)
+    assert [key for key, _ in report.done][4:] == keys
 
 
 async def test_no_plasmashell(session_bus: str) -> None:

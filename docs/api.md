@@ -83,6 +83,11 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:27494/api/conversations
 | `GET` | `/api/update` | Version installée, mise à jour disponible (`available`, `latest`, `changes`), progression (`status`) |
 | `POST` | `/api/update/check` | Chercher une mise à jour maintenant (`400` pour une copie de développement, `503` si GitHub ne répond pas) |
 | `POST` | `/api/update` | Installer la mise à jour disponible → `202` ; le démon redémarre ensuite |
+| `GET` | `/api/memory` | Mémoire : carnets (`user`, `notes`), savoir-faire, âme (`soul`, `soul_is_seed`), réglages |
+| `PUT` | `/api/memory/{user\|notes\|soul}` | Remplacer un carnet ou l'âme (`{"content": "…"}`) ; `400` si trop long ou secret |
+| `DELETE` | `/api/memory/soul` | Rendre à l'assistant sa personnalité d'origine |
+| `DELETE` | `/api/memory/skills/{nom}` | Supprimer un savoir-faire |
+| `DELETE` | `/api/memory` | Tout oublier (carnets, savoir-faire, âme) |
 | `POST` | `/api/ui/show` | Demander aux panneaux (bulle, widget Plasma) d'afficher une conversation : `{"conversation_id": "…"}` → `{"delivered": n}` (0 : aucun panneau n'écoute) |
 | `GET` | `/api/ui/requests?after=N&wait=25` | Pour un panneau sans WebSocket : attend la prochaine demande d'affichage après la n° `N` (sans `after` : renvoie seulement le dernier numéro) → `{"requests": […], "last": N}` |
 
@@ -119,6 +124,7 @@ il compte alors parmi les panneaux capables d'afficher une conversation (`/api/u
 | `conversation_updated` / `conversation_deleted` | Conversation modifiée (titre, état…) / supprimée |
 | `config_updated` | Nouveaux réglages |
 | `providers_updated` | Clé API enregistrée ou retirée (`provider`, `api_key`) |
+| `memory_updated` | la mémoire a changé ; `conversation_id` quand c'est la relecture d'une conversation, `soul: true` quand l'âme a grandi |
 | `update_available` | `update` : une nouvelle version est publiée (même contenu que `GET /api/update`) |
 | `update_started` | `target` : installation lancée ; le démon va redémarrer |
 | `show_conversation` | `conversation_id` : une recherche du bureau a posé une question, les panneaux l'affichent |
