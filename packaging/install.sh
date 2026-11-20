@@ -230,10 +230,9 @@ fi
 
 say "Installation de Kreafinity et de ses dépendances (quelques minutes)…"
 "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade "$SOURCE"
-# A local folder keeps the same version number: make sure its latest code is used.
-if [[ -d "$SOURCE" ]]; then
-  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --force-reinstall --no-deps "$SOURCE"
-fi
+# Versions share their number between releases: when Kreafinity was already
+# installed, pip keeps the old files. Make sure the new code is used.
+"$VENV/bin/python" -m pip install --quiet --disable-pip-version-check --force-reinstall --no-deps "$SOURCE"
 if [[ -z "${KREAFINITY_SOURCE:-}" ]]; then
   "$VENV/bin/python" -m kreafinity.update record "$REPOSITORY" "$REF" "$commit"
 else

@@ -280,8 +280,13 @@ def test_apply(monkeypatch: pytest.MonkeyPatch) -> None:
     update.apply(NEW, run=run, log=lines.append)
 
     assert commands[0][:3] == [sys.executable, "-m", "pip"]
-    assert commands[0][-1] == f"{REPOSITORY}/archive/{NEW}.tar.gz"
-    assert commands[1] == [sys.executable, "-m", "kreafinity.cli", "setup", "--refresh"]
+    assert commands[0][-3:] == [
+        "--force-reinstall",
+        "--no-deps",
+        f"{REPOSITORY}/archive/{NEW}.tar.gz",
+    ]
+    assert commands[1][:2] == [sys.executable, "-c"]  # lists the new version's dependencies
+    assert commands[2] == [sys.executable, "-m", "kreafinity.cli", "setup", "--refresh"]
     assert update.installation().commit == NEW  # type: ignore[union-attr]
     assert update.read_status().state == "done" and restarted == [True]
     assert len(lines) == 3

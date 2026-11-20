@@ -317,6 +317,20 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+#: Prints the dependencies of the installed Kreafinity (those of the new version).
+_REQUIREMENTS = """
+import importlib.metadata as metadata
+for requirement in metadata.requires("kreafinity-os") or []:
+    if "extra ==" not in requirement:
+        print(requirement)
+"""
+
+
+def _check(result: subprocess.CompletedProcess[str]) -> None:
+    if result.returncode != 0:
+        raise UpdateError(f"installation failed: {(result.stderr or result.stdout)[-800:]}")
+
+
 def apply(target: str, *, run: Runner = _run, log: Callable[[str], None] = logger.info) -> None:
     """Install the version `target` (a commit) over the current one, then restart.
 
@@ -333,20 +347,14 @@ def apply(target: str, *, run: Runner = _run, log: Callable[[str], None] = logge
     write_status("running", target)
     try:
         log(f"Downloading and installing {target[:7]}…")
-        result = run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--quiet",
-                "--disable-pip-version-check",
-                "--upgrade",
-                record.archive_url(target),
-            ]
-        )
-        if result.returncode != 0:
-            raise UpdateError(f"installation failed: {(result.stderr or result.stdout)[-800:]}")
+        pip = [sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
+        # Versions share their number between releases: pip would keep the old
+        # files, so the new code is installed by force, then its dependencies.
+        _check(run([*pip, "--force-reinstall", "--no-deps", record.archive_url(target)]))
+        listed = run([sys.executable, "-c", _REQUIREMENTS])
+        requirements = [line for line in listed.stdout.splitlines() if line.strip()]
+        if listed.returncode == 0 and requirements:
+            _check(run([*pip, *requirements]))
         record_installation(Installation(record.repository, record.ref, target, _now(), record.api))
         log("Refreshing the integration with the session…")
         # The new version writes its own service, menu and desktop files.
