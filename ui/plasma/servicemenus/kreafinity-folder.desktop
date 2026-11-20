@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+X-KDE-ServiceTypes=KonqPopupMenu/Plugin
+MimeType=inode/directory;
+X-KDE-Submenu=Kreafinity
+Icon=kreafinity
+Actions=organize;
+
+[Desktop Action organize]
+Name=Organize this folder
+Name[fr]=Ranger ce dossier
+Icon=kreafinity
+Exec=@COMMAND@ organize %F

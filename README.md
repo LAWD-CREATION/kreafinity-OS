@@ -58,8 +58,9 @@ kreafinity bubble --autostart             # l'afficher à chaque ouverture de se
 ```
 
 **Sur KDE Plasma** (étape 2, en cours), Kreafinity s'intègre au bureau : une question tapée dans
-le menu démarrer est envoyée à l'assistant, un bouton ∞ dans la barre des tâches ouvre le
-panneau, et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
+le menu démarrer est envoyée à l'assistant, un bouton ∞ dans la barre des tâches (ou Meta+C)
+ouvre le panneau, un clic droit sur des fichiers propose de les expliquer, les résumer ou les
+ranger, et un thème Kreafinity donne au bureau une disposition à la façon de Windows. Détails :
 [docs/bureau-kde.md](docs/bureau-kde.md).
 ```bash
 kreafinity desktop install --theme        # recherche, bouton de la barre des tâches, couleurs

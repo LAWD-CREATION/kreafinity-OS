@@ -2,7 +2,7 @@
 
 Étape 2 de la feuille de route : un bureau familier, à la façon de Windows, avec l'IA intégrée.
 Kreafinity s'appuie sur **KDE Plasma** (barre des tâches, menu démarrer, fenêtres) et y ajoute
-trois choses.
+l'assistant partout où on en a besoin.
 
 ![Le bureau Kreafinity sur KDE Plasma](img/plasma-bureau.jpg)
 
@@ -17,9 +17,27 @@ Kreafinity. Entrée, et la réponse s'affiche dans le panneau de l'assistant.
 **Le bouton ∞ dans la barre des tâches.** Un clic ouvre le panneau de l'assistant au-dessus de
 la barre : la même conversation que dans l'interface web, en compact, avec les cartes de
 validation des actions. Il s'ouvre aussi tout seul quand vous posez une question depuis la
-recherche. Avec le thème Kreafinity, **Meta+C** l'ouvre au clavier (comme Copilot sous Windows).
+recherche. Au clavier, **Meta+C** (touche Windows + C, comme Copilot sous Windows) l'ouvre et
+le referme. Pour changer ce raccourci : clic droit sur le bouton ∞ › Configurer › Raccourcis
+clavier. Si vous en aviez déjà choisi un, il est gardé.
 
 ![Le panneau de l'assistant ouvert depuis la barre des tâches](img/plasma-panneau.jpg)
+
+**Kreafinity dans le clic droit des fichiers.** Dans le gestionnaire de fichiers (Dolphin),
+un clic droit sur des fichiers ou des dossiers propose un sous-menu **Kreafinity** :
+
+| Action | Pour | Ce que l'assistant fait |
+|---|---|---|
+| Poser une question… | tout | une petite fenêtre demande votre question sur la sélection |
+| Qu'est-ce que c'est ? | tout | il regarde la sélection et vous explique ce que c'est |
+| Résumer | fichiers texte | il lit le fichier et le résume |
+| Ranger ce dossier | dossiers | il propose un rangement, sans rien déplacer avant votre accord |
+
+La réponse s'affiche dans le panneau ∞. L'assistant regarde les fichiers avec ses outils
+habituels : il reste limité aux dossiers autorisés, et toute modification demande votre
+validation.
+
+![Le sous-menu Kreafinity dans Dolphin](img/plasma-menu-fichiers.jpg)
 
 **Le thème Kreafinity.** Couleurs sombres et violettes, fond d'écran Kreafinity et, si vous le
 souhaitez, une disposition à la façon de Windows : une seule barre en bas avec le menu
@@ -69,6 +87,11 @@ script.
 - **Bouton ∞** : un widget Plasma (`org.kreafinity.assistant`, dans
   `~/.local/share/plasma/plasmoids`) qui affiche l'interface compacte du démon. Il attend les
   demandes d'affichage (`GET /api/ui/requests`) et s'ouvre quand il en reçoit une.
+- **Clic droit des fichiers** : trois menus de service KDE (`kreafinity-*.desktop` dans
+  `~/.local/share/kio/servicemenus`, exécutables comme KDE l'exige), réunis dans le même
+  sous-menu. Ils lancent `python -m kreafinity.plasma.files_menu ACTION FICHIERS…`, qui envoie la
+  question comme la recherche.
+- **Raccourci** : le raccourci global du widget (`Meta+C`), enregistré par Plasma lui-même.
 - **Thème** : un thème global Plasma (`org.kreafinity.desktop`), un jeu de couleurs
   (`Kreafinity.colors`) et un fond d'écran (`Kreafinity`), dans `~/.local/share`.
 

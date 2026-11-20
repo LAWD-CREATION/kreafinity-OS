@@ -159,5 +159,14 @@
   "memory.cli.skills": "Savoir-faire appris :",
   "memory.cli.where": "Fichiers : {path} (modifiables aussi dans les réglages de l'interface)",
   "memory.cli.forget_confirm": "Effacer tout ce dont Kreafinity se souvient ? Vos conversations sont gardées.",
-  "memory.cli.forgotten": "Kreafinity a tout oublié."
+  "memory.cli.forgotten": "Kreafinity a tout oublié.",
+  "files.explain": "Explique-moi ce que sont ces éléments et ce qu'ils contiennent.",
+  "files.summarize": "Lis ces fichiers et résume leur contenu.",
+  "files.organize": "Regarde ce dossier et propose-moi comment le ranger (sous-dossiers, noms plus clairs, doublons…). Ne déplace rien avant que je sois d'accord.",
+  "files.selection": "Sélection dans le gestionnaire de fichiers :",
+  "files.more": "- … et {count} autres éléments",
+  "files.dialog_title": "Demander à Kreafinity",
+  "files.dialog_label": "Votre question sur la sélection :",
+  "plasma.files_menu": "Clic droit dans le gestionnaire de fichiers : Actions › Kreafinity.",
+  "plasma.shortcut": "Raccourci clavier de l'assistant : {shortcut}."
 }

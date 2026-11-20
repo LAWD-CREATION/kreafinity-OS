@@ -159,5 +159,14 @@
   "memory.cli.skills": "Learned skills:",
   "memory.cli.where": "Files: {path} (also editable in the interface's settings)",
   "memory.cli.forget_confirm": "Erase everything Kreafinity remembers? Your conversations are kept.",
-  "memory.cli.forgotten": "Kreafinity forgot everything."
+  "memory.cli.forgotten": "Kreafinity forgot everything.",
+  "files.explain": "Explain what these items are and what they contain.",
+  "files.summarize": "Read these files and summarize their content.",
+  "files.organize": "Look at this folder and suggest how to organize it (subfolders, clearer names, duplicates…). Do not move anything before I agree.",
+  "files.selection": "Selection in the file manager:",
+  "files.more": "- … and {count} more items",
+  "files.dialog_title": "Ask Kreafinity",
+  "files.dialog_label": "Your question about the selection:",
+  "plasma.files_menu": "Right-click in the file manager: Actions › Kreafinity.",
+  "plasma.shortcut": "Assistant keyboard shortcut: {shortcut}."
 }
