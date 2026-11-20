@@ -212,7 +212,7 @@ export class SettingsDialog {
         "div",
         { class: "skill-row" },
         el("div", {}, el("div", { class: "tool-name" }, skill.title), el("div", { class: "hint" }, skill.description)),
-        el("span", { class: "hint" }, t("settings.memory.uses", { count: skill.uses })),
+        el("span", { class: "hint" }, skill.uses ? t("settings.memory.uses", { count: skill.uses }) : t("settings.memory.unused")),
       );
       const remove = el("button", { class: "button small ghost", type: "button" }, t("settings.memory.delete_skill"));
       remove.addEventListener("click", async () => {

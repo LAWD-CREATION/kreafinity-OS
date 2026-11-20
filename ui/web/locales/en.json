@@ -181,5 +181,6 @@
   "tool.skill": "Skills",
   "tool.skill.help": "Save and improve procedures that worked.",
   "tool.search_conversations": "History search",
-  "tool.search_conversations.help": "Recall what was said in past conversations."
+  "tool.search_conversations.help": "Recall what was said in past conversations.",
+  "settings.memory.unused": "not used yet"
 }

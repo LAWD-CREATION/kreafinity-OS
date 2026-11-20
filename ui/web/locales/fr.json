@@ -181,5 +181,6 @@
   "tool.skill": "Savoir-faire",
   "tool.skill.help": "Enregistrer et améliorer les procédures qui ont marché.",
   "tool.search_conversations": "Recherche dans l'historique",
-  "tool.search_conversations.help": "Retrouver ce qui a été dit dans les conversations passées."
+  "tool.search_conversations.help": "Retrouver ce qui a été dit dans les conversations passées.",
+  "settings.memory.unused": "pas encore utilisé"
 }

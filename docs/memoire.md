@@ -30,6 +30,8 @@ chaque conversation ».
 
 ## Vous gardez la main
 
+![La mémoire dans les réglages](img/memoire-reglages.jpg)
+
 - **Tout est visible et modifiable** : Réglages › Mémoire montre ce que Kreafinity sait de vous et
   ce qu'il a appris (modifiable comme un texte), et ses savoir-faire (supprimables un par un).
   En ligne de commande : `kreafinity memory`.

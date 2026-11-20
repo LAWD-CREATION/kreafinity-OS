@@ -120,6 +120,8 @@ Tout cela se règle aussi dans l'écran **Réglages** de l'interface (`kreafinit
 
 ## Mettre à jour
 
+![Le bandeau de mise à jour](img/mise-a-jour.jpg)
+
 Kreafinity vérifie une fois par jour si une nouvelle version est publiée sur GitHub. Quand
 c'est le cas, une notification apparaît sur le bureau et un bandeau **« Une mise à jour de
 Kreafinity est disponible »** s'affiche dans l'interface et dans le panneau de l'assistant, avec
