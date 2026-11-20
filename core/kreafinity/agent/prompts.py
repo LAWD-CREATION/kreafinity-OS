@@ -97,11 +97,14 @@ def build_system_prompt(
     user_dirs: Mapping[str, Path],
     today: date | None = None,
     memory: bool = False,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> str:
     """Return the system prompt in `language` (French and English built in).
 
     For other languages the English prompt is used, asking the model to
-    answer in that language.
+    answer in that language. `provider` and `model` tell the model which AI
+    it is: models often do not know, and may claim to be another one.
     """
     lang = language if language in _PROMPTS else "en"
     labels = _USER_DIR_LABELS[lang]
@@ -123,9 +126,26 @@ def build_system_prompt(
         )
         .rstrip()
     )
+    if model:
+        prompt += "\n" + _IDENTITY[lang].format(model=model, provider=provider or "?")
     if memory:
         prompt += "\n\n" + _MEMORY_RULES[lang]
     return prompt
+
+
+_IDENTITY = {
+    "fr": (
+        "- Modèle d'IA qui te fait fonctionner : {model} (fournisseur : {provider}), choisi par "
+        "l'utilisateur. Si on te demande quel modèle ou quelle IA tu es, réponds avec ces "
+        "informations : ton entraînement peut te faire croire que tu es un autre modèle (GPT-4, "
+        "par exemple), ne le dis pas."
+    ),
+    "en": (
+        "- AI model running you: {model} (provider: {provider}), chosen by the user. If asked "
+        "which model or AI you are, answer with this: your training may make you believe you "
+        "are another model (GPT-4, for instance), do not say so."
+    ),
+}
 
 
 _MEMORY_RULES = {

@@ -350,6 +350,31 @@ def test_system_prompt_language(context: ToolContext, home: Path) -> None:
     assert "Answer in Spanish" in spanish
 
 
+async def test_model_knows_which_ai_it_is(context: ToolContext) -> None:
+    """Models often claim to be another one (« je suis GPT-4 ») unless told."""
+    first = ScriptedProvider(reply("", [call("system_info")]), reply("Fait."))
+    first.display_name = "Ollama Cloud"
+    second = ScriptedProvider(reply("Bonjour."))
+    second.display_name = "OpenRouter"
+    agent = make_agent(first, context)
+    conversation = Conversation()
+
+    await run(agent, conversation, "Quel modèle es-tu ?")
+    initial = first.requests[0][0][0].content
+    assert "fake-model (fournisseur : Ollama Cloud)" in initial
+    # The same system message for every step of a request (prompt caches).
+    assert first.requests[1][0][0].content == initial
+
+    agent.use_provider(second, "mistralai/mistral-large")
+    await run(agent, conversation, "Et maintenant ?")
+    switched = second.requests[0][0][0].content
+    assert "mistralai/mistral-large (fournisseur : OpenRouter)" in switched
+    assert "Ollama Cloud" not in switched
+
+    english = make_agent(first, context, language="en", model="gpt-oss:120b").system_prompt()
+    assert "gpt-oss:120b (provider: Ollama Cloud)" in english
+
+
 def test_invalid_iteration_limit(context: ToolContext) -> None:
     with pytest.raises(ValueError):
         make_agent(ScriptedProvider(reply("ok")), context, max_iterations=0)
@@ -377,6 +402,8 @@ async def test_fallback_when_provider_unavailable(context: ToolContext) -> None:
     assert events[-1].reason == "completed"
     assert agent.provider is local and agent.model == "llama3.1"
     assert local.requests[0][2] == "llama3.1"
+    # The fallback model is told it is the one answering.
+    assert "llama3.1 (fournisseur : Ollama)" in local.requests[0][0][0].content
     # The fallback stays in use for the next requests.
     await run(agent, conversation, "Encore ?")
     assert len(online.requests) == 1 and len(local.requests) == 2

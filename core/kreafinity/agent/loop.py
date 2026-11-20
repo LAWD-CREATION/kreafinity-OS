@@ -217,6 +217,7 @@ class Agent:
         self.fallback = fallback
         self.memory = memory
         self.instructions = instructions
+        self._system: tuple[tuple[object, ...], Message] | None = None
 
     def use_provider(self, provider: LLMProvider, model: str | None = None) -> None:
         """Switch provider and model; takes effect from the next LLM call."""
@@ -231,6 +232,8 @@ class Agent:
             allowed_roots=self.context.allowed_roots,
             user_dirs=user_dirs(self.context.home),
             memory=self.memory is not None,
+            provider=self.provider.display_name,
+            model=self.model or self.provider.default_model,
         )
         snapshot = self.memory.snapshot(self.language) if self.memory else ""
         return f"{prompt}\n\n{snapshot}" if snapshot else prompt
@@ -244,13 +247,13 @@ class Agent:
         """
         conversation.messages[:] = complete_unanswered_calls(conversation.messages)
         conversation.messages.append(Message.user(user_text))
-        system = Message.system(self.system_prompt())
+        self._system = None  # memory and date may have changed since the last request
         specs = self.tools.specs() if self.provider.supports_tools else []
         model: str | None = None
 
         for iteration in range(1, self.max_iterations + 1):
             done: ResponseDone | None = None
-            async for event in self._stream_response([system, *conversation.messages], specs):
+            async for event in self._stream_response(conversation.messages, specs):
                 if isinstance(event, ResponseDone):
                     done = event
                 else:
@@ -304,7 +307,9 @@ class Agent:
         """Call the provider, switching to the fallback one if it cannot be reached."""
         started = False
         try:
-            async for event in self.provider.chat(messages, specs, model=self.model):
+            async for event in self.provider.chat(
+                [self._system_message(), *messages], specs, model=self.model
+            ):
                 started = True
                 yield event
             return
@@ -317,8 +322,21 @@ class Agent:
             yield ProviderFallback(
                 unavailable=unavailable, fallback=self.provider.display_name, reason=str(exc)
             )
-        async for event in self.provider.chat(messages, specs, model=self.model):
+        async for event in self.provider.chat(
+            [self._system_message(), *messages], specs, model=self.model
+        ):
             yield event
+
+    def _system_message(self) -> Message:
+        """The system message, built again only when the provider or model changed.
+
+        It stays the same during a request otherwise (memory saved meanwhile
+        is shown from the next request), which keeps providers' prompt caches.
+        """
+        key = (self.provider, self.model, self.language)
+        if self._system is None or self._system[0] != key:
+            self._system = (key, Message.system(self.system_prompt()))
+        return self._system[1]
 
     async def _run_call(
         self, conversation: Conversation, call: ToolCall, model: str | None
