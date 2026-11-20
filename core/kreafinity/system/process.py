@@ -16,6 +16,8 @@ HEAD_BYTES = 12_000
 TAIL_BYTES = 4_000
 #: How long background processes may keep the output open after the program exits.
 _GRACE_SECONDS = 2.0
+#: How often the program is checked for having exited.
+_POLL_SECONDS = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,7 +99,7 @@ async def run_captured(
     reader = asyncio.create_task(capture.drain(process.stdout))
     exit_code: int | None
     try:
-        exit_code = await asyncio.wait_for(process.wait(), timeout)
+        exit_code = await asyncio.wait_for(_exited(process), timeout)
     except TimeoutError:
         exit_code = None
         await _stop_group(process)
@@ -125,13 +127,25 @@ async def run_captured(
     )
 
 
+async def _exited(process: asyncio.subprocess.Process) -> int:
+    """Wait for the program itself to exit, and return its exit code.
+
+    Before Python 3.13, ``Process.wait()`` also waits until nothing holds the
+    output open, so a program started in the background (``command &``) kept
+    the caller waiting. The exit code is known as soon as the program exits.
+    """
+    while (code := process.returncode) is None:
+        await asyncio.sleep(_POLL_SECONDS)
+    return code
+
+
 async def _stop_group(process: asyncio.subprocess.Process) -> None:
     """Ask the process group to stop, then force it after a few seconds."""
     for sig, wait in ((signal.SIGTERM, 3.0), (signal.SIGKILL, 3.0)):
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(process.pid, sig)
         try:
-            await asyncio.wait_for(process.wait(), wait)
+            await asyncio.wait_for(_exited(process), wait)
             return
         except TimeoutError:
             continue
