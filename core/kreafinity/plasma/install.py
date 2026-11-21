@@ -44,8 +44,9 @@ SERVICE_MENUS = ("kreafinity-files", "kreafinity-text", "kreafinity-folder")
 ADD_WIDGET_SCRIPT = """
 var found = [];
 panels().forEach(function (panel) { found = found.concat(panel.widgets("%(id)s")); });
-var state = "present";
-if (found.length == 0) {
+var mayAdd = %(add)s;
+var state = found.length > 0 ? "present" : "absent";
+if (found.length == 0 && mayAdd) {
     var bottom = panels().filter(function (panel) { return panel.location == "bottom"; });
     var panel = bottom.length ? bottom[0] : panels()[0];
     if (panel) {
@@ -253,11 +254,18 @@ def install(version: int, *, port: int, add_widget: bool = True) -> Report:
         shutil.copyfile(logo, icon)
 
     _run(f"kquitapp{version}", "krunner")  # restarted on next use, with the new plugin
+    # An update only gives the shortcut to a widget that has none: a widget
+    # the user removed stays removed.
+    script = ADD_WIDGET_SCRIPT % {
+        "id": WIDGET_ID,
+        "shortcut": SHORTCUT,
+        "add": "true" if add_widget else "false",
+    }
+    answer = (evaluate_script(script) or "").split()
     if not add_widget:
+        if "shortcut" in answer:
+            report.add("plasma.shortcut", shortcut=SHORTCUT)
         return report
-    answer = (
-        evaluate_script(ADD_WIDGET_SCRIPT % {"id": WIDGET_ID, "shortcut": SHORTCUT}) or ""
-    ).split()
     if answer and answer[0] in ("added", "present"):
         report.add("plasma.widget_added")
         if "shortcut" in answer:
