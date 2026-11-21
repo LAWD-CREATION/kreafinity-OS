@@ -7,4 +7,11 @@ case "$1" in
         rm -rf /usr/share/plasma/plasmoids/org.kreafinity.assistant
         ;;
 esac
+case "$1" in
+    purge)
+        # Removing the package keeps the repository (reinstalling is one command);
+        # purging it forgets it.
+        rm -f /etc/apt/sources.list.d/kreafinity.sources
+        ;;
+esac
 exit 0

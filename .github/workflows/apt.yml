@@ -1,0 +1,69 @@
+name: APT repository
+
+# The Kreafinity APT repository, on GitHub Pages: rebuilt and signed for every
+# change on main. It needs, once (see docs/distribution.md): the APT_SIGNING_KEY
+# secret (packaging/apt/new-signing-key.sh) and Pages set to « GitHub Actions ».
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apt-repository
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      signed: ${{ steps.key.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the version holds the commit date and hash
+      - name: Signing key
+        id: key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          if [ -z "$APT_SIGNING_KEY" ]; then
+            echo "::warning::No APT_SIGNING_KEY secret yet: the repository is built but not published (docs/distribution.md)."
+            echo "signed=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import 2>/dev/null
+          fingerprint="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
+          echo "fingerprint=$fingerprint" >>"$GITHUB_OUTPUT"
+          echo "signed=true" >>"$GITHUB_OUTPUT"
+      - name: Tools
+        run: |
+          pip install uv
+          sudo apt-get install -y -q apt-utils
+      - name: Package
+        run: packaging/debian/build-deb.sh dist
+      - name: Repository
+        if: steps.key.outputs.signed == 'true'
+        env:
+          KREAFINITY_APT_KEY: ${{ steps.key.outputs.fingerprint }}
+        run: packaging/apt/build-repo.sh dist site
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.key.outputs.signed == 'true'
+        with:
+          path: site
+
+  publish:
+    needs: build
+    if: needs.build.outputs.signed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -108,3 +108,124 @@ def test_maintainer_scripts_handle_the_widget_and_the_service() -> None:
     build = (DEBIAN / "build-deb.sh").read_text()
     assert "PYTHONNOUSERSITE=1" in build  # never the build machine's own packages
     assert "python3 -s -m" in build  # never the user's own packages either
+
+
+# --- The APT repository ------------------------------------------------------------------------
+
+APT = ROOT / "packaging" / "apt"
+needs_repo_tools = pytest.mark.skipif(
+    not all(shutil.which(tool) for tool in ("apt-ftparchive", "gpg", "gpgv", "dpkg-deb")),
+    reason="apt-ftparchive, gpg and dpkg-deb are needed (apt-utils, gnupg)",
+)
+
+
+def tiny_package(folder: Path, version: str) -> Path:
+    root = folder / f"root-{version}"
+    (root / "DEBIAN").mkdir(parents=True)
+    (root / "DEBIAN" / "control").write_text(
+        f"Package: kreafinity\nVersion: {version}\nArchitecture: amd64\n"
+        "Maintainer: Kreafinity <contact@kreafinity.com>\nDescription: test\n"
+    )
+    package = folder / f"kreafinity_{version}_amd64.deb"
+    subprocess.run(
+        ["dpkg-deb", "--root-owner-group", "--build", str(root), str(package)],
+        check=True,
+        capture_output=True,
+    )
+    return package
+
+
+@needs_repo_tools
+def test_signed_repository(tmp_path: Path) -> None:
+    # gpg-agent's socket path must stay short (Unix sockets: 108 characters).
+    import tempfile
+
+    with tempfile.TemporaryDirectory(dir="/tmp", prefix="kgpg") as gnupg:
+        env = {"PATH": "/usr/bin:/bin", "GNUPGHOME": gnupg, "HOME": str(tmp_path)}
+        subprocess.run(
+            [
+                "gpg",
+                "--batch",
+                "--quiet",
+                "--passphrase",
+                "",
+                "--quick-generate-key",
+                "Kreafinity test <test@example.invalid>",
+                "ed25519",
+                "sign",
+                "1d",
+            ],
+            check=True,
+            env=env,
+            capture_output=True,
+        )
+        listing = subprocess.run(
+            ["gpg", "--list-secret-keys", "--with-colons"],
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        fingerprint = next(
+            line.split(":")[9] for line in listing.splitlines() if line.startswith("fpr")
+        )
+        debs = tmp_path / "debs"
+        debs.mkdir()
+        tiny_package(debs, "0.1.0~dev0+git20261121.100000.aaaaaaa")
+        tiny_package(debs, "0.1.0~dev0+git20261121.153000.bbbbbbb")
+        site = tmp_path / "site"
+        subprocess.run(
+            [str(APT / "build-repo.sh"), str(debs), str(site)],
+            check=True,
+            capture_output=True,
+            env={
+                **env,
+                "KREAFINITY_APT_KEY": fingerprint,
+                "KREAFINITY_APT_URL": "https://apt.test",
+            },
+        )
+        keyring = site / "kreafinity-archive-keyring.gpg"
+        release = site / "dists" / "stable"
+        # Both signatures check against the published key (what APT does).
+        for command in (
+            ["gpgv", "--keyring", str(keyring), str(release / "InRelease")],
+            [
+                "gpgv",
+                "--keyring",
+                str(keyring),
+                str(release / "Release.gpg"),
+                str(release / "Release"),
+            ],
+        ):
+            assert subprocess.run(command, capture_output=True).returncode == 0
+
+    index = (release / "main" / "binary-amd64" / "Packages").read_text()
+    assert index.count("Package: kreafinity") == 2
+    assert "Filename: pool/main/k/kreafinity/" in index
+    text = (release / "Release").read_text()
+    assert "Origin: Kreafinity" in text and "Architectures: amd64" in text
+    assert "main/binary-amd64/Packages.gz" in text  # checksums of every index
+    # The page and the files people need: the latest package, the source, the key.
+    assert (site / "kreafinity_latest_amd64.deb").read_bytes() == (
+        debs / "kreafinity_0.1.0~dev0+git20261121.153000.bbbbbbb_amd64.deb"
+    ).read_bytes()
+    assert "URIs: https://apt.test\n" in (site / "kreafinity.sources").read_text()
+    page = (site / "index.html").read_text()
+    assert "@" not in page.replace("@kreafinity", "")  # every placeholder replaced
+    assert "https://apt.test/kreafinity_latest_amd64.deb" in page
+    assert (site / ".nojekyll").exists()
+
+
+def test_package_configures_the_repository() -> None:
+    build = (DEBIAN / "build-deb.sh").read_text()
+    assert "/usr/share/keyrings/kreafinity-archive-keyring.gpg" in build
+    postinst = (DEBIAN / "postinst").read_text()
+    # Never over a repository already set up by hand.
+    assert "[ ! -e /etc/apt/sources.list.d/kreafinity.sources ]" in postinst
+    assert "rm -f /etc/apt/sources.list.d/kreafinity.sources" in (DEBIAN / "postrm").read_text()
+    for script in ("build-repo.sh", "new-signing-key.sh"):
+        assert (APT / script).stat().st_mode & 0o111
+    # The private key never belongs in the repository.
+    assert not list(ROOT.glob("packaging/apt/*secret*")) and not list(
+        ROOT.glob("**/*signing-key.asc")
+    )

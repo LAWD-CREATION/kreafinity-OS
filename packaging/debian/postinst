@@ -23,6 +23,13 @@ case "$1" in
         mkdir -p /usr/share/plasma/plasmoids
         rm -rf "$widget"
         ln -s "/opt/kreafinity/share/plasmoids/$version" "$widget"
+        # Updates with the system: the Kreafinity APT repository, unless already set up
+        # (by hand, or by an earlier installation).
+        if [ -f /usr/share/kreafinity/kreafinity.sources ] \
+            && [ ! -e /etc/apt/sources.list.d/kreafinity.sources ] \
+            && [ ! -e /etc/apt/sources.list.d/kreafinity.list ]; then
+            cp /usr/share/kreafinity/kreafinity.sources /etc/apt/sources.list.d/kreafinity.sources
+        fi
         if command -v gtk-update-icon-cache >/dev/null 2>&1; then
             gtk-update-icon-cache -q -t /usr/share/icons/hicolor || true
         fi
