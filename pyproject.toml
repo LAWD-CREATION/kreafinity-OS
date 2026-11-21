@@ -93,6 +93,7 @@ packages = ["kreafinity"]
 module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 follow_imports_for_stubs = true
+ignore_missing_imports = true  # also used by the optional voice engines
 
 [[tool.mypy.overrides]]
 # Optional voice engines (kreafinity voice install), absent from most installs.
