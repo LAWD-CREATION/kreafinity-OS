@@ -194,5 +194,9 @@
   "tool.soul": "Âme",
   "tool.soul.help": "Faire grandir sa propre personnalité au fil des échanges.",
   "tool.set_appearance": "Apparence du bureau",
-  "tool.set_appearance.help": "Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME)."
+  "tool.set_appearance.help": "Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME).",
+  "tool.list_windows": "Fenêtres ouvertes",
+  "tool.list_windows.help": "Lister les fenêtres du bureau (KDE Plasma).",
+  "tool.arrange_window": "Disposition des fenêtres",
+  "tool.arrange_window.help": "Mettre une fenêtre au premier plan, la réduire, l'agrandir ou la placer à gauche ou à droite (KDE Plasma)."
 }

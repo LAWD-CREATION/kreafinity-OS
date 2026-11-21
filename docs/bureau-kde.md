@@ -49,6 +49,11 @@ Plage.jpg en fond d'écran » ou « remets le thème Kreafinity » : l'assistant
 le fond d'écran, après votre validation, sans toucher à la disposition du bureau (voir
 [outils.md](outils.md#apparence-du-bureau-set_appearance)).
 
+**Les fenêtres rangées à la demande.** « Mets Firefox à gauche et Dolphin à droite », « réduis
+tout sauf le terminal » : l'assistant voit les fenêtres ouvertes et peut les mettre au premier
+plan, les réduire, les agrandir ou les placer côte à côte, après votre validation (voir
+[outils.md](outils.md#fenêtres-list_windows-arrange_window)).
+
 Sur Plasma, ce bouton remplace la bulle flottante utilisée sur les autres bureaux.
 
 ## Installer

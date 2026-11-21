@@ -194,5 +194,9 @@
   "tool.soul": "Soul",
   "tool.soul.help": "Grow its own personality as you talk.",
   "tool.set_appearance": "Desktop look",
-  "tool.set_appearance.help": "Light, dark or Kreafinity theme, and wallpaper (KDE Plasma, GNOME)."
+  "tool.set_appearance.help": "Light, dark or Kreafinity theme, and wallpaper (KDE Plasma, GNOME).",
+  "tool.list_windows": "Open windows",
+  "tool.list_windows.help": "List the desktop's windows (KDE Plasma).",
+  "tool.arrange_window": "Window layout",
+  "tool.arrange_window.help": "Bring a window forward, minimize, maximize or snap it left or right (KDE Plasma)."
 }
