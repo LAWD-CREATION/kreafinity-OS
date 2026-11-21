@@ -35,3 +35,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# APT repository: the built site, and never the private signing key
+/site/
+*signing-key.asc

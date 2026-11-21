@@ -6,7 +6,7 @@ KDE Plasma, le thème Kreafinity et l'assistant déjà prêts.
 | Étape | Contenu | État |
 |---|---|---|
 | 1 | **Paquet Debian** (`.deb`) de Kreafinity | ✅ fait (ce document) |
-| 2 | **Dépôt APT** : `apt install kreafinity` et mises à jour avec le système | à faire |
+| 2 | **Dépôt APT** : `apt install kreafinity` et mises à jour avec le système | ✅ fait, à activer (voir plus bas) |
 | 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | à faire |
 | 4 | **Clé USB live** : essayer sans rien installer | à faire (vient avec l'ISO) |
 | 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | à faire |
@@ -79,15 +79,71 @@ web, message des mises à jour, voix installable dans le dossier de l'utilisateu
 Pas encore essayé sur un vrai **Debian 13** : ses miroirs n'étaient pas accessibles depuis
 l'environnement de développement. C'est la base prévue de l'ISO, le prochain essai à faire.
 
+## Le dépôt APT
+
+Le dépôt est publié sur **GitHub Pages**, à l'adresse
+<https://lawd-creation.github.io/kreafinity-OS/> : une page explique l'installation, et APT y
+trouve les paquets. La CI le reconstruit et le **signe** à chaque modification de `main`
+(`.github/workflows/apt.yml`).
+
+### Installer depuis le dépôt
+
+```bash
+curl -fsSLo /tmp/kreafinity.deb https://lawd-creation.github.io/kreafinity-OS/kreafinity_latest_amd64.deb
+sudo apt install /tmp/kreafinity.deb
+```
+
+Le paquet ajoute lui-même le dépôt (`/etc/apt/sources.list.d/kreafinity.sources`, avec la clé
+dans `/usr/share/keyrings/kreafinity-archive-keyring.gpg`) : les mises à jour arrivent ensuite
+avec celles du système. Il ne touche pas à un dépôt déjà configuré à la main ; `apt purge` le
+retire.
+
+### L'activer (une seule fois)
+
+Le dépôt a besoin d'une **clé de signature** : APT refuse un dépôt non signé, et la signature
+garantit que les paquets viennent bien de Kreafinity. La partie privée de cette clé ne doit
+jamais être dans le code ni envoyée à quelqu'un. Sur votre ordinateur, depuis le dépôt Git :
+
+1. `packaging/apt/new-signing-key.sh` : crée la clé, écrit la clé **publique** dans
+   `packaging/apt/kreafinity-archive-keyring.asc` et la clé **privée** dans
+   `~/kreafinity-apt-signing-key.asc`.
+2. Validez et poussez la clé publique (`git add packaging/apt/kreafinity-archive-keyring.asc`).
+3. Sur GitHub : **Settings › Secrets and variables › Actions › New repository secret**, nom
+   `APT_SIGNING_KEY`, valeur : tout le contenu de `~/kreafinity-apt-signing-key.asc`.
+4. Sur GitHub : **Settings › Pages › Source : GitHub Actions**.
+5. Gardez la clé privée sur une clé USB, puis effacez-la de l'ordinateur
+   (`shred -u ~/kreafinity-apt-signing-key.asc`). Si elle était perdue, il faudrait une nouvelle
+   clé, et chaque ordinateur devrait réinstaller le paquet pour l'avoir.
+
+Tant que le secret n'existe pas, la CI construit le paquet mais ne publie rien (un avertissement
+le rappelle). Les paquets construits avant l'étape 2 n'ont pas la clé : ils ne recevront pas de
+mises à jour, il faudra les réinstaller une fois depuis le dépôt.
+
+### Comment c'est fait
+
+- `packaging/apt/build-repo.sh` : place les paquets dans `pool/`, crée les index (`Packages`),
+  le fichier `Release` avec leurs sommes de contrôle, le signe (`Release.gpg`, `InRelease`) et
+  publie la clé publique, le fichier `kreafinity.sources`, le dernier paquet
+  (`kreafinity_latest_amd64.deb`) et la page d'accueil.
+- Chaque publication remplace la précédente : le dépôt contient la dernière version.
+- Les numéros de version contiennent la date et l'heure du commit
+  (`0.1.0~dev0+git20261121.143012.abc1234`) : ils augmentent toujours, et APT propose chaque
+  nouvelle version.
+
+### Essayé
+
+Sur un **Ubuntu 24.04 neuf**, avec une clé de test et le dépôt servi localement : installation
+exactement comme l'indique la page, dépôt ajouté par le paquet, `apt update` sans
+avertissement, puis une version 2 publiée et installée par `apt upgrade`. Et deux attaques
+refusées par APT : un index modifié (« taille inattendue ») et un dépôt signé par une autre clé
+(« NO_PUBKEY »).
+
 ## La suite
 
-1. **Dépôt APT** : publier les paquets signés (GitHub Pages ou `apt.kreafinity.com`), avec une
-   clé de signature Kreafinity, pour que `apt install kreafinity` et les mises à jour marchent
-   comme pour n'importe quel logiciel.
-2. **ISO** avec `live-build` : Debian 13 « trixie », KDE Plasma 6, le paquet Kreafinity,
+1. **ISO** avec `live-build` : Debian 13 « trixie », KDE Plasma 6, le paquet Kreafinity,
    le thème appliqué par défaut (`/etc/skel` et la configuration par défaut de Plasma),
    Ollama préinstallé en option.
-3. **Calamares** : l'installateur graphique, avec les couleurs et le logo Kreafinity, en
+2. **Calamares** : l'installateur graphique, avec les couleurs et le logo Kreafinity, en
    français par défaut.
-4. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
+3. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
    voix, découverte des fonctions).

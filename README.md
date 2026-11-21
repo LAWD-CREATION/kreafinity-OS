@@ -38,6 +38,13 @@ Ollama Cloud, Claude, GPT, Mistral ou OpenRouter. Options, emplacements, mise à
 [docs/installation.md](docs/installation.md). Pour désinstaller : `kreafinity uninstall`
 (`--purge` efface aussi vos réglages et conversations).
 
+Ou avec le **paquet Debian**, pour tous les utilisateurs et avec les mises à jour du système
+(voir [docs/distribution.md](docs/distribution.md)) :
+```bash
+curl -fsSLo /tmp/kreafinity.deb https://lawd-creation.github.io/kreafinity-OS/kreafinity_latest_amd64.deb
+sudo apt install /tmp/kreafinity.deb
+```
+
 ### Utiliser
 ```bash
 kreafinity ui             # ouvre l'interface web dans votre navigateur (ou « Kreafinity » dans le menu)

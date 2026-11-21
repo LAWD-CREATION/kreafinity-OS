@@ -12,7 +12,9 @@
 #   packaging/debian/build-deb.sh [output folder]      (default: dist/)
 #
 # Needs: uv (downloads the Python), dpkg-deb, and Internet access (PyPI).
-# Variables: KREAFINITY_PYTHON (Python version, 3.13 by default).
+# Variables: KREAFINITY_PYTHON (Python version, 3.13 by default); KREAFINITY_VERSION
+# (package version, computed by default); KREAFINITY_APT_URL and KREAFINITY_APT_KEYRING
+# (the APT repository the package configures, see packaging/apt/).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,14 +33,18 @@ unset PYTHONPATH PYTHONHOME
 
 say() { printf '\033[1;35m==>\033[0m %s\n' "$*"; }
 
-# --- Version: 0.1.0.dev0 from git commit abc1234 → 0.1.0~dev0+git20261121.abc1234 ---------
+# --- Version: 0.1.0.dev0, commit abc1234 of 2026-11-21 14:30:12 UTC → 0.1.0~dev0+git20261121.143012.abc1234
+# (date and time first: versions always increase, even for two commits the same day) ---------
 upstream="$(python3 -c 'import tomllib, sys; print(tomllib.load(open(sys.argv[1], "rb"))["project"]["version"])' "$repo/pyproject.toml")"
 version="$(printf '%s' "$upstream" | sed -E 's/\.?(dev|a|b|rc)([0-9]*)$/~\1\2/')"
 if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
   commit="$(git -C "$repo" rev-parse --short=7 HEAD)"
-  date="$(git -C "$repo" log -1 --format=%cd --date=format:%Y%m%d)"
+  date="$(TZ=UTC git -C "$repo" log -1 --format=%cd --date=format-local:%Y%m%d.%H%M%S)"
   version="$version+git$date.$commit"
 fi
+version="${KREAFINITY_VERSION:-$version}"
+apt_url="${KREAFINITY_APT_URL:-https://lawd-creation.github.io/kreafinity-OS}"
+apt_keyring="${KREAFINITY_APT_KEYRING:-$repo/packaging/apt/kreafinity-archive-keyring.asc}"
 say "Kreafinity $version ($arch), Python $python_version"
 
 # --- Its own Python ----------------------------------------------------------------------------
@@ -128,6 +134,18 @@ for menu in "$assets"/servicemenus/*.desktop; do
   sed "s|@COMMAND@|$prefix/python/bin/python3 -s -m kreafinity.plasma.files_menu|" "$menu" >"$target"
   chmod 755 "$target"  # KDE ignores service menus that are not executable
 done
+
+# The APT repository, for updates with the system (once its signing key exists).
+if [ -f "$apt_keyring" ]; then
+  mkdir -p "$root/usr/share/keyrings" "$root/usr/share/kreafinity"
+  gpg --dearmor <"$apt_keyring" >"$root/usr/share/keyrings/kreafinity-archive-keyring.gpg"
+  chmod 644 "$root/usr/share/keyrings/kreafinity-archive-keyring.gpg"
+  printf 'Types: deb\nURIs: %s\nSuites: stable\nComponents: main\nSigned-By: /usr/share/keyrings/kreafinity-archive-keyring.gpg\n' \
+    "$apt_url" >"$root/usr/share/kreafinity/kreafinity.sources"
+  say "APT repository: $apt_url"
+else
+  say "No APT repository key yet ($apt_keyring): updates will need a new package"
+fi
 
 install -Dm644 "$repo/LICENSE" "$root/usr/share/doc/kreafinity/copyright"
 printf 'kreafinity (%s) unstable; urgency=medium\n\n  * Build from %s.\n\n -- Kreafinity <contact@kreafinity.com>  %s\n' \
