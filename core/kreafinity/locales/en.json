@@ -176,5 +176,11 @@
   "tool.set_appearance.theme.light": "Switch the desktop to the light theme",
   "tool.set_appearance.theme.kreafinity": "Apply the Kreafinity colors to the desktop",
   "tool.set_appearance.wallpaper": "change the wallpaper",
-  "tool.set_appearance.and": " and "
+  "tool.set_appearance.and": " and ",
+  "tool.arrange_window.focus": "Bring the window “{title}” to the front",
+  "tool.arrange_window.minimize": "Minimize the window “{title}”",
+  "tool.arrange_window.restore": "Show the window “{title}” again",
+  "tool.arrange_window.maximize": "Maximize the window “{title}”",
+  "tool.arrange_window.left": "Snap the window “{title}” to the left half of the screen",
+  "tool.arrange_window.right": "Snap the window “{title}” to the right half of the screen"
 }

@@ -176,5 +176,11 @@
   "tool.set_appearance.theme.light": "Passer le bureau en thème clair",
   "tool.set_appearance.theme.kreafinity": "Appliquer les couleurs Kreafinity au bureau",
   "tool.set_appearance.wallpaper": "changer le fond d'écran",
-  "tool.set_appearance.and": " et "
+  "tool.set_appearance.and": " et ",
+  "tool.arrange_window.focus": "Afficher la fenêtre « {title} » au premier plan",
+  "tool.arrange_window.minimize": "Réduire la fenêtre « {title} »",
+  "tool.arrange_window.restore": "Rouvrir la fenêtre « {title} »",
+  "tool.arrange_window.maximize": "Agrandir la fenêtre « {title} » en plein écran",
+  "tool.arrange_window.left": "Placer la fenêtre « {title} » sur la moitié gauche de l'écran",
+  "tool.arrange_window.right": "Placer la fenêtre « {title} » sur la moitié droite de l'écran"
 }

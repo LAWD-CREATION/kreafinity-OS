@@ -14,6 +14,7 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `search_files` | safe | Chercher des fichiers (par nom, taille, date) |
 | `read_file` | safe | Lire un fichier texte |
 | `list_applications` | safe | Lister les applications installées |
+| `list_windows` | safe | Lister les fenêtres ouvertes (KDE Plasma) |
 | `search_conversations` | safe | Chercher dans les conversations passées |
 | `memory` | safe | Retenir ou corriger une note de sa mémoire (voir [memoire.md](memoire.md)) |
 | `skill` | safe | Lire, enregistrer ou améliorer un savoir-faire |
@@ -27,6 +28,7 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `close_application` | confirm | Demander à une application de se fermer (jamais de force) |
 | `set_volume` | confirm | Régler le volume, couper ou rétablir le son |
 | `set_brightness` | confirm | Régler la luminosité de l'écran (ordinateurs portables) |
+| `arrange_window` | confirm | Mettre une fenêtre au premier plan, la réduire, l'agrandir, la placer à gauche ou à droite (KDE Plasma) |
 | `set_appearance` | confirm | Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME) |
 | `move_to_trash` | danger | Mettre à la corbeille (jamais de suppression définitive) |
 | `run_command` | danger | Exécuter une commande avec vos droits |
@@ -67,6 +69,21 @@ La disposition du bureau (barres, widgets) n'est jamais modifiée.
 - **GNOME** (et le bureau d'Ubuntu) : `gsettings`, schéma de couleurs préféré de l'interface et
   image de fond (`picture-uri`, et `picture-uri-dark` depuis GNOME 42).
 - Les autres bureaux ne sont pas pris en charge : l'assistant le dit.
+
+## Fenêtres (`list_windows`, `arrange_window`)
+
+« Mets Firefox à gauche et mes documents à droite », « réduis le terminal », « remets Dolphin
+devant » : comme l'ancrage des fenêtres de Windows, l'assistant peut ranger les fenêtres
+ouvertes. Une action peut mettre une fenêtre au premier plan (`focus`), la réduire, la rouvrir
+(`restore`), l'agrandir (`maximize`) ou la placer sur la moitié gauche ou droite de l'écran.
+Pour mettre deux fenêtres côte à côte, il fait deux actions.
+
+![Deux fenêtres placées côte à côte par l'assistant](img/plasma-fenetres.jpg)
+
+Sur KDE Plasma uniquement : Kreafinity envoie à KWin (le gestionnaire de fenêtres de Plasma) un
+petit script par D-Bus (`org.kde.kwin.Scripting`), qui lui renvoie sa réponse puis est
+déchargé. Fermer une application passe toujours par `close_application`, qui lui demande
+poliment de se fermer.
 
 ## Commandes (`run_command`)
 
