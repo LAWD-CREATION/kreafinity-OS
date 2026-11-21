@@ -18,6 +18,7 @@ const ICONS = {
   check: "M5 12.5l4.5 4.5L19 7",
   expand: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7",
   download: "M12 3v12M7 10l5 5 5-5M5 21h14",
+  mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7",
 };
 
 /** Build an element: el("p", {class: "x", dataset: {id: "1"}, onclick: fn}, "text", child). */

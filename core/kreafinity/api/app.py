@@ -41,6 +41,8 @@ from kreafinity import __version__
 from kreafinity.api.auth import token_matches
 from kreafinity.api.peer import Address, peer_uid
 from kreafinity.service import AssistantService, ErrorCode, ServiceError
+from kreafinity.voice import VoiceError
+from kreafinity.voice.audio import MAX_BYTES
 
 #: Seconds a WebSocket client has to authenticate.
 AUTH_TIMEOUT = 10.0
@@ -58,6 +60,7 @@ STATUS_BY_CODE: dict[ErrorCode, int] = {
     "provider_error": status.HTTP_502_BAD_GATEWAY,
     "keyring_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "update_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "voice_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 PeerLookup = Callable[[Address | None, Address | None], int | None]
@@ -88,6 +91,10 @@ class NewMessage(BaseModel):
 
 class MemoryText(BaseModel):
     content: str = Field(max_length=20_000)
+
+
+class SpeechText(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
 
 
 class ShowRequest(BaseModel):
@@ -243,6 +250,39 @@ def create_app(
         if section not in ("user", "notes", "soul"):
             raise ServiceError("Unknown memory section", code="not_found")
         return service.write_memory(section, body.content)
+
+    @api.get("/voice")
+    async def voice(service: Service) -> dict[str, Any]:
+        return service.voice.info()
+
+    @api.post("/voice/prepare", status_code=status.HTTP_202_ACCEPTED)
+    async def prepare_voice(service: Service) -> dict[str, Any]:
+        return service.voice.prepare()
+
+    @api.post("/voice/transcribe")
+    async def transcribe(service: Service, request: Request) -> dict[str, Any]:
+        """The text of a recording sent as the request body (WebM, Ogg, WAV…)."""
+        data = bytearray()
+        async for chunk in request.stream():
+            data += chunk
+            if len(data) > MAX_BYTES:
+                raise ServiceError("Recording too large", code="invalid")
+        try:
+            text = await service.voice.transcribe(
+                bytes(data), request.headers.get("content-type", "")
+            )
+        except VoiceError as exc:
+            raise ServiceError(str(exc), code="voice_unavailable") from exc
+        return {"text": text}
+
+    @api.post("/voice/speak")
+    async def speak(service: Service, body: SpeechText) -> Response:
+        """`text` read aloud, as a WAV file."""
+        try:
+            audio = await service.voice.speak(body.text)
+        except VoiceError as exc:
+            raise ServiceError(str(exc), code="voice_unavailable") from exc
+        return Response(audio, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
     @api.delete("/memory/soul")
     async def reset_soul(service: Service) -> dict[str, Any]:
@@ -451,6 +491,8 @@ class _SecurityHeaders:
             "Content-Security-Policy": (
                 "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
                 f"font-src 'self'; connect-src 'self' {websockets}; manifest-src 'self'; "
+                # Answers read aloud: audio the page itself received from the daemon.
+                "media-src blob:; "
                 "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
             ),
             "X-Content-Type-Options": "nosniff",

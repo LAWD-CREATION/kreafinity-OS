@@ -125,6 +125,12 @@ Item {
             onNewViewRequested: function (request) {
                 Qt.openUrlExternally(request.requestedUrl)
             }
+            // The microphone, to talk to Kreafinity: for our interface only.
+            onFeaturePermissionRequested: function (securityOrigin, feature) {
+                var ours = securityOrigin.toString().indexOf(root.daemonUrl) === 0
+                grantFeaturePermission(securityOrigin, feature,
+                                       ours && feature === WebEngineView.MediaAudioCapture)
+            }
         }
 
         ColumnLayout {

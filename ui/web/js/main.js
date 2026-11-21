@@ -7,6 +7,7 @@ import { language, setLanguage, t, translatePage } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
 import { UpdateBanner } from "./update.js";
+import { Voice } from "./voice.js";
 
 const api = new Api();
 const $ = (id) => document.getElementById(id);
@@ -43,6 +44,9 @@ const state = {
 let welcome;
 let settings;
 let updates;
+let voice;
+// The conversation whose last question was said aloud (its answer is read aloud).
+let spokenQuestion = null;
 
 // --- Start -----------------------------------------------------------------------------
 
@@ -103,6 +107,13 @@ async function start() {
     translatePage();
   }
   updates = new UpdateBanner(api, { toast });
+  voice = new Voice(api, {
+    button: $("voice"),
+    toast,
+    openSettings: () => settings.open("voice"),
+    onText: (text) => send(text, { spoken: true }),
+  });
+  voice.refresh();
   settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast, updates });
   bindInterface();
   renderWelcome();
@@ -523,7 +534,7 @@ function updateComposer() {
   $("stop").hidden = !running;
 }
 
-async function send(rawText) {
+async function send(rawText, { spoken = false } = {}) {
   const text = rawText.trim();
   if (!text || (state.current && state.running.has(state.current.id))) return;
   $("send").disabled = true;
@@ -541,6 +552,7 @@ async function send(rawText) {
     else if (!spec && state.current.provider && state.current.provider !== state.config.provider) body.provider = state.config.provider;
     $("prompt").value = "";
     autosize();
+    spokenQuestion = spoken ? state.current.id : null;
     await api.post(`/api/conversations/${state.current.id}/messages`, body);
   } catch (error) {
     $("prompt").value = text;
@@ -707,6 +719,10 @@ function onEvent(event) {
       // Learned something from a finished conversation (not the user's own edit).
       if (event.conversation_id && !compact) toast(t(event.soul ? "memory.soul_updated" : "memory.updated"));
       break;
+    case "voice_updated":
+      voice?.update(event.voice);
+      settings?.voiceUpdated(event.voice);
+      break;
     case "update_available":
     case "update_started":
       updates?.onEvent(event);
@@ -724,6 +740,11 @@ function onEvent(event) {
 
 function finishRun(event) {
   state.running.delete(event.conversation_id);
+  const spoken = spokenQuestion === event.conversation_id;
+  if (spoken) spokenQuestion = null;
+  if (event.type === "run_finished" && voice?.shouldSpeak(spoken) && state.current?.id === event.conversation_id) {
+    readAnswerAloud(event.conversation_id);
+  }
   const live = state.live?.runId === event.run_id ? state.live : null;
   if (live) {
     flushRender(live);
@@ -736,6 +757,17 @@ function finishRun(event) {
   }
   updateComposer();
   renderSidebar();
+}
+
+/** Read the conversation's last answer aloud (as saved: complete even if joined midway). */
+async function readAnswerAloud(id) {
+  try {
+    const conversation = await api.get(`/api/conversations/${id}`);
+    const answer = [...conversation.messages].reverse().find((m) => m.role === "assistant" && m.content?.trim());
+    if (answer) voice.speak(answer.content);
+  } catch {
+    /* nothing read aloud: the answer is on screen */
+  }
 }
 
 /** Show the saved conversation in full (its live display had missed the beginning). */
@@ -803,6 +835,7 @@ async function settingsSaved(config, changes) {
     renderSidebar();
   }
   await refreshProviders();
+  voice.refresh();
   toast(t("settings.saved"));
 }
 

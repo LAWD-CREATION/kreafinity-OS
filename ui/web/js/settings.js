@@ -48,15 +48,17 @@ export class SettingsDialog {
 
   async open(section) {
     try {
-      const [config, providers, tools, memory] = await Promise.all([
+      const [config, providers, tools, memory, voice] = await Promise.all([
         this.api.get("/api/config"),
         this.api.get("/api/providers"),
         this.api.get("/api/tools"),
         this.api.get("/api/memory").catch(() => null),
+        this.api.get("/api/voice").catch(() => null),
       ]);
       this.config = config;
       this.providers = providers;
       this.memory = memory;
+      this.voice = voice;
       this.render(config, providers, tools);
     } catch (error) {
       this.toast(error.message, "error");
@@ -105,6 +107,21 @@ export class SettingsDialog {
       memoryNotes: el("textarea", { id: "settings-memory-notes", class: "prose", rows: 4, spellcheck: "true" }),
       soul: el("textarea", { id: "settings-soul", class: "prose", rows: 7, spellcheck: "true", maxlength: this.memory?.soul_limit ?? 1500 }),
       soulEvolution: el("input", { id: "settings-soul-evolution", type: "checkbox", checked: config.soul_evolution !== false }),
+      voiceInput: el(
+        "select",
+        { id: "settings-voice-input" },
+        ["local", "openai", "off"].map((value) => el("option", { value, selected: config.voice_input === value }, t(`settings.voice.input.${value}`))),
+      ),
+      voiceModel: el(
+        "select",
+        { id: "settings-voice-model" },
+        ["base", "small", "medium"].map((value) => el("option", { value, selected: config.voice_model === value }, t(`settings.voice.model.${value}`))),
+      ),
+      voiceReply: el(
+        "select",
+        { id: "settings-voice-reply" },
+        ["voice", "always", "never"].map((value) => el("option", { value, selected: config.voice_reply === value }, t(`settings.voice.reply.${value}`))),
+      ),
     };
     this.fields.soul.value = this.memory?.soul ?? "";
     this.fields.memoryUser.value = this.memory?.user ?? "";
@@ -146,6 +163,7 @@ export class SettingsDialog {
           sortedTools.map((tool) => this.toolRow(tool)),
         ),
         this.renderMemory(),
+        this.renderVoice(),
         el(
           "section",
           { class: "settings-section", dataset: { section: "folders" } },
@@ -271,6 +289,46 @@ export class SettingsDialog {
   }
 
   /** Installed version and « Rechercher maintenant » (updates). */
+  /** Talking to Kreafinity: how it listens, whether it answers aloud, its voice engines. */
+  renderVoice() {
+    const field = (id, label, control) => el("div", { class: "field-row two" }, el("label", { for: id }, t(label)), control);
+    this.voiceStatus = el("p", { class: "hint", id: "settings-voice-status" });
+    this.voicePrepare = el("button", { class: "button small", type: "button", id: "settings-voice-prepare" }, t("settings.voice.prepare"));
+    this.voicePrepare.addEventListener("click", async () => {
+      try {
+        this.voiceUpdated(await this.api.post("/api/voice/prepare"));
+      } catch (error) {
+        this.toast(error.message, "error");
+      }
+    });
+    this.voiceUpdated(this.voice);
+    return el(
+      "section",
+      { class: "settings-section", dataset: { section: "voice" } },
+      el("h3", {}, t("settings.voice.title")),
+      el("p", {}, t("settings.voice.text")),
+      field("settings-voice-input", "settings.voice.input", this.fields.voiceInput),
+      field("settings-voice-model", "settings.voice.model", this.fields.voiceModel),
+      field("settings-voice-reply", "settings.voice.reply", this.fields.voiceReply),
+      el("div", { class: "update-check" }, this.voicePrepare, this.voiceStatus),
+    );
+  }
+
+  /** The voice engines' state changed (preparation started, finished or failed). */
+  voiceUpdated(info) {
+    this.voice = info;
+    if (!this.voiceStatus) return;
+    let key = "settings.voice.unavailable";
+    if (info?.preparing) key = `settings.voice.${info.preparing}`;
+    else if (info?.error) key = "settings.voice.error";
+    else if (info?.listening && info?.speaking) key = "settings.voice.ready";
+    else if (info?.listening) key = "settings.voice.ready_listening";
+    else if (info) key = "settings.voice.missing";
+    this.voiceStatus.textContent = t(key, { message: info?.error ?? "" });
+    this.voicePrepare.disabled = Boolean(info?.preparing);
+    this.voicePrepare.hidden = Boolean(info?.listening && info?.speaking && !info?.error);
+  }
+
   renderUpdates() {
     const info = this.updates?.info;
     if (!info) return null;
@@ -374,6 +432,9 @@ export class SettingsDialog {
     if (fields.memory.checked !== (this.config.memory !== false)) changes.memory = fields.memory.checked;
     if (fields.memoryReview.checked !== (this.config.memory_review !== false)) {
       changes.memory_review = fields.memoryReview.checked;
+    }
+    for (const [key, field] of [["voice_input", fields.voiceInput], ["voice_model", fields.voiceModel], ["voice_reply", fields.voiceReply]]) {
+      if (field.value !== this.config[key]) changes[key] = field.value;
     }
     if (fields.soulEvolution.checked !== (this.config.soul_evolution !== false)) {
       changes.soul_evolution = fields.soulEvolution.checked;

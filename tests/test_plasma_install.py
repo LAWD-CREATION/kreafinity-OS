@@ -210,7 +210,8 @@ async def test_widget_added_through_plasmashell(session_bus: str) -> None:
     bus.add_message_handler(plasmashell)
     try:
         answer = await plasma._evaluate_script(
-            plasma.ADD_WIDGET_SCRIPT % {"id": plasma.WIDGET_ID, "shortcut": plasma.SHORTCUT}
+            plasma.ADD_WIDGET_SCRIPT
+            % {"id": plasma.WIDGET_ID, "shortcut": plasma.SHORTCUT, "add": "true"}
         )
     finally:
         bus.disconnect()
@@ -280,3 +281,17 @@ def test_uninstall_removes_the_plasma_integration(
     result = runner.invoke(cli.app, ["uninstall", "--yes"])
     assert result.exit_code == 0, result.output
     assert not plasma.is_installed()
+
+
+@pytest.mark.parametrize(
+    ("answer", "keys"),
+    [("present shortcut", ["plasma.shortcut"]), ("present", []), ("absent", []), (None, [])],
+)
+def test_update_gives_the_shortcut_without_adding_the_widget(
+    tools: Path, monkeypatch: pytest.MonkeyPatch, answer: str | None, keys: list[str]
+) -> None:
+    scripts: list[str] = []
+    monkeypatch.setattr(plasma, "evaluate_script", lambda script: scripts.append(script) or answer)
+    report = plasma.install(6, port=27494, add_widget=False)  # what an update runs
+    assert "var mayAdd = false;" in scripts[0]  # a widget the user removed stays removed
+    assert [key for key, _ in report.done][4:] == keys

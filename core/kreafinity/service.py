@@ -50,6 +50,7 @@ from kreafinity.config import (
     Settings,
     api_key_source,
     delete_api_key,
+    get_api_key,
     keyring_available,
     load_settings,
     resolve_provider_options,
@@ -78,6 +79,7 @@ from kreafinity.providers import (
 )
 from kreafinity.system.notifications import send_notification
 from kreafinity.tools import ToolContext, ToolRegistry, printable
+from kreafinity.voice.manager import VoiceManager
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,7 @@ ErrorCode = Literal[
     "provider_error",
     "keyring_unavailable",
     "update_unavailable",
+    "voice_unavailable",
 ]
 Event = dict[str, Any]
 
@@ -337,6 +340,7 @@ class AssistantService:
             launcher=update_launcher,
             client=update_client,
         )
+        self.voice = VoiceManager(self.settings, self.events.publish, get_api_key)
         self._background: list[asyncio.Task[None]] = []
         self._reviews: dict[str, asyncio.Task[None]] = {}
         self.review_delay = REVIEW_DELAY

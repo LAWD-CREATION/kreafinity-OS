@@ -182,5 +182,18 @@
   "tool.arrange_window.restore": "Rouvrir la fenêtre « {title} »",
   "tool.arrange_window.maximize": "Agrandir la fenêtre « {title} » en plein écran",
   "tool.arrange_window.left": "Placer la fenêtre « {title} » sur la moitié gauche de l'écran",
-  "tool.arrange_window.right": "Placer la fenêtre « {title} » sur la moitié droite de l'écran"
+  "tool.arrange_window.right": "Placer la fenêtre « {title} » sur la moitié droite de l'écran",
+  "voice.cli.input.local": "Reconnaissance de la voix : sur cet ordinateur (modèle Whisper « {model} »).",
+  "voice.cli.input.openai": "Reconnaissance de la voix : OpenAI (en ligne).",
+  "voice.cli.input.off": "Reconnaissance de la voix : désactivée.",
+  "voice.cli.listening_ok": "  ✓ prête",
+  "voice.cli.listening_missing": "  ✗ pas encore installée",
+  "voice.cli.speaking_ok": "Lecture à voix haute : ✓ voix {voice}",
+  "voice.cli.speaking_missing": "Lecture à voix haute : ✗ voix {voice} pas encore installée",
+  "voice.cli.hint": "Pour tout installer : kreafinity voice install (environ 600 Mo, une seule fois).",
+  "voice.cli.installing": "Installation des moteurs de voix (Whisper, Piper)… quelques minutes.",
+  "voice.cli.downloading_model": "Téléchargement du modèle de reconnaissance « {model} »…",
+  "voice.cli.downloading_voice": "Téléchargement de la voix {voice}…",
+  "voice.cli.failed": "La préparation de la voix a échoué : {detail}",
+  "voice.cli.ready": "La voix est prête : cliquez sur le micro dans l'interface pour parler à Kreafinity."
 }

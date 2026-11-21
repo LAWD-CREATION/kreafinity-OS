@@ -139,8 +139,16 @@ kreafinity version            # version installée (et son commit)
 
 La vérification envoie une requête anonyme à `api.github.com` (aucune donnée personnelle). Pour
 la désactiver : Réglages › Général › « Rechercher les mises à jour chaque jour », ou
-`check_updates: false` dans `~/.config/kreafinity/config.yaml`. Les éléments du bureau KDE (bouton
-de la barre des tâches) prennent la nouvelle version à la prochaine ouverture de session.
+`check_updates: false` dans `~/.config/kreafinity/config.yaml`.
+
+**Inutile de redémarrer l'ordinateur.** La mise à jour redémarre elle-même Kreafinity (le démon,
+la bulle, la recherche du menu démarrer) et les nouveautés sont là tout de suite : nouveaux
+outils, clic droit des fichiers, raccourci Meta+C. Seul le bouton ∞ de la barre des tâches (KDE)
+garde l'ancienne version jusqu'à la prochaine ouverture de session : déconnectez-vous puis
+reconnectez-vous si vous voulez ses nouveautés tout de suite.
+
+La voix est facultative : après la mise à jour, préparez-la une fois dans Réglages › Voix, ou
+avec `kreafinity voice install` (voir [voix.md](voix.md)).
 
 Une copie de développement (`KREAFINITY_SOURCE`, ou `pip install -e .`) se met à jour avec
 `git pull`.
