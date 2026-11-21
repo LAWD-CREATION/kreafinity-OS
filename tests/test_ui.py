@@ -502,7 +502,9 @@ def test_talking_to_kreafinity(browser: Any, daemon: str) -> None:
     page.click("#voice")  # stop: the recording is sent, then the question
     page.wait_for_selector(".message.user >> text=Bonjour")
     page.wait_for_selector(".message.assistant .markdown strong >> text=Kreafinity")
-    page.wait_for_function("window.__played.length > 0")  # the answer, read aloud
+    # As functions, not expressions: Playwright evaluates expressions with eval(),
+    # which the page's Content Security Policy refuses.
+    page.wait_for_function("() => window.__played.length > 0")  # the answer, read aloud
 
     assert uploads and uploads[0].startswith("audio/")
     assert spoken == ["Bonjour ! Je suis **Kreafinity**, votre assistant."]
@@ -511,7 +513,7 @@ def test_talking_to_kreafinity(browser: Any, daemon: str) -> None:
     page.fill("#prompt", "Et toi ?")
     page.press("#prompt", "Enter")
     page.wait_for_selector(".message.user >> text=Et toi ?")
-    page.wait_for_function("document.querySelectorAll('.message.assistant').length === 2")
+    page.wait_for_function("() => document.querySelectorAll('.message.assistant').length === 2")
     time.sleep(0.5)
     assert len(spoken) == 1
     assert problems == []  # no page error, and no blocked audio (CSP)

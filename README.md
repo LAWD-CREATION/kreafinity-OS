@@ -25,7 +25,7 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 ### Feuille de route
 - [ ] **Étape 1** — Assistant système multi-LLM (démon, CLI, interface web de chat)
 - [ ] **Étape 2** — Bureau façon Windows avec IA intégrée
-- [ ] **Étape 3** — Distribution bootable (ISO, clé USB live, installateur)
+- [ ] **Étape 3** — Distribution bootable (ISO, clé USB live, installateur) : le paquet Debian est prêt ([docs/distribution.md](docs/distribution.md))
 
 ### Installer
 Sur Debian, Ubuntu et dérivées, une seule commande (sans `sudo`) :
@@ -126,7 +126,7 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 ### Roadmap
 - [ ] **Step 1** — Multi-LLM system assistant (daemon, CLI, web chat UI)
 - [ ] **Step 2** — Windows-like desktop shell with built-in AI
-- [ ] **Step 3** — Bootable distribution (ISO, live USB, installer)
+- [ ] **Step 3** — Bootable distribution (ISO, live USB, installer): the Debian package is ready
 
 ### Install
 On Debian, Ubuntu and derivatives, one command (without `sudo`):

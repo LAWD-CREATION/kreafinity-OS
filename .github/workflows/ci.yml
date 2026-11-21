@@ -35,8 +35,47 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
-          shellcheck packaging/install.sh
+          shellcheck packaging/install.sh packaging/debian/build-deb.sh packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm
       - name: Type check
         run: mypy
       - name: Tests
         run: pytest
+
+  package:
+    # The Debian package: built, installed with APT on this clean machine, tried,
+    # removed, and kept as a download of the run (Actions › this run › Artifacts).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the version holds the commit date and hash
+      - name: Install uv (downloads the package's own Python)
+        run: pip install uv
+      - name: Build
+        run: packaging/debian/build-deb.sh dist
+      - name: Install with APT
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ./dist/kreafinity_*.deb
+      - name: Try it
+        run: |
+          kreafinity version | grep -q "paquet"
+          if kreafinity update --check; then exit 1; fi  # updates come from APT
+          test -L /etc/systemd/user/graphical-session.target.wants/kreafinity.service
+          test -L /usr/share/plasma/plasmoids/org.kreafinity.assistant
+          kreafinity-core --port 27911 &
+          daemon=$!
+          for _ in $(seq 30); do curl -sf http://127.0.0.1:27911/api/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:27911/api/health | grep -q '"status":"ok"'
+          curl -sf http://127.0.0.1:27911/ | grep -q "<title>Kreafinity</title>"
+          kill "$daemon"
+      - name: Remove
+        run: |
+          sudo apt-get purge -y -q kreafinity
+          test ! -e /opt/kreafinity && test ! -e /usr/bin/kreafinity
+          test ! -e /usr/share/plasma/plasmoids/org.kreafinity.assistant
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kreafinity-deb
+          path: dist/kreafinity_*.deb
+          retention-days: 30

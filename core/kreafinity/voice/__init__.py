@@ -12,6 +12,9 @@ Voice): Kreafinity works without them. Models are downloaded once into
 from __future__ import annotations
 
 import importlib.util
+import os
+import sys
+import sysconfig
 from pathlib import Path
 
 from kreafinity.paths import data_dir
@@ -29,9 +32,31 @@ def voice_dir() -> Path:
     return data_dir() / "voice"
 
 
+def engines_dir() -> Path:
+    """Where the engines go when Kreafinity's own Python is read-only (system package)."""
+    return voice_dir() / "site-packages"
+
+
+def environment_writable() -> bool:
+    """Whether packages can be installed into Kreafinity's own Python."""
+    return os.access(sysconfig.get_paths()["purelib"], os.W_OK)
+
+
+def use_engines_dir() -> None:
+    """Make the engines installed for this user importable (after Kreafinity's own packages)."""
+    folder = str(engines_dir())
+    if Path(folder).is_dir() and folder not in sys.path:
+        sys.path.append(folder)
+        importlib.invalidate_caches()
+
+
 def installed(module: str) -> bool:
     """Whether a voice engine's Python package is importable."""
+    use_engines_dir()
     try:
         return importlib.util.find_spec(module) is not None
     except (ImportError, ValueError):
         return False
+
+
+use_engines_dir()  # engines installed for this user (system package installs)

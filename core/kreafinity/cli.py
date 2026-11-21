@@ -113,12 +113,15 @@ def main() -> None:
 @app.command()
 def version() -> None:
     """Affiche la version de Kreafinity OS."""
-    from kreafinity.update import installation
+    from kreafinity.update import installation, package_info
 
     record = installation()
+    package = package_info()
     detail = ""
     if record is not None and record.commit:
         detail = f" ({record.commit[:7]}, {record.ref})"
+    elif package is not None:
+        detail = f" ({t('version.package', version=package.get('version', '?'))})"
     console.print(f"Kreafinity OS [bold]{__version__}[/bold]{detail}")
 
 
@@ -189,7 +192,8 @@ def update_command(
     _load_settings()
     record = updates.installation()
     if record is None:
-        err_console.print(Text(t("update.cli.dev"), style="yellow"))
+        message = "update.cli.apt" if updates.package_info() else "update.cli.dev"
+        err_console.print(Text(t(message), style="yellow"))
         raise typer.Exit(1)
     try:
         result = asyncio.run(updates.check(record))
@@ -704,6 +708,14 @@ def uninstall(
             console.print(t(key, **values))
     for key, values in integration.uninstall().done:
         console.print(t(key, **values))
+    from kreafinity.update import package_info
+
+    if package_info() is not None:  # the program itself belongs to the system's package
+        if purge:
+            _purge_user_data()
+            console.print(t("uninstall.purged"))
+        console.print(Text(t("uninstall.packaged"), style="yellow"))
+        return
     venv = data_dir() / "venv"
     for process in integration.processes_running_from(venv):  # bubble, on-demand daemon
         with contextlib.suppress(Exception):
@@ -715,17 +727,22 @@ def uninstall(
             link.unlink()
             console.print(t("setup.removed", path=link))
     if purge:
-        for name in available_providers():
-            if get_provider_class(name).requires_api_key:
-                with contextlib.suppress(SecretStoreError):
-                    delete_api_key(name)
-        shutil.rmtree(config_dir(), ignore_errors=True)
-        shutil.rmtree(data_dir(), ignore_errors=True)  # includes the environment itself
+        _purge_user_data()  # includes the environment itself
         console.print(t("uninstall.purged"))
     elif venv.is_dir():
         shutil.rmtree(venv, ignore_errors=True)
         console.print(t("setup.removed", path=venv))
     console.print(Text(t("uninstall.done" if not purge else "uninstall.done_purge"), style="green"))
+
+
+def _purge_user_data() -> None:
+    """Erase the user's API keys, settings and data (conversations, memory, voice models…)."""
+    for name in available_providers():
+        if get_provider_class(name).requires_api_key:
+            with contextlib.suppress(SecretStoreError):
+                delete_api_key(name)
+    shutil.rmtree(config_dir(), ignore_errors=True)
+    shutil.rmtree(data_dir(), ignore_errors=True)
 
 
 @desktop_app.command("install")

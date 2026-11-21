@@ -228,5 +228,6 @@
   "settings.voice.ready_listening": "La reconnaissance est prête ; la voix de lecture n'est pas installée.",
   "settings.voice.missing": "La voix n'est pas encore installée sur cet ordinateur (environ 600 Mo à télécharger).",
   "settings.voice.unavailable": "Voix indisponible.",
-  "settings.voice.error": "La préparation a échoué : {message}"
+  "settings.voice.error": "La préparation a échoué : {message}",
+  "settings.updates.managed": "Kreafinity a été installé par un paquet du système : ses mises à jour arrivent avec celles du système."
 }

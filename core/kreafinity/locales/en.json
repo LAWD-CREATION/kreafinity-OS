@@ -195,5 +195,8 @@
   "voice.cli.downloading_model": "Downloading the recognition model “{model}”…",
   "voice.cli.downloading_voice": "Downloading the voice {voice}…",
   "voice.cli.failed": "Voice preparation failed: {detail}",
-  "voice.cli.ready": "Voice is ready: click the microphone in the interface to talk to Kreafinity."
+  "voice.cli.ready": "Voice is ready: click the microphone in the interface to talk to Kreafinity.",
+  "update.cli.apt": "Kreafinity was installed from a system package: it is updated with the system (sudo apt update && sudo apt upgrade, or the software center).",
+  "version.package": "package {version}",
+  "uninstall.packaged": "The program itself was installed from a system package: to remove it, sudo apt remove kreafinity."
 }
