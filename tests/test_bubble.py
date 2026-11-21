@@ -271,3 +271,46 @@ def _healthy(url: str) -> bool:
         return httpx.get(f"{url}/api/health", timeout=1).json().get("name") == "kreafinity"
     except (httpx.HTTPError, json.JSONDecodeError, ValueError):
         return False
+
+
+def test_only_the_microphone_is_allowed_and_only_to_our_page() -> None:
+    class UserMediaPermissionRequest:
+        def __init__(self, audio: bool, video: bool) -> None:
+            self.properties = {"is-for-audio-device": audio, "is-for-video-device": video}
+            self.answer = ""
+
+        def get_property(self, name: str) -> bool:
+            return self.properties[name]
+
+        def allow(self) -> None:
+            self.answer = "allowed"
+
+        def deny(self) -> None:
+            self.answer = "denied"
+
+    class GeolocationPermissionRequest(UserMediaPermissionRequest):
+        """Not a microphone request (the location, say)."""
+
+    class View:
+        def __init__(self, uri: str) -> None:
+            self.uri = uri
+
+        def get_uri(self) -> str:
+            return self.uri
+
+    app = object.__new__(bubble.Bubble)
+    app.m = {
+        "WebKit2": type("WebKit2", (), {"UserMediaPermissionRequest": UserMediaPermissionRequest})
+    }
+    app.url = "http://127.0.0.1:27494"
+    ours, elsewhere = View("http://127.0.0.1:27494/?compact=1"), View("https://evil.example/")
+    cases = [
+        (ours, UserMediaPermissionRequest(audio=True, video=False), "allowed"),
+        (ours, UserMediaPermissionRequest(audio=True, video=True), "denied"),  # no camera
+        (elsewhere, UserMediaPermissionRequest(audio=True, video=False), "denied"),
+    ]
+    for view, request, expected in cases:
+        assert app.on_permission(view, request) is True
+        assert request.answer == expected
+    location = GeolocationPermissionRequest(audio=False, video=False)
+    assert app.on_permission(ours, location) is True and location.answer == "denied"

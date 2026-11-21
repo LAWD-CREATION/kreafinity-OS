@@ -222,6 +222,8 @@ class Bubble:
         settings = view.get_settings()
         settings.set_enable_developer_extras(False)
         settings.set_javascript_can_open_windows_automatically(False)
+        settings.set_enable_media_stream(True)  # the microphone, to talk to Kreafinity
+        view.connect("permission-request", self.on_permission)
         view.connect("decide-policy", self.on_policy)
         view.connect("load-failed", self.on_load_failed)
         panel.add(view)
@@ -388,6 +390,21 @@ class Bubble:
             self.open_full()
         elif kind == "show" and not self.panel.get_visible():
             self.show_panel()  # a desktop search sent a question: show the answer
+
+    def on_permission(self, view: Any, request: Any) -> bool:
+        """Allow the microphone (and nothing else) to our own interface."""
+        WebKit2 = self.m["WebKit2"]
+        ours = (view.get_uri() or "").startswith(f"{self.url}/")
+        microphone = (
+            isinstance(request, WebKit2.UserMediaPermissionRequest)
+            and request.get_property("is-for-audio-device")
+            and not request.get_property("is-for-video-device")
+        )
+        if ours and microphone:
+            request.allow()
+        else:
+            request.deny()
+        return True
 
     def on_policy(self, view: Any, decision: Any, decision_type: Any) -> bool:
         WebKit2 = self.m["WebKit2"]

@@ -124,6 +124,26 @@ PlasmoidItem {
                 }
             }
             onNewWindowRequested: request => Qt.openUrlExternally(request.requestedUrl)
+
+            // The microphone, to talk to Kreafinity: for our interface only.
+            Connections {
+                target: view
+                ignoreUnknownSignals: true
+                // Qt 6.8 and later.
+                function onPermissionRequested(permission) {
+                    const ours = permission.origin.toString().indexOf(root.daemonUrl) === 0
+                    if (ours && permission.permissionType === WebEnginePermission.PermissionType.MediaAudioCapture)
+                        permission.grant()
+                    else
+                        permission.deny()
+                }
+                // Before Qt 6.8.
+                function onFeaturePermissionRequested(securityOrigin, feature) {
+                    const ours = securityOrigin.toString().indexOf(root.daemonUrl) === 0
+                    view.grantFeaturePermission(securityOrigin, feature,
+                                                ours && feature === WebEngineView.MediaAudioCapture)
+                }
+            }
         }
 
         ColumnLayout {

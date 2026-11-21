@@ -83,6 +83,10 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:27494/api/conversations
 | `GET` | `/api/update` | Version installée, mise à jour disponible (`available`, `latest`, `changes`), progression (`status`) |
 | `POST` | `/api/update/check` | Chercher une mise à jour maintenant (`400` pour une copie de développement, `503` si GitHub ne répond pas) |
 | `POST` | `/api/update` | Installer la mise à jour disponible → `202` ; le démon redémarre ensuite |
+| `GET` | `/api/voice` | Voix : reconnaissance (`input`, `model`), lecture (`reply`), prête (`listening`, `speaking`), préparation (`preparing`, `error`) |
+| `POST` | `/api/voice/prepare` | Installer les moteurs de voix et télécharger les modèles, en arrière-plan → `202` |
+| `POST` | `/api/voice/transcribe` | Le texte d'un enregistrement (corps de la requête : WebM, Ogg, WAV… 10 Mo au plus) → `{"text"}` ; `503` si la voix n'est pas prête |
+| `POST` | `/api/voice/speak` | `{"text": "…"}` lu à voix haute → `audio/wav` ; `503` si la voix n'est pas prête |
 | `GET` | `/api/memory` | Mémoire : carnets (`user`, `notes`), savoir-faire, âme (`soul`, `soul_is_seed`), réglages |
 | `PUT` | `/api/memory/{user\|notes\|soul}` | Remplacer un carnet ou l'âme (`{"content": "…"}`) ; `400` si trop long ou secret |
 | `DELETE` | `/api/memory/soul` | Rendre à l'assistant sa personnalité d'origine |
@@ -124,6 +128,7 @@ il compte alors parmi les panneaux capables d'afficher une conversation (`/api/u
 | `conversation_updated` / `conversation_deleted` | Conversation modifiée (titre, état…) / supprimée |
 | `config_updated` | Nouveaux réglages |
 | `providers_updated` | Clé API enregistrée ou retirée (`provider`, `api_key`) |
+| `voice_updated` | `voice` : l'état de la voix a changé (préparation commencée, finie ou échouée) |
 | `memory_updated` | la mémoire a changé ; `conversation_id` quand c'est la relecture d'une conversation, `soul: true` quand l'âme a grandi |
 | `update_available` | `update` : une nouvelle version est publiée (même contenu que `GET /api/update`) |
 | `update_started` | `target` : installation lancée ; le démon va redémarrer |

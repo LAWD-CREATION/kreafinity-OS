@@ -84,6 +84,11 @@ desktop_app = typer.Typer(
 )
 app.add_typer(desktop_app, name="desktop")
 app.add_typer(desktop_app, name="bureau", hidden=True)
+voice_app = typer.Typer(
+    help="Parler à Kreafinity : reconnaissance de la voix et lecture à voix haute."
+)
+app.add_typer(voice_app, name="voice")
+app.add_typer(voice_app, name="voix", hidden=True)
 console = Console()
 err_console = Console(stderr=True)
 
@@ -773,6 +778,58 @@ def desktop_remove() -> None:
     for key, values in plasma.remove(plasma.plasma_version()).done:
         console.print(t(key, **values))
     console.print(Text(t("desktop.removed"), style="green"))
+
+
+@voice_app.callback(invoke_without_command=True)
+def voice_status(context: typer.Context) -> None:
+    """Montre l'état de la voix (sans sous-commande)."""
+    if context.invoked_subcommand is not None:
+        return
+    from kreafinity.voice import stt, tts
+
+    settings = _load_settings()
+    engine = settings.voice_input
+    if engine == "local":
+        listening = stt.local_available() and stt.model_ready(settings.voice_model)
+    else:
+        listening = engine == "openai"
+    console.print(t(f"voice.cli.input.{engine}", model=settings.voice_model))
+    console.print(t("voice.cli.listening_ok" if listening else "voice.cli.listening_missing"))
+    speaking = tts.available() and tts.voice_ready(settings.language)
+    console.print(
+        t(
+            "voice.cli.speaking_ok" if speaking else "voice.cli.speaking_missing",
+            voice=tts.voice_name(settings.language),
+        )
+    )
+    if not (listening and speaking):
+        console.print(Text(t("voice.cli.hint"), style="dim"))
+
+
+@voice_app.command("install")
+def voice_install() -> None:
+    """Installe la voix : moteurs (Whisper, Piper) et modèles, téléchargés une seule fois."""
+    from kreafinity.voice import PACKAGES, VoiceError, stt, tts
+    from kreafinity.voice.manager import pip_install
+
+    settings = _load_settings()
+    try:
+        if not (stt.local_available() and tts.available()):
+            console.print(t("voice.cli.installing"))
+            pip_install(PACKAGES)
+        if settings.voice_input == "local" and not stt.model_ready(settings.voice_model):
+            console.print(t("voice.cli.downloading_model", model=settings.voice_model))
+            stt.LocalTranscriber().load(settings.voice_model)
+        if not tts.voice_ready(settings.language):
+            console.print(t("voice.cli.downloading_voice", voice=tts.voice_name(settings.language)))
+            tts.download_voice(settings.language)
+    except VoiceError as exc:
+        err_console.print(Text(str(exc), style="red"))
+        raise typer.Exit(1) from exc
+    except Exception as exc:  # network errors while downloading the models
+        err_console.print(Text(t("voice.cli.failed", detail=exc), style="red"))
+        raise typer.Exit(1) from exc
+    console.print(Text(t("voice.cli.ready"), style="green"))
 
 
 @app.command()

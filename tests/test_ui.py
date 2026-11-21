@@ -428,3 +428,104 @@ def test_soul_in_the_settings(page: Any, tmp_path: Path) -> None:
     page.wait_for_selector("#settings-soul-seed:visible")
     assert page.input_value("#settings-soul").startswith("Je suis Kreafinity, l'assistant")
     assert not soul_file.exists()
+
+
+# A microphone for the page (a tone from WebAudio), and a record of the sounds played.
+FAKE_MICROPHONE = """
+navigator.mediaDevices.getUserMedia = async () => {
+  const context = new AudioContext();
+  const tone = context.createOscillator();
+  const output = context.createMediaStreamDestination();
+  tone.connect(output);
+  tone.start();
+  return output.stream;
+};
+window.__played = [];
+const play = HTMLMediaElement.prototype.play;
+HTMLMediaElement.prototype.play = function () {
+  window.__played.push(this.src);
+  return play.call(this);
+};
+"""
+
+
+def silent_wav() -> bytes:
+    import io
+    import wave
+
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16_000)
+        wav.writeframes(b"\\x00\\x00" * 1600)
+    return output.getvalue()
+
+
+def test_talking_to_kreafinity(browser: Any, daemon: str) -> None:
+    context = browser.new_context(viewport={"width": 1100, "height": 800}, locale="fr-FR")
+    context.add_init_script(FAKE_MICROPHONE)
+    page = context.new_page()
+    problems: list[str] = []
+    page.on("pageerror", lambda error: problems.append(str(error)))
+    page.on("console", lambda m: m.type == "error" and problems.append(m.text))
+    voice = {
+        "input": "local",
+        "model": "small",
+        "reply": "voice",
+        "listening": True,
+        "speaking": True,
+        "installed": True,
+        "preparing": None,
+        "error": None,
+    }
+    uploads: list[str] = []
+    spoken: list[str] = []
+
+    def transcribe(route: Any) -> None:
+        uploads.append(route.request.headers.get("content-type", ""))
+        route.fulfill(json={"text": "Bonjour"})
+
+    def speak(route: Any) -> None:
+        spoken.append(json.loads(route.request.post_data or "{}")["text"])
+        route.fulfill(body=silent_wav(), content_type="audio/wav")
+
+    page.route("**/api/voice", lambda route: route.fulfill(json=voice))
+    page.route("**/api/voice/transcribe", transcribe)
+    page.route("**/api/voice/speak", speak)
+    page.goto(daemon)
+    page.wait_for_selector("#connection.online")
+
+    page.click("#voice")  # start listening
+    page.wait_for_selector("#voice.listening")
+    time.sleep(0.6)
+    page.click("#voice")  # stop: the recording is sent, then the question
+    page.wait_for_selector(".message.user >> text=Bonjour")
+    page.wait_for_selector(".message.assistant .markdown strong >> text=Kreafinity")
+    page.wait_for_function("window.__played.length > 0")  # the answer, read aloud
+
+    assert uploads and uploads[0].startswith("audio/")
+    assert spoken == ["Bonjour ! Je suis **Kreafinity**, votre assistant."]
+    assert page.evaluate("window.__played[0]").startswith("blob:")
+    # A question typed is not read aloud ("after a question asked aloud").
+    page.fill("#prompt", "Et toi ?")
+    page.press("#prompt", "Enter")
+    page.wait_for_selector(".message.user >> text=Et toi ?")
+    page.wait_for_function("document.querySelectorAll('.message.assistant').length === 2")
+    time.sleep(0.5)
+    assert len(spoken) == 1
+    assert problems == []  # no page error, and no blocked audio (CSP)
+    context.close()
+
+
+def test_microphone_hidden_when_voice_is_off(browser: Any, daemon: str) -> None:
+    context = browser.new_context(locale="fr-FR")
+    page = context.new_page()
+    page.route(
+        "**/api/voice", lambda route: route.fulfill(json={"input": "off", "listening": False})
+    )
+    page.goto(daemon)
+    page.wait_for_selector("#connection.online")
+    time.sleep(0.3)
+    assert page.is_hidden("#voice")
+    context.close()

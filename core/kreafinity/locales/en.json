@@ -182,5 +182,18 @@
   "tool.arrange_window.restore": "Show the window “{title}” again",
   "tool.arrange_window.maximize": "Maximize the window “{title}”",
   "tool.arrange_window.left": "Snap the window “{title}” to the left half of the screen",
-  "tool.arrange_window.right": "Snap the window “{title}” to the right half of the screen"
+  "tool.arrange_window.right": "Snap the window “{title}” to the right half of the screen",
+  "voice.cli.input.local": "Speech recognition: on this computer (Whisper model “{model}”).",
+  "voice.cli.input.openai": "Speech recognition: OpenAI (online).",
+  "voice.cli.input.off": "Speech recognition: off.",
+  "voice.cli.listening_ok": "  ✓ ready",
+  "voice.cli.listening_missing": "  ✗ not installed yet",
+  "voice.cli.speaking_ok": "Reading aloud: ✓ voice {voice}",
+  "voice.cli.speaking_missing": "Reading aloud: ✗ voice {voice} not installed yet",
+  "voice.cli.hint": "To install everything: kreafinity voice install (about 600 MB, only once).",
+  "voice.cli.installing": "Installing the voice engines (Whisper, Piper)… a few minutes.",
+  "voice.cli.downloading_model": "Downloading the recognition model “{model}”…",
+  "voice.cli.downloading_voice": "Downloading the voice {voice}…",
+  "voice.cli.failed": "Voice preparation failed: {detail}",
+  "voice.cli.ready": "Voice is ready: click the microphone in the interface to talk to Kreafinity."
 }

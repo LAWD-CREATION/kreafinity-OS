@@ -13,6 +13,10 @@ Example::
     memory: true                   # remember things across conversations
     memory_review: true            # after a conversation, learn from it (one more AI call)
     soul_evolution: true           # the assistant grows its own personality (its soul)
+    voice_input: local             # speech recognition: local (private), openai, or off
+    voice_model: small             # Whisper model for local recognition (tiny … medium)
+    voice_reply: voice             # read answers aloud: voice (after a spoken question),
+                                   # always, or never
     providers:                     # options passed to each adapter
       ollama:
         base_url: http://127.0.0.1:11434
@@ -61,6 +65,9 @@ class Settings:
     memory: bool = True
     memory_review: bool = True
     soul_evolution: bool = True
+    voice_input: str = "local"
+    voice_model: str = "small"
+    voice_reply: str = "voice"
     providers: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def provider_options(self, name: str) -> dict[str, Any]:
@@ -114,6 +121,13 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
     check("port", int, "an integer")
     if not 1024 <= values.get("port", 27494) <= 65535:
         raise ConfigError(f"{path}: 'port' must be between 1024 and 65535")
+    for key, choices in (
+        ("voice_input", ("local", "openai", "off")),
+        ("voice_model", ("tiny", "base", "small", "medium")),
+        ("voice_reply", ("voice", "always", "never")),
+    ):
+        if key in values and values[key] not in choices:
+            raise ConfigError(f"{path}: {key!r} must be one of: {', '.join(choices)}")
     for key in ("check_updates", "memory", "memory_review", "soul_evolution"):
         if key in values and not isinstance(values[key], bool):
             raise ConfigError(f"{path}: {key!r} must be true or false")
