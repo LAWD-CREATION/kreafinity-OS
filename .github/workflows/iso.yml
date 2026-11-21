@@ -1,0 +1,50 @@
+name: ISO
+
+# The Kreafinity OS image (Debian 13 + KDE Plasma + Kreafinity), built on demand
+# (Actions > ISO > Run workflow) and for every version tag (v0.2.0…). It is kept
+# as a download of the run: Actions > the run > Artifacts > kreafinity-os-iso.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the version holds the commit date and hash
+      - name: Make room (the image needs about 15 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Kreafinity package
+        run: |
+          pip install uv
+          packaging/debian/build-deb.sh dist
+      - name: Image (live-build, in Debian 13)
+        run: |
+          docker run --rm --privileged -v "$PWD:/src" -w /src debian:trixie bash -euc '
+            apt-get update -q
+            apt-get install -y -q --no-install-recommends live-build mount ca-certificates xorriso \
+              squashfs-tools dosfstools mtools grub-efi-amd64-bin grub-pc-bin syslinux-common isolinux
+            packaging/iso/build-iso.sh dist/kreafinity_*.deb dist'
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: kreafinity-os-iso
+          path: |
+            dist/kreafinity-os-*.iso
+            dist/kreafinity-os-*.iso.sha256
+          retention-days: 14
+          compression-level: 0  # already compressed
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: kreafinity-os-build-log
+          path: dist/kreafinity-os-build.log
