@@ -70,6 +70,11 @@ curl -fsSL https://raw.githubusercontent.com/LAWD-CREATION/kreafinity-OS/ma-bran
 
 Depuis un clone du dépôt : `KREAFINITY_SOURCE=. bash packaging/install.sh`.
 
+### Ou avec le paquet Debian
+
+Un paquet `.deb` installe Kreafinity pour tous les utilisateurs de l'ordinateur, avec son
+propre Python, et le met à jour avec le système (APT). Voir [distribution.md](distribution.md).
+
 ## Ce qui est installé, et où
 
 | Élément | Emplacement |

@@ -10,7 +10,15 @@ import sys
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from kreafinity.voice import PACKAGES, VoiceError, stt, tts
+from kreafinity.voice import (
+    PACKAGES,
+    VoiceError,
+    engines_dir,
+    environment_writable,
+    stt,
+    tts,
+    use_engines_dir,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +26,12 @@ Event = dict[str, Any]
 
 
 def pip_install(packages: Sequence[str]) -> None:
-    """Install the voice engines into Kreafinity's own Python (blocking)."""
+    """Install the voice engines into Kreafinity's own Python (blocking).
+
+    A system package keeps Kreafinity's Python read-only: the engines then go
+    to the user's own folder (``~/.local/share/kreafinity/voice/site-packages``).
+    """
+    target = [] if environment_writable() else ["--target", str(engines_dir())]
     result = subprocess.run(
         [
             sys.executable,
@@ -27,6 +40,7 @@ def pip_install(packages: Sequence[str]) -> None:
             "install",
             "--quiet",
             "--disable-pip-version-check",
+            *target,
             *packages,
         ],
         capture_output=True,
@@ -38,6 +52,7 @@ def pip_install(packages: Sequence[str]) -> None:
         detail = (result.stderr or result.stdout).strip().splitlines()
         raise VoiceError(f"installation failed: {detail[-1] if detail else result.returncode}")
     importlib.invalidate_caches()
+    use_engines_dir()
 
 
 class VoiceManager:

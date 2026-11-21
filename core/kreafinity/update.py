@@ -4,7 +4,9 @@ The installer records what it installed in ``~/.local/share/kreafinity/install.j
 (repository, branch, exact commit). Checking asks GitHub's API what changed on
 that branch since; installing downloads the new commit into the same Python
 environment, refreshes the integration with the session and restarts
-Kreafinity. A development checkout has no record: it is updated with git.
+Kreafinity. A development checkout has no record: it is updated with git, and
+an installation from a system package (Debian package) is updated with the
+system (APT), like any other software.
 
 ``python -m kreafinity.update apply <commit>`` installs an update; the daemon
 starts it in its own process, so that it survives the daemon's restart.
@@ -39,6 +41,8 @@ CHECK_INTERVAL = timedelta(hours=24)
 MAX_CHANGES = 20
 _COMMIT = re.compile(r"[0-9a-f]{7,40}")
 _GITHUB = re.compile(r"https://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
+#: Written by the Debian package next to its Python: updates come from the system.
+PACKAGE_MARKER = "kreafinity-package.json"
 
 
 class UpdateError(Exception):
@@ -106,6 +110,21 @@ class Installation:
 
     def archive_url(self, commit: str) -> str:
         return f"{self.repository.rstrip('/')}/archive/{commit}.tar.gz"
+
+
+def package_info() -> dict[str, Any] | None:
+    """The system package Kreafinity comes from (``{"format": "deb", …}``), or None."""
+    return _read_json(Path(sys.base_prefix) / PACKAGE_MARKER)
+
+
+def _unsupported() -> UpdateError:
+    if package_info() is not None:
+        return UpdateError(
+            "Kreafinity was installed by the system's package manager: it is updated with the "
+            "system's updates",
+            code="unsupported",
+        )
+    return UpdateError("this is a development installation: update it with git", code="unsupported")
 
 
 def install_record_path() -> Path:
@@ -500,8 +519,10 @@ class UpdateManager:
         available = bool(
             record and result.available and result.latest and result.latest != record.commit
         )
+        package = package_info()
         return {
             "supported": record is not None and record.api_url() is not None,
+            "managed": str(package.get("format", "deb")) if package else None,
             "current": (
                 {"commit": record.commit, "ref": record.ref, "installed_at": record.installed_at}
                 if record
@@ -524,9 +545,7 @@ class UpdateManager:
         """
         record = installation()
         if record is None:
-            raise UpdateError(
-                "this is a development installation: update it with git", code="unsupported"
-            )
+            raise _unsupported()
         previous = load_check()
         try:
             result = await check(record, self._client)
@@ -559,9 +578,7 @@ class UpdateManager:
         """
         info = self.info()
         if not info["supported"]:
-            raise UpdateError(
-                "this is a development installation: update it with git", code="unsupported"
-            )
+            raise _unsupported()
         if info["status"]["state"] == "running":
             raise UpdateError("an update is already being installed", code="busy")
         if not info["available"]:

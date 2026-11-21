@@ -1,0 +1,20 @@
+Package: kreafinity
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Kreafinity <contact@kreafinity.com>
+Installed-Size: @SIZE@
+Section: utils
+Priority: optional
+Homepage: https://kreafinity.com
+Depends: libc6 (>= 2.31), ca-certificates, xdg-utils
+Recommends: pkexec | policykit-1, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, wireplumber | pulseaudio-utils
+Suggests: qml6-module-qtwebengine | qml-module-qtwebengine, kdialog
+Description: assistant système piloté par IA, avec l'IA de votre choix
+ Kreafinity est l'assistant de votre ordinateur : vous lui parlez (texte ou
+ voix) pour trouver et ranger vos fichiers, lancer des applications ou régler
+ le système. Vous choisissez l'IA : Ollama (sur l'ordinateur, gratuit et
+ privé), Ollama Cloud, Claude, GPT, Mistral ou OpenRouter.
+ .
+ Toute action qui modifie l'ordinateur vous est présentée et attend votre
+ accord. Sur KDE Plasma, Kreafinity s'intègre au menu démarrer, à la barre
+ des tâches et au gestionnaire de fichiers.

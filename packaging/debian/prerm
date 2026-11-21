@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+case "$1" in
+    remove|deconfigure)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl --global disable kreafinity.service >/dev/null 2>&1 || true
+        fi
+        # Added by postinst (not a file of the package): removed before dpkg removes the rest.
+        rm -rf /usr/share/plasma/plasmoids/org.kreafinity.assistant
+        ;;
+esac
+exit 0

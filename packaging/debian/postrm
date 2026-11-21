@@ -1,0 +1,10 @@
+#!/bin/sh
+# The users' own data (settings, conversations, memory) stay in their home
+# folders: « kreafinity uninstall --purge » before removing the package erases them.
+set -e
+case "$1" in
+    remove|purge)
+        rm -rf /usr/share/plasma/plasmoids/org.kreafinity.assistant
+        ;;
+esac
+exit 0
