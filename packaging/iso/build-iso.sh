@@ -33,7 +33,7 @@ say "Kreafinity OS image, with Kreafinity $version"
 cd "$work"
 lb config \
   --distribution trixie \
-  --archive-areas "main contrib non-free non-free-firmware" \
+  --archive-areas "main non-free-firmware" \
   --debian-installer none \
   --mirror-bootstrap "$mirror" \
   --mirror-chroot "$mirror" \

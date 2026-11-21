@@ -184,8 +184,8 @@ directement sur le bureau, sans rien installer. L'icône « Installer » lance l
 
 ### Comment c'est fait
 
-- `packaging/iso/build-iso.sh` : configure `live-build` (Debian 13, dépôts main, contrib,
-  non-free et non-free-firmware, paramètres de démarrage en français), y ajoute notre
+- `packaging/iso/build-iso.sh` : configure `live-build` (Debian 13, dépôts main et
+  non-free-firmware, comme les images officielles, paramètres de démarrage en français), y ajoute notre
   configuration et le paquet Kreafinity, puis construit l'ISO hybride (BIOS et UEFI, CD ou
   clé USB).
 - `packaging/iso/config/` : la liste des paquets, les réglages par défaut du bureau
