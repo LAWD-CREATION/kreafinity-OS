@@ -192,5 +192,7 @@
   "settings.memory.soul_was_reset": "Kreafinity is back to its original personality.",
   "memory.soul_updated": "Kreafinity grew its personality.",
   "tool.soul": "Soul",
-  "tool.soul.help": "Grow its own personality as you talk."
+  "tool.soul.help": "Grow its own personality as you talk.",
+  "tool.set_appearance": "Desktop look",
+  "tool.set_appearance.help": "Light, dark or Kreafinity theme, and wallpaper (KDE Plasma, GNOME)."
 }

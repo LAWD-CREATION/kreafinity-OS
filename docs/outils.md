@@ -27,6 +27,7 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `close_application` | confirm | Demander à une application de se fermer (jamais de force) |
 | `set_volume` | confirm | Régler le volume, couper ou rétablir le son |
 | `set_brightness` | confirm | Régler la luminosité de l'écran (ordinateurs portables) |
+| `set_appearance` | confirm | Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME) |
 | `move_to_trash` | danger | Mettre à la corbeille (jamais de suppression définitive) |
 | `run_command` | danger | Exécuter une commande avec vos droits |
 | `install_package` | danger | Installer des logiciels du système (mot de passe administrateur) |
@@ -50,6 +51,22 @@ ne pas laisser un écran noir. Seuls les écrans intégrés (rétroéclairage da
 
 > Le brief prévoyait `dbus-next` ; il n'est plus maintenu depuis 2021 et laisse ses connexions
 > ouvertes. `dbus-fast` est sa suite maintenue, avec la même interface.
+
+## Apparence du bureau (`set_appearance`)
+
+« Passe en mode sombre », « mets cette photo en fond d'écran », « remets les couleurs
+Kreafinity » : l'outil change le thème (`dark`, `light` ou `kreafinity`, sombre et violet) et/ou
+le fond d'écran (une image de vos dossiers autorisés, ou `kreafinity` pour le fond Kreafinity).
+La disposition du bureau (barres, widgets) n'est jamais modifiée.
+
+![Thème Kreafinity puis thème clair, appliqués par l'assistant](img/plasma-apparence.jpg)
+
+- **KDE Plasma** : jeu de couleurs des applications (`plasma-apply-colorscheme` : BreezeDark,
+  BreezeLight ou Kreafinity), thème des barres et menus (`plasma-apply-desktoptheme`) et
+  `plasma-apply-wallpaperimage`. Le thème Kreafinity demande `kreafinity desktop install`.
+- **GNOME** (et le bureau d'Ubuntu) : `gsettings`, schéma de couleurs préféré de l'interface et
+  image de fond (`picture-uri`, et `picture-uri-dark` depuis GNOME 42).
+- Les autres bureaux ne sont pas pris en charge : l'assistant le dit.
 
 ## Commandes (`run_command`)
 
