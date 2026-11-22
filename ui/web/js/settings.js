@@ -34,8 +34,9 @@ function joinSpec(name, model) {
 }
 
 export class SettingsDialog {
-  constructor({ api, info, onSaved, toast, updates }) {
+  constructor({ api, info, onSaved, toast, updates, openWelcome }) {
     this.api = api;
+    this.openWelcome = openWelcome;
     this.info = info;
     this.onSaved = onSaved;
     this.toast = toast;
@@ -187,6 +188,12 @@ export class SettingsDialog {
         "div",
         { class: "settings-footer" },
         el("span", { class: "version" }, t("settings.version", { version: this.info().version })),
+        this.openWelcome
+          ? el("button", {
+            class: "button ghost", type: "button",
+            onclick: () => { this.dialog.close(); this.openWelcome(); },
+          }, t("settings.welcome"))
+          : null,
         el("button", { class: "button ghost", type: "button", onclick: () => this.dialog.close() }, t("settings.cancel")),
         el("button", { class: "button primary", type: "submit" }, t("settings.save")),
       ),

@@ -495,6 +495,41 @@ def ui(
         console.print(t("ui.address", url=url))
 
 
+@app.command()
+def welcome(
+    if_needed: Annotated[
+        bool,
+        typer.Option(
+            "--si-besoin",
+            "--if-needed",
+            help="Seulement si aucune IA ne peut encore répondre (ouverture de session).",
+        ),
+    ] = False,
+) -> None:
+    """Ouvre l'accueil : choisir son IA, préparer la voix, découvrir l'assistant."""
+    settings = _load_settings()
+    if if_needed and settings.onboarded:
+        return
+    url = _running_daemon_url(settings) or _start_daemon(settings)
+    if if_needed:
+        from kreafinity.api.client import DaemonClient
+
+        try:
+            status = asyncio.run(DaemonClient(url).get("/api/setup"))
+        except (httpx.HTTPError, OSError, ValueError):
+            return
+        if not status.get("needed"):
+            return
+    if webbrowser.open(f"{url}/#bienvenue"):
+        console.print(t("ui.opened", url=url))
+    else:
+        console.print(t("ui.address", url=f"{url}/#bienvenue"))
+
+
+# French alias: « kreafinity bienvenue »
+app.command("bienvenue", hidden=True)(welcome)
+
+
 def _running_daemon_url(settings: Settings) -> str | None:
     """Address of the running daemon, if it answers."""
     from kreafinity.api.daemon_info import HOST, read_daemon_info

@@ -6,6 +6,7 @@ import { el, hydrateIcons, icon, relativeTime, shortenPath } from "./dom.js";
 import { language, setLanguage, t, translatePage } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
+import { Welcome } from "./welcome.js";
 import { UpdateBanner } from "./update.js";
 import { Voice } from "./voice.js";
 
@@ -43,6 +44,7 @@ const state = {
 
 let welcome;
 let settings;
+let onboarding;
 let updates;
 let voice;
 // The conversation whose last question was said aloud (its answer is read aloud).
@@ -114,7 +116,11 @@ async function start() {
     onText: (text) => send(text, { spoken: true }),
   });
   voice.refresh();
-  settings = new SettingsDialog({ api, info: () => state.info, onSaved: settingsSaved, toast, updates });
+  onboarding = new Welcome({ api, toast, onDone: refreshProviders, onPrompt: (text) => send(text) });
+  settings = new SettingsDialog({
+    api, info: () => state.info, onSaved: settingsSaved, toast, updates,
+    openWelcome: () => onboarding.open().catch((error) => toast(error.message, "error")),
+  });
   bindInterface();
   renderWelcome();
   renderPicker();
@@ -125,6 +131,11 @@ async function start() {
   if (initialConversation) await openConversation(initialConversation);
   updates.refresh();
   new EventStream(api, { onEvent, onStatus: setConnected, panel: compact }).connect();
+  // First start: no AI can answer yet, help choose one.
+  const setup = await api.get("/api/setup").catch(() => null);
+  if (setup && (setup.needed || location.hash === "#bienvenue")) {
+    onboarding.open(setup).catch((error) => toast(error.message, "error"));
+  }
 }
 
 function bindInterface() {
@@ -729,6 +740,9 @@ function onEvent(event) {
       break;
     case "config_updated":
       state.config = event.config;
+      break;
+    case "ollama_pull":
+      onboarding?.onPull(event);
       break;
     case "providers_updated":
       refreshProviders();

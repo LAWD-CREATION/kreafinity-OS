@@ -241,5 +241,6 @@
   "pilot.step.scroll.left": "Scrolling left",
   "pilot.step.scroll.right": "Scrolling right",
   "pilot.step.type": "Typing “{text}”",
-  "pilot.step.key": "Keys {keys}"
+  "pilot.step.key": "Keys {keys}",
+  "setup.welcome_autostart": "The welcome (choosing the AI) will open at login until an AI is ready ({path})."
 }

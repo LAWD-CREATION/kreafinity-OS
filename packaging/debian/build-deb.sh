@@ -115,6 +115,10 @@ write("/usr/share/applications/kreafinity.desktop",
 write("/etc/xdg/autostart/kreafinity-bubble.desktop",
       integration.autostart_entry(["/usr/bin/kreafinity", "bubble"], "Kreafinity, l'assistant IA")
       + "NotShowIn=KDE;\n")
+# The welcome (choosing the AI…) at login, until an AI can answer.
+write("/etc/xdg/autostart/kreafinity-welcome.desktop",
+      integration.autostart_entry(["/usr/bin/kreafinity", "welcome", "--if-needed"],
+                                  "Kreafinity : choisir son IA au premier démarrage"))
 write("/usr/share/dbus-1/services/org.kreafinity.KRunner.service",
       "[D-BUS Service]\nName=org.kreafinity.KRunner\n"
       f"Exec={prefix}/python/bin/python3 -s -m kreafinity.plasma.krunner\n")
@@ -156,7 +160,7 @@ mkdir -p "$root/DEBIAN"
 installed_size="$(du -sk --exclude=DEBIAN "$root" | cut -f1)"
 sed -e "s|@VERSION@|$version|" -e "s|@ARCH@|$arch|" -e "s|@SIZE@|$installed_size|" \
   "$here/control.in" >"$root/DEBIAN/control"
-echo "/etc/xdg/autostart/kreafinity-bubble.desktop" >"$root/DEBIAN/conffiles"
+printf '%s\n' /etc/xdg/autostart/kreafinity-bubble.desktop /etc/xdg/autostart/kreafinity-welcome.desktop >"$root/DEBIAN/conffiles"
 for script in postinst prerm postrm; do
   install -m755 "$here/$script" "$root/DEBIAN/$script"
 done

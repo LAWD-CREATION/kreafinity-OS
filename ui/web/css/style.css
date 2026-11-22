@@ -376,6 +376,42 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); }
 .settings-footer .version { flex: 1; color: var(--text-muted); font-size: 13px; }
 
+/* --- First start (welcome) --------------------------------------------------------------- */
+
+.onboarding { width: min(680px, calc(100% - 24px)); }
+.onboarding-step { display: grid; gap: 14px; padding: 26px 28px 22px; overflow-y: auto; max-height: calc(100vh - 40px); }
+.onboarding-step > .logo-mark { justify-self: center; }
+.onboarding-step h2 { margin: 0; font-size: 22px; text-align: center; }
+.onboarding-step > p { margin: 0; color: var(--text-muted); text-align: center; }
+.onboarding-points { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.onboarding-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.onboarding .suggestions { justify-self: center; }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.choice-card {
+  display: grid; gap: 6px; align-content: start; text-align: left; padding: 14px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2);
+  transition: border-color .15s, transform .15s;
+}
+.choice-card:hover, .choice-card:focus-visible { border-color: var(--kf-violet); transform: translateY(-1px); }
+.choice-card .pill { justify-self: start; background: var(--surface); }
+.choice-card .pill.ok { background: color-mix(in srgb, var(--success) 18%, transparent); }
+.choice-text { color: var(--text-muted); font-size: 13.5px; }
+.choice-ready { color: var(--success); font-size: 13px; font-weight: 600; }
+.pill.ok { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.onboarding-form { display: grid; gap: 8px; }
+.onboarding-form label { font-weight: 600; }
+.command-line { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: var(--radius-small); background: var(--code-bg); border: 1px solid var(--border); }
+.command-line code { flex: 1; font-family: var(--mono); font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.model-list { display: grid; gap: 8px; }
+.model-option { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-small); cursor: pointer; }
+.model-option:has(input:checked) { border-color: var(--kf-violet); background: color-mix(in srgb, var(--kf-violet) 10%, transparent); }
+.model-option span:first-of-type { flex: 1; }
+.onboarding progress { width: 100%; height: 10px; accent-color: var(--kf-violet); }
+@media (max-width: 560px) {
+  .choice-grid { grid-template-columns: 1fr; }
+  .onboarding-step { padding: 20px 16px; }
+}
+
 /* --- Toasts ---------------------------------------------------------------------------- */
 
 .toasts { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 10px; z-index: 50; width: min(380px, calc(100% - 36px)); }

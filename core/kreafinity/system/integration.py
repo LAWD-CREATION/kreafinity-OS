@@ -51,6 +51,10 @@ def autostart_path() -> Path:
     return xdg_config_home() / "autostart" / "kreafinity-bubble.desktop"
 
 
+def welcome_autostart_path() -> Path:
+    return xdg_config_home() / "autostart" / "kreafinity-welcome.desktop"
+
+
 def python_command(*arguments: str) -> list[str]:
     """Run Kreafinity with the interpreter it is installed in (``python -m ...``)."""
     return [sys.executable, "-m", *arguments]
@@ -205,6 +209,16 @@ def install(
     entry.write_text(menu_entry(python_command("kreafinity.cli", "ui"), icon), encoding="utf-8")
     report.add("setup.menu_entry", path=str(entry))
 
+    welcome = welcome_autostart_path()
+    welcome.parent.mkdir(parents=True, exist_ok=True)
+    welcome.write_text(
+        autostart_entry(
+            python_command("kreafinity.cli", "welcome", "--if-needed"), autostart_comment
+        ),
+        encoding="utf-8",
+    )
+    report.add("setup.welcome_autostart", path=str(welcome))
+
     if bubble:
         autostart = autostart_path()
         autostart.parent.mkdir(parents=True, exist_ok=True)
@@ -219,7 +233,13 @@ def uninstall() -> Report:
     report = Report()
     if service_path().exists() and systemd_available():
         systemctl("disable", "--now", SERVICE_NAME)
-    for path in (service_path(), menu_entry_path(), icon_path(), autostart_path()):
+    for path in (
+        service_path(),
+        menu_entry_path(),
+        icon_path(),
+        autostart_path(),
+        welcome_autostart_path(),
+    ):
         if path.exists():
             path.unlink()
             report.add("setup.removed", path=str(path))

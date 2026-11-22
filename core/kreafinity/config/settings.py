@@ -13,6 +13,7 @@ Example::
     memory: true                   # remember things across conversations
     memory_review: true            # after a conversation, learn from it (one more AI call)
     soul_evolution: true           # the assistant grows its own personality (its soul)
+    onboarded: false               # the welcome (choosing the AI…) was completed
     voice_input: local             # speech recognition: local (private), openai, or off
     voice_model: small             # Whisper model for local recognition (tiny … medium)
     voice_reply: voice             # read answers aloud: voice (after a spoken question),
@@ -65,6 +66,7 @@ class Settings:
     memory: bool = True
     memory_review: bool = True
     soul_evolution: bool = True
+    onboarded: bool = False
     voice_input: str = "local"
     voice_model: str = "small"
     voice_reply: str = "voice"
@@ -128,7 +130,7 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
     ):
         if key in values and values[key] not in choices:
             raise ConfigError(f"{path}: {key!r} must be one of: {', '.join(choices)}")
-    for key in ("check_updates", "memory", "memory_review", "soul_evolution"):
+    for key in ("check_updates", "memory", "memory_review", "soul_evolution", "onboarded"):
         if key in values and not isinstance(values[key], bool):
             raise ConfigError(f"{path}: {key!r} must be true or false")
     for key in ("allowed_paths", "tools"):

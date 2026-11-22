@@ -86,6 +86,12 @@ class DaemonClient:
         token = token or token_path().read_text(encoding="ascii").strip()
         self._headers = {"Authorization": f"Bearer {token}"}
 
+    async def get(self, path: str) -> Any:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(f"{self.url}{path}", headers=self._headers)
+        response.raise_for_status()
+        return response.json()
+
     async def _post(self, path: str, body: dict[str, Any] | None = None) -> Any:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(f"{self.url}{path}", json=body, headers=self._headers)
