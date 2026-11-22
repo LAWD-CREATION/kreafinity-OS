@@ -231,5 +231,13 @@
   "settings.voice.error": "La préparation a échoué : {message}",
   "settings.updates.managed": "Kreafinity a été installé par un paquet du système : ses mises à jour arrivent avec celles du système.",
   "tool.look_at_screen": "Regarder l'écran",
-  "tool.look_at_screen.help": "Prendre une capture d'écran pour vous guider (avec votre accord à chaque fois)."
+  "tool.look_at_screen.help": "Prendre une capture d'écran pour vous guider (avec votre accord à chaque fois).",
+  "tool.browser_open": "Navigateur de l'assistant : ouvrir une page",
+  "tool.browser_open.help": "Ouvrir une page dans une fenêtre à part, sans vos mots de passe ni votre historique (avec votre accord).",
+  "tool.browser_read": "Navigateur de l'assistant : lire la page",
+  "tool.browser_read.help": "Lire le texte, les liens et les boutons de la page ouverte par l'assistant.",
+  "tool.browser_point": "Navigateur de l'assistant : vous montrer où cliquer",
+  "tool.browser_point.help": "Entourer un bouton ou un champ et afficher une bulle pour vous guider.",
+  "tool.browser_act": "Navigateur de l'assistant : cliquer, écrire",
+  "tool.browser_act.help": "Cliquer, remplir un champ, faire défiler (avec votre accord ; jamais de mot de passe ni de carte bancaire)."
 }

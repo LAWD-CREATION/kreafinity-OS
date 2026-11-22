@@ -31,6 +31,10 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `arrange_window` | confirm | Mettre une fenêtre au premier plan, la réduire, l'agrandir, la placer à gauche ou à droite (KDE Plasma) |
 | `set_appearance` | confirm | Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME) |
 | `look_at_screen` | confirm | Regarder votre écran (une capture d'écran) pour vous guider |
+| `browser_open` | confirm | Ouvrir une page dans le navigateur de l'assistant (une fenêtre à part) |
+| `browser_read` | safe | Lire la page de ce navigateur : texte, liens, boutons, champs |
+| `browser_point` | safe | Vous montrer où cliquer : un cadre lumineux et une bulle |
+| `browser_act` | confirm | Cliquer, écrire, choisir, faire défiler dans ce navigateur (jamais de mot de passe) |
 | `move_to_trash` | danger | Mettre à la corbeille (jamais de suppression définitive) |
 | `run_command` | danger | Exécuter une commande avec vos droits |
 | `install_package` | danger | Installer des logiciels du système (mot de passe administrateur) |
@@ -105,6 +109,51 @@ que ce que vous acceptez, et il ne bouge ni la souris ni le clavier.
 - **Outil de capture** : celui du bureau, le seul que Wayland autorise : Spectacle (KDE
   Plasma), gnome-screenshot (GNOME), grim (Sway…) ; sous X11, aussi `scrot` ou `import`
   (ImageMagick).
+
+## Le navigateur de l'assistant (`browser_open`, `browser_read`, `browser_point`, `browser_act`)
+
+« Aide-moi à faire ma déclaration en ligne », « je n'arrive pas à me connecter à mon espace
+client » : l'assistant ouvre la page dans **sa propre fenêtre de navigateur**, la lit, puis :
+
+- **vous guide** : il entoure le bouton ou le champ à utiliser et affiche une bulle (« Cliquez
+  ici… »), vous faites vous-même, il regarde le résultat et passe à l'étape suivante ;
+- ou **fait pour vous**, si vous le lui demandez : cliquer, remplir des champs, choisir dans une
+  liste, faire défiler. Toutes les étapes vous sont montrées sur une seule carte de validation
+  avant d'être faites.
+
+![L'assistant montre le champ du mot de passe, puis remplit le reste du formulaire](img/navigateur-guide.jpg)
+
+![La carte de validation liste chaque étape](img/navigateur-validation.jpg)
+
+Garde-fous :
+
+- **Une fenêtre à part** : un profil séparé, sans vos mots de passe enregistrés, votre
+  historique ni vos sessions ouvertes. Il ne voit pas votre navigateur habituel. Firefox
+  marque cette fenêtre d'une barre d'adresse rayée et d'une icône de robot.
+- **Jamais de mot de passe ni de carte bancaire** : il refuse d'écrire dans ces champs (mot de
+  passe, code à usage unique, numéro de carte…) ; il vous les montre et c'est vous qui tapez.
+  Ce navigateur n'enregistre ni mots de passe ni formulaires.
+- **Ouvrir une page et agir demandent votre accord** ; lire la page et vous montrer un élément
+  non (c'est sa propre fenêtre, que vous avez accepté d'ouvrir).
+- **Les pages web sont des données, pas des ordres** : ce qu'une page écrit (« ignore tes
+  consignes… ») n'est jamais suivi.
+- **Vie privée** : ce que l'assistant lit dans cette fenêtre est envoyé à l'IA choisie (il reste
+  sur l'ordinateur avec Ollama). Si vous vous connectez à un compte dans cette fenêtre, il peut
+  en lire les pages.
+
+Comment c'est fait :
+
+- **Firefox** (ESR, celui de Kreafinity OS et de Debian, ou celui d'Ubuntu) est piloté par
+  **WebDriver BiDi**, le standard du W3C ; **Chromium, Google Chrome, Brave ou Edge** par le
+  protocole DevTools. Le navigateur choisi est du même type que votre navigateur par défaut ;
+  `KREAFINITY_BROWSER=chromium` (ou un chemin) en impose un.
+- Le profil est dans `~/.local/share/kreafinity/browser/` (dans `~/snap/firefox/common/`
+  pour le Firefox d'Ubuntu, en snap).
+- La fenêtre reste ouverte quand Kreafinity redémarre, et il s'y reconnecte. Si vous la
+  fermez, il en rouvre une à la prochaine page.
+- Le pilotage passe par une adresse locale (127.0.0.1), refusée aux sites web. Comme pour tout
+  navigateur piloté, un autre compte de la même machine pourrait s'y connecter tant que la
+  fenêtre est ouverte : fermez-la quand l'aide est finie sur un ordinateur partagé.
 
 ## Commandes (`run_command`)
 

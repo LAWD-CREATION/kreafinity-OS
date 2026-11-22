@@ -1045,6 +1045,9 @@ async def _close_providers(agent: Agent, *others: LLMProvider) -> None:
         providers[id(agent.fallback[0])] = agent.fallback[0]
     for provider in providers.values():
         await provider.aclose()
+    from kreafinity import browser
+
+    await browser.shutdown()  # the assistant's browser window stays open
 
 
 async def _run_turn(agent: Agent, conversation: Conversation, text: str) -> bool:
