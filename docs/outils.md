@@ -42,6 +42,9 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `run_command` | danger | Exécuter une commande avec vos droits |
 | `install_package` | danger | Installer des logiciels du système (mot de passe administrateur) |
 
+D'autres outils peuvent s'ajouter avec des **extensions MCP** (agenda, mails, GitHub…) : voir
+[mcp.md](mcp.md). Ils demandent votre accord, sauf ceux que vous dispensez.
+
 Les fichiers accessibles sont limités à votre dossier personnel (liste modifiable dans les
 réglages). Les dossiers sensibles (`~/.ssh`, trousseaux, données de Kreafinity…) restent
 toujours inaccessibles.

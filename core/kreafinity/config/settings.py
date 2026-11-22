@@ -14,6 +14,7 @@ Example::
     memory_review: true            # after a conversation, learn from it (one more AI call)
     soul_evolution: true           # the assistant grows its own personality (its soul)
     onboarded: false               # the welcome (choosing the AI…) was completed
+    mcp_servers: {}                # MCP servers: extra tools (see docs/mcp.md)
     voice_input: local             # speech recognition: local (private), openai, or off
     voice_model: small             # Whisper model for local recognition (tiny … medium)
     voice_reply: voice             # read answers aloud: voice (after a spoken question),
@@ -67,6 +68,7 @@ class Settings:
     memory_review: bool = True
     soul_evolution: bool = True
     onboarded: bool = False
+    mcp_servers: dict[str, dict[str, Any]] = field(default_factory=dict)
     voice_input: str = "local"
     voice_model: str = "small"
     voice_reply: str = "voice"
@@ -153,6 +155,14 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
                 "stored in the configuration file"
             )
     values["providers"] = providers
+    if "mcp_servers" in values:
+        from kreafinity.mcp.config import McpConfigError, parse_servers
+
+        try:
+            parse_servers(values["mcp_servers"])
+        except McpConfigError as exc:
+            raise ConfigError(f"{path}: {exc}") from exc
+        values["mcp_servers"] = values["mcp_servers"] or {}
     return Settings(**values)
 
 
