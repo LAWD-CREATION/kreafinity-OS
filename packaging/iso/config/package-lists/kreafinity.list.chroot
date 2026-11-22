@@ -1,0 +1,39 @@
+# Kreafinity OS: Debian 13 « trixie », KDE Plasma 6, Kreafinity.
+# The Kreafinity package itself comes from config/packages.chroot/ (copied by build-iso.sh).
+
+# Desktop: KDE Plasma, with what a computer needs every day
+kde-plasma-desktop
+plasma-nm
+plasma-pa
+bluedevil
+powerdevil
+kscreen
+sddm
+qml6-module-qtwebengine
+kdialog
+ark
+okular
+gwenview
+kate
+kde-spectacle
+kcalc
+firefox-esr
+firefox-esr-l10n-fr
+
+# French by default (the installer offers every language)
+locales
+task-french
+
+# Sound, network, printing, and what Kreafinity's tools use
+pipewire-audio
+wireplumber
+network-manager
+cups
+sudo
+curl
+pkexec
+xdg-utils
+
+# Installer
+calamares
+calamares-settings-debian

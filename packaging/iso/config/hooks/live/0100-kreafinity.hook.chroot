@@ -1,0 +1,12 @@
+#!/bin/sh
+# Kreafinity OS: checks and settings inside the image, after the packages.
+set -e
+
+# The Kreafinity package is there, and its daemon starts with every session.
+test -x /usr/bin/kreafinity
+systemctl --global is-enabled kreafinity.service >/dev/null
+
+# French by default for the installed system too (the installer can change it).
+sed -i 's/^# *fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen >/dev/null
+echo 'LANG=fr_FR.UTF-8' >/etc/default/locale

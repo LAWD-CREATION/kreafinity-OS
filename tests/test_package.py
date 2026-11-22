@@ -229,3 +229,64 @@ def test_package_configures_the_repository() -> None:
     assert not list(ROOT.glob("packaging/apt/*secret*")) and not list(
         ROOT.glob("**/*signing-key.asc")
     )
+
+
+# --- The Kreafinity OS image (ISO) ---------------------------------------------------------------
+
+ISO = ROOT / "packaging" / "iso"
+
+
+def test_iso_packages() -> None:
+    listed = {
+        line.strip()
+        for line in (ISO / "config" / "package-lists" / "kreafinity.list.chroot")
+        .read_text()
+        .splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    # The desktop, the widget's web view, the installer, French.
+    for package in (
+        "kde-plasma-desktop",
+        "qml6-module-qtwebengine",
+        "calamares",
+        "locales",
+        "pkexec",
+    ):
+        assert package in listed
+
+
+def test_iso_uses_the_kreafinity_look() -> None:
+    from kreafinity.plasma.install import COLOR_SCHEME, THEME_ID
+
+    kdeglobals = (ISO / "config" / "includes.chroot" / "etc" / "xdg" / "kdeglobals").read_text()
+    assert f"LookAndFeelPackage={THEME_ID}" in kdeglobals
+    assert f"ColorScheme={COLOR_SCHEME}" in kdeglobals
+    layout = (
+        ROOT
+        / "ui"
+        / "plasma"
+        / "look-and-feel"
+        / THEME_ID
+        / "contents"
+        / "layouts"
+        / "org.kde.plasma.desktop-layout.js"
+    ).read_text()
+    assert 'addWidget("org.kreafinity.assistant")' in layout  # the assistant in the taskbar
+
+
+def test_iso_scripts() -> None:
+    scripts = [
+        ISO / "build-iso.sh",
+        *sorted((ISO / "config" / "hooks" / "live").glob("*.hook.chroot")),
+    ]
+    for script in scripts:
+        assert script.stat().st_mode & 0o111, f"{script.name} is not executable"
+        assert subprocess.run(["sh", "-n", str(script)], check=False).returncode == 0
+    if shutil.which("shellcheck"):
+        assert subprocess.run(["shellcheck", *map(str, scripts)], check=False).returncode == 0
+    build = (ISO / "build-iso.sh").read_text()
+    assert (
+        "--distribution trixie" in build
+        and "--mirror-binary https://deb.debian.org/debian" in build
+    )
+    assert "locales=fr_FR.UTF-8" in build and "keyboard-layouts=fr" in build

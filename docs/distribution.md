@@ -7,8 +7,8 @@ KDE Plasma, le thème Kreafinity et l'assistant déjà prêts.
 |---|---|---|
 | 1 | **Paquet Debian** (`.deb`) de Kreafinity | ✅ fait (ce document) |
 | 2 | **Dépôt APT** : `apt install kreafinity` et mises à jour avec le système | ✅ fait, à activer (voir plus bas) |
-| 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | à faire |
-| 4 | **Clé USB live** : essayer sans rien installer | à faire (vient avec l'ISO) |
+| 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | ✅ fait, à essayer sur de vrais ordinateurs |
+| 4 | **Clé USB live** : essayer sans rien installer | ✅ fait (avec l'ISO) |
 | 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | à faire |
 | 6 | **Premier démarrage guidé** : choisir son IA, préparer la voix | à faire |
 
@@ -138,12 +138,84 @@ avertissement, puis une version 2 publiée et installée par `apt upgrade`. Et d
 refusées par APT : un index modifié (« taille inattendue ») et un dépôt signé par une autre clé
 (« NO_PUBKEY »).
 
+## L'image ISO
+
+Une image **Debian 13 « trixie » + KDE Plasma 6 + Kreafinity**, construite avec `live-build`
+(l'outil officiel de Debian pour ses images live) :
+
+- **En français** par défaut (langue, clavier, fuseau horaire), modifiable à l'installation.
+- **Le bureau Kreafinity dès le premier démarrage** : thème global Kreafinity comme thème par
+  défaut de chaque session (`/etc/xdg/kdeglobals`), donc la disposition à la façon de Windows
+  (barre en bas, menu ∞, assistant à côté de l'horloge, Meta+C), les couleurs et le fond
+  d'écran.
+- **Kreafinity installé** (le paquet Debian), son démon démarrant avec la session.
+- **Le quotidien** : Firefox, Dolphin, Kate, Okular, Gwenview, Spectacle, l'archiveur, la
+  calculatrice, le réseau, le son, le Bluetooth, l'impression, et les micrologiciels courants
+  (Wi-Fi…).
+- **Essai sans rien installer** (session live, utilisateur `kreafinity`) et **installation**
+  avec Calamares (« Installer Debian » pour l'instant : ses couleurs Kreafinity sont l'étape
+  suivante).
+
+![Le bureau de la session live : Meta+C ouvre l'assistant](img/iso-bureau.jpg)
+
+### Essayé
+
+Une image construite pour de vrai (2,6 Go), démarrée dans QEMU (BIOS, processeur émulé, sans
+accélération graphique) : menu de démarrage, session live en français ouverte toute seule,
+**bureau Kreafinity** (fond d'écran, barre des tâches en bas, menu ∞, assistant à côté de
+l'horloge), démon Kreafinity démarré avec la session, et **Meta+C ouvre l'assistant**
+(capture ci-dessus).
+
+À savoir pour cette première version :
+
+- dans cette machine sans accélération graphique, KWin (qui dessine les fenêtres) a planté une
+  fois au démarrage puis a redémarré tout seul, et le gestionnaire d'énergie aussi (fréquent
+  dans les machines virtuelles) : à vérifier sur de vrais ordinateurs et dans VirtualBox ;
+- le menu de démarrage et l'installateur portent encore le nom de Debian (« Install Debian »),
+  et le menu attend Entrée sans délai : c'est l'étape suivante (couleurs Kreafinity) ;
+- pas encore essayé en UEFI ni sur un vrai ordinateur ;
+- sans clé API ni Ollama, l'assistant ne peut pas encore répondre : le premier démarrage guidé
+  (choisir son IA) viendra ensuite.
+
+### Construire l'ISO
+
+Sur GitHub : **Actions › ISO › Run workflow**. L'image (environ 3 Go) est ensuite dans
+**Artifacts › kreafinity-os-iso** pendant 14 jours, avec sa somme de contrôle SHA-256. Elle
+est aussi construite pour chaque version publiée (étiquette `v0.2.0`…).
+
+Ou sur un ordinateur sous Debian 13, en tant que root (environ 30 minutes et 15 Go) :
+
+```bash
+sudo apt install live-build mount squashfs-tools xorriso
+packaging/debian/build-deb.sh dist                    # le paquet Kreafinity
+sudo packaging/iso/build-iso.sh dist/kreafinity_*.deb dist
+```
+
+### La mettre sur une clé USB
+
+Avec **Balena Etcher** ou **Ventoy** (Windows, macOS, Linux), ou sous Linux :
+
+```bash
+sudo dd if=kreafinity-os-<version>-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
+```
+
+(`/dev/sdX` est la clé USB : vérifiez avec `lsblk`, tout son contenu est effacé.) Démarrez
+l'ordinateur sur la clé (touche F12, F2 ou Échap selon les modèles) : Kreafinity OS s'ouvre
+directement sur le bureau, sans rien installer. L'icône « Installer » lance l'installation.
+
+### Comment c'est fait
+
+- `packaging/iso/build-iso.sh` : configure `live-build` (Debian 13, dépôts main et
+  non-free-firmware, comme les images officielles, paramètres de démarrage en français), y ajoute notre
+  configuration et le paquet Kreafinity, puis construit l'ISO hybride (BIOS et UEFI, CD ou
+  clé USB).
+- `packaging/iso/config/` : la liste des paquets, les réglages par défaut du bureau
+  (`includes.chroot/etc/xdg/`) et un script qui vérifie l'image (Kreafinity présent, démon
+  activé) et met le français par défaut.
+
 ## La suite
 
-1. **ISO** avec `live-build` : Debian 13 « trixie », KDE Plasma 6, le paquet Kreafinity,
-   le thème appliqué par défaut (`/etc/skel` et la configuration par défaut de Plasma),
-   Ollama préinstallé en option.
-2. **Calamares** : l'installateur graphique, avec les couleurs et le logo Kreafinity, en
+1. **Calamares** : l'installateur graphique, avec les couleurs et le logo Kreafinity, en
    français par défaut.
-3. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
+2. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
    voix, découverte des fonctions).

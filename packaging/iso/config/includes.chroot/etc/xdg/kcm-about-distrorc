@@ -1,0 +1,6 @@
+# System Settings > About this System
+[General]
+LogoPath=/usr/share/icons/hicolor/scalable/apps/kreafinity.svg
+Name=Kreafinity OS
+Website=https://kreafinity.com
+Variant=Debian 13 + KDE Plasma

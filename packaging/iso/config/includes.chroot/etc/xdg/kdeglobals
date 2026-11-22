@@ -1,0 +1,12 @@
+# Kreafinity OS: the Kreafinity look for every new session (users can change it
+# in System Settings > Appearance). The global theme also lays out the desktop
+# the first time: one taskbar at the bottom, the assistant next to the clock.
+[KDE]
+LookAndFeelPackage=org.kreafinity.desktop
+widgetStyle=Breeze
+
+[General]
+ColorScheme=Kreafinity
+
+[Icons]
+Theme=breeze-dark
