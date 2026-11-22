@@ -1,0 +1,33 @@
+#!/bin/sh
+# Live session only (live-config): no lock screen. Whoever tries Kreafinity OS
+# from the USB stick does not know the live user's password, and an idle
+# session must not lock them out. An installed system keeps its lock screen:
+# live-config only runs when booted as a live system.
+
+# shellcheck source=/dev/null
+. /usr/lib/live/config.sh
+
+for parameter in ${LIVE_CONFIG_CMDLINE:-}; do
+    case "$parameter" in
+        live-config.username=* | username=*) LIVE_USERNAME="${parameter#*username=}" ;;
+    esac
+done
+
+if component_was_executed "kreafinity-nolock"; then
+    exit 0
+fi
+printf " kreafinity-nolock"
+
+user="${LIVE_USERNAME:-user}"
+config="/home/$user/.config"
+if [ -d "/home/$user" ]; then
+    mkdir -p "$config"
+    cat >"$config/kscreenlockerrc" <<'EOF'
+[Daemon]
+Autolock=false
+LockOnResume=false
+EOF
+    chown -R "$user:$user" "$config"
+fi
+
+touch /var/lib/live/config/kreafinity-nolock

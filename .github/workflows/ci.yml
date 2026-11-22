@@ -35,7 +35,7 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
-          shellcheck packaging/install.sh packaging/debian/build-deb.sh packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm packaging/apt/build-repo.sh packaging/apt/new-signing-key.sh packaging/iso/build-iso.sh packaging/iso/config/hooks/live/0100-kreafinity.hook.chroot
+          shellcheck packaging/install.sh packaging/debian/build-deb.sh packaging/debian/postinst packaging/debian/prerm packaging/debian/postrm packaging/apt/build-repo.sh packaging/apt/new-signing-key.sh packaging/iso/build-iso.sh packaging/iso/config/hooks/live/0100-kreafinity.hook.chroot packaging/iso/config/includes.chroot/usr/lib/live/config/1200-kreafinity-nolock
       - name: Type check
         run: mypy
       - name: Tests
