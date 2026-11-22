@@ -1,0 +1,12 @@
+label live-@FLAVOUR@
+	menu label ^Essayer Kreafinity OS
+	menu default
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@
+
+label live-@FLAVOUR@-failsafe
+	menu label Essayer Kreafinity OS (mode de secours)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE_FAILSAFE@

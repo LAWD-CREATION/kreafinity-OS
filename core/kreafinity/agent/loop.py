@@ -15,8 +15,11 @@ from kreafinity.agent.prompts import build_system_prompt, soul_section
 from kreafinity.memory import MemoryStore
 from kreafinity.paths import user_dirs
 from kreafinity.providers.base import (
+    NO_VISION_NOTE,
     LLMProvider,
     Message,
+    ProviderAuthError,
+    ProviderError,
     ProviderUnavailableError,
     ResponseDone,
     StreamEvent,
@@ -39,6 +42,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ITERATIONS = 10
 # Longer tool outputs are cut to keep the conversation within context limits.
 MAX_TOOL_RESULT_CHARS = 20_000
+# Only the latest screenshots are sent again in a long conversation (cost, context).
+MAX_IMAGE_RESULTS = 3
+OLD_IMAGE_NOTE = "\n[An earlier screenshot, no longer shown.]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -314,11 +320,10 @@ class Agent:
         self, messages: list[Message], specs: list[ToolSpec]
     ) -> AsyncIterator[StreamEvent | ProviderFallback]:
         """Call the provider, switching to the fallback one if it cannot be reached."""
+        messages = _latest_images(messages)
         started = False
         try:
-            async for event in self.provider.chat(
-                [self._system_message(), *messages], specs, model=self.model
-            ):
+            async for event in self._chat(messages, specs):
                 started = True
                 yield event
             return
@@ -331,6 +336,34 @@ class Agent:
             yield ProviderFallback(
                 unavailable=unavailable, fallback=self.provider.display_name, reason=str(exc)
             )
+        async for event in self._chat(messages, specs):
+            yield event
+
+    async def _chat(
+        self, messages: list[Message], specs: list[ToolSpec]
+    ) -> AsyncIterator[StreamEvent]:
+        """One call to the provider; again without images if the model refuses them."""
+        started = False
+        try:
+            async for event in self.provider.chat(
+                [self._system_message(), *messages], specs, model=self.model
+            ):
+                started = True
+                yield event
+            return
+        except ProviderError as exc:
+            # A model that cannot read images makes chat-completions APIs answer
+            # with a plain error (400): try once more, telling it why it sees nothing.
+            if (
+                started
+                or exc.retryable
+                or isinstance(exc, ProviderUnavailableError | ProviderAuthError)
+                or not any(m.images for m in messages)
+            ):
+                raise
+            logger.info("Request with images refused (%s); retrying without them", exc)
+        note = NO_VISION_NOTE.format(model=self.model or self.provider.default_model)
+        messages = [m.without_images(note) if m.images else m for m in messages]
         async for event in self.provider.chat(
             [self._system_message(), *messages], specs, model=self.model
         ):
@@ -366,11 +399,15 @@ class Agent:
 
         if len(result.content) > MAX_TOOL_RESULT_CHARS:
             result = ToolResult(
-                result.content[:MAX_TOOL_RESULT_CHARS] + "\n[output truncated]", result.is_error
+                result.content[:MAX_TOOL_RESULT_CHARS] + "\n[output truncated]",
+                result.is_error,
+                result.images,
             )
         self._log(call, tool, status, result, model)
         conversation.messages.append(
-            Message.tool_result(call.id, call.name, result.content, is_error=result.is_error)
+            Message.tool_result(
+                call.id, call.name, result.content, is_error=result.is_error, images=result.images
+            )
         )
         yield ToolCallFinished(call=call, status=status, result=result)
 
@@ -449,6 +486,15 @@ class Agent:
             )
         except OSError:
             logger.exception("Cannot write the action log")
+
+
+def _latest_images(messages: list[Message]) -> list[Message]:
+    """Keep the images of the last MAX_IMAGE_RESULTS tool results only."""
+    with_images = [i for i, m in enumerate(messages) if m.images]
+    old = set(with_images[:-MAX_IMAGE_RESULTS])
+    if not old:
+        return messages
+    return [m.without_images(OLD_IMAGE_NOTE) if i in old else m for i, m in enumerate(messages)]
 
 
 def _validation_error(tool: Tool, arguments: dict[str, Any]) -> str | None:

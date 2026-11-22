@@ -198,5 +198,7 @@
   "voice.cli.ready": "La voix est prête : cliquez sur le micro dans l'interface pour parler à Kreafinity.",
   "update.cli.apt": "Kreafinity a été installé par un paquet du système : il se met à jour avec le système (sudo apt update && sudo apt upgrade, ou la logithèque).",
   "version.package": "paquet {version}",
-  "uninstall.packaged": "Le programme lui-même a été installé par un paquet du système : pour le retirer, sudo apt remove kreafinity."
+  "uninstall.packaged": "Le programme lui-même a été installé par un paquet du système : pour le retirer, sudo apt remove kreafinity.",
+  "tool.look_at_screen.summary": "Regarder votre écran (une capture d'écran)",
+  "tool.look_at_screen.privacy": "La capture est envoyée à l'IA choisie (elle reste sur l'ordinateur avec Ollama). Fermez d'abord ce qui est privé."
 }

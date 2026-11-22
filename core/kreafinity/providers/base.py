@@ -39,6 +39,30 @@ class ToolCall:
 
 
 @dataclass(frozen=True, slots=True)
+class Image:
+    """An image shown to the model (a screenshot).
+
+    Attributes:
+        media_type: ``image/jpeg`` or ``image/png``.
+        data: The image's bytes, base64-encoded.
+    """
+
+    media_type: str
+    data: str
+
+
+#: Text introducing images sent in their own message (APIs whose tool results are text only).
+IMAGES_INTRO = "Images returned by the tool calls above (from {names}):"
+
+#: Said to a model that cannot read images, instead of the image.
+NO_VISION_NOTE = (
+    "\n[The image could not be shown: the model {model} does not read images. Tell the user "
+    "to choose a model that can, for example Claude, GPT, Mistral Small or Pixtral online, or "
+    "qwen2.5vl or llava with Ollama.]"
+)
+
+
+@dataclass(frozen=True, slots=True)
 class Message:
     """One message of a conversation, in the neutral format.
 
@@ -49,6 +73,9 @@ class Message:
         tool_call_id: Id of the call this message answers (``tool`` only).
         name: Name of the tool that produced this result (``tool`` only).
         is_error: Whether the tool failed (``tool`` only).
+        images: Images that come with a tool result (``tool`` only), such as a
+            screenshot. They are never saved in the history: the model sees
+            them during the request that produced them.
         provider_data: Opaque data an adapter attaches to the messages it
             produces, keyed by provider name, and reads back when the same
             provider sees the conversation again (e.g. Anthropic thinking
@@ -63,6 +90,7 @@ class Message:
     name: str | None = None
     is_error: bool = False
     provider_data: dict[str, Any] = field(default_factory=dict)
+    images: tuple[Image, ...] = ()
 
     @classmethod
     def system(cls, content: str) -> Message:
@@ -81,7 +109,13 @@ class Message:
 
     @classmethod
     def tool_result(
-        cls, tool_call_id: str, name: str, content: str, *, is_error: bool = False
+        cls,
+        tool_call_id: str,
+        name: str,
+        content: str,
+        *,
+        is_error: bool = False,
+        images: Sequence[Image] = (),
     ) -> Message:
         """Build the message carrying the result of a tool call."""
         return cls(
@@ -90,6 +124,19 @@ class Message:
             tool_call_id=tool_call_id,
             name=name,
             is_error=is_error,
+            images=tuple(images),
+        )
+
+    def without_images(self, note: str) -> Message:
+        """The same message with its images replaced by `note` (appended to the text)."""
+        return Message(
+            role=self.role,
+            content=self.content + note,
+            tool_calls=self.tool_calls,
+            tool_call_id=self.tool_call_id,
+            name=self.name,
+            is_error=self.is_error,
+            provider_data=self.provider_data,
         )
 
 

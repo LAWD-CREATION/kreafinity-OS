@@ -9,7 +9,7 @@ KDE Plasma, le thème Kreafinity et l'assistant déjà prêts.
 | 2 | **Dépôt APT** : `apt install kreafinity` et mises à jour avec le système | ✅ fait, à activer (voir plus bas) |
 | 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | ✅ fait, à essayer sur de vrais ordinateurs |
 | 4 | **Clé USB live** : essayer sans rien installer | ✅ fait (avec l'ISO) |
-| 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | à faire |
+| 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | ✅ fait |
 | 6 | **Premier démarrage guidé** : choisir son IA, préparer la voix | à faire |
 
 ## Le paquet Debian
@@ -152,11 +152,19 @@ Une image **Debian 13 « trixie » + KDE Plasma 6 + Kreafinity**, construite ave
 - **Le quotidien** : Firefox, Dolphin, Kate, Okular, Gwenview, Spectacle, l'archiveur, la
   calculatrice, le réseau, le son, le Bluetooth, l'impression, et les micrologiciels courants
   (Wi-Fi…).
-- **Essai sans rien installer** (session live, utilisateur `kreafinity`) et **installation**
-  avec Calamares (« Installer Debian » pour l'instant : ses couleurs Kreafinity sont l'étape
-  suivante).
+- **Essai sans rien installer** (session live, utilisateur `kreafinity`, sans écran de
+  verrouillage) et **installation** avec Calamares aux couleurs Kreafinity (icône « Installer
+  Kreafinity OS » sur le bureau et dans le menu), en français.
+- **Menu de démarrage Kreafinity** : logo, « Essayer Kreafinity OS » (démarrage automatique
+  après 5 secondes), mode de secours.
 
 ![Le bureau de la session live : Meta+C ouvre l'assistant](img/iso-bureau.jpg)
+
+| Menu de démarrage | Installateur |
+|---|---|
+| ![Menu de démarrage Kreafinity](img/iso-menu.jpg) | ![Accueil de Calamares aux couleurs Kreafinity](img/iso-calamares.jpg) |
+
+(Les deux messages rouges de l'installateur viennent de la machine de test, sans disque.)
 
 ### Essayé
 
@@ -168,11 +176,12 @@ l'horloge), démon Kreafinity démarré avec la session, et **Meta+C ouvre l'ass
 
 À savoir pour cette première version :
 
-- dans cette machine sans accélération graphique, KWin (qui dessine les fenêtres) a planté une
-  fois au démarrage puis a redémarré tout seul, et le gestionnaire d'énergie aussi (fréquent
-  dans les machines virtuelles) : à vérifier sur de vrais ordinateurs et dans VirtualBox ;
-- le menu de démarrage et l'installateur portent encore le nom de Debian (« Install Debian »),
-  et le menu attend Entrée sans délai : c'est l'étape suivante (couleurs Kreafinity) ;
+- dans QEMU sans accélération (processeur émulé, environ 20 fois plus lent, et dessin des
+  fenêtres par le processeur), KWin et plasmashell plantent : KWin signale sans arrêt que « son
+  fil principal a bloqué » avant de s'arrêter. Ce sont les limites de cette machine de test ;
+  à vérifier sur de vrais ordinateurs et dans VirtualBox ou GNOME Boxes (avec KVM) ;
+- l'accueil de Calamares, son logo et ses couleurs ont été vérifiés avec le Calamares de l'image
+  (capture ci-dessus) ; l'installation complète sur un disque reste à essayer ;
 - pas encore essayé en UEFI ni sur un vrai ordinateur ;
 - sans clé API ni Ollama, l'assistant ne peut pas encore répondre : le premier démarrage guidé
   (choisir son IA) viendra ensuite.
@@ -212,10 +221,14 @@ directement sur le bureau, sans rien installer. L'icône « Installer » lance l
 - `packaging/iso/config/` : la liste des paquets, les réglages par défaut du bureau
   (`includes.chroot/etc/xdg/`) et un script qui vérifie l'image (Kreafinity présent, démon
   activé) et met le français par défaut.
+- `packaging/iso/config/includes.chroot/etc/calamares/branding/kreafinity/` : les couleurs, le
+  logo et le diaporama de l'installateur ; `packaging/iso/config/bootloaders/` : le menu de
+  démarrage.
+- `includes.chroot/usr/lib/live/config/1200-kreafinity-nolock` : coupe le verrouillage de
+  l'écran de la session live seulement (personne ne connaît son mot de passe) ; un système
+  installé garde son écran de verrouillage.
 
 ## La suite
 
-1. **Calamares** : l'installateur graphique, avec les couleurs et le logo Kreafinity, en
-   français par défaut.
-2. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
+1. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
    voix, découverte des fonctions).

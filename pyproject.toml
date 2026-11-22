@@ -37,6 +37,7 @@ dependencies = [
     "websockets>=13",
     "keyring>=25",
     "dbus-fast>=5.0",  # screen brightness via systemd-logind (D-Bus)
+    "Pillow>=10",  # screenshots made small enough for the AI
 ]
 
 [project.optional-dependencies]
