@@ -226,5 +226,20 @@
   "tool.browser.key.ArrowRight": "flèche droite",
   "tool.browser.key.PageUp": "Page précédente",
   "tool.browser.key.PageDown": "Page suivante",
-  "tool.browser.key.Space": "Espace"
+  "tool.browser.key.Space": "Espace",
+  "tool.pilot_start.summary": "Laisser l'assistant piloter la souris et le clavier",
+  "tool.pilot_start.banner": "Un bandeau reste affiché en haut de l'écran pendant tout le pilotage.",
+  "tool.pilot_start.take_back_escape": "Pour reprendre la main : Échap, bouger la souris, ou « Arrêter » sur le bandeau.",
+  "tool.pilot_start.take_back": "Pour reprendre la main : bouger la souris, ou « Arrêter » sur le bandeau.",
+  "tool.pilot_start.limits": "Il n'écrit jamais dans un terminal ni dans Kreafinity, chaque action est notée dans le journal, et le pilotage s'arrête à la fin de la demande.",
+  "tool.pilot_start.privacy": "Des captures de l'écran sont envoyées à l'IA choisie (elles restent sur l'ordinateur avec Ollama).",
+  "pilot.banner": "Kreafinity pilote votre ordinateur. Bougez la souris pour reprendre la main.",
+  "pilot.step.click": "Clic en ({x}, {y})",
+  "pilot.step.drag": "Glisser-déposer",
+  "pilot.step.scroll.down": "Défilement vers le bas",
+  "pilot.step.scroll.up": "Défilement vers le haut",
+  "pilot.step.scroll.left": "Défilement vers la gauche",
+  "pilot.step.scroll.right": "Défilement vers la droite",
+  "pilot.step.type": "Écrit « {text} »",
+  "pilot.step.key": "Touches {keys}"
 }

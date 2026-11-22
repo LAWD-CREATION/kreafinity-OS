@@ -903,6 +903,9 @@ class AssistantService:
     def start_background_tasks(self) -> None:
         """Start the daily update check (called by the daemon once running)."""
         self._background.append(asyncio.create_task(self.updates.watch()))
+        from kreafinity.pilot.desktop import release_leftovers
+
+        self._background.append(asyncio.create_task(release_leftovers()))
 
     def update_info(self) -> Event:
         """Installed version, available update, progress of an installation."""
@@ -944,12 +947,13 @@ class AssistantService:
             except Exception:
                 logger.exception("Closing provider %s failed", provider.name)
         self._providers.clear()
-        from kreafinity import browser
+        from kreafinity import browser, pilot
 
         try:
             await browser.shutdown()  # the assistant's browser window stays open
+            await pilot.end_request()  # the user gets the mouse and keyboard back
         except Exception:
-            logger.exception("Closing the browser connection failed")
+            logger.exception("Closing the browser or pilot mode failed")
         self._retired.clear()
 
 

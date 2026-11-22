@@ -207,6 +207,21 @@ class Tool(ABC):
         """
         return ActionPreview(summary=self.describe(arguments))
 
+    def pre_approved(self, arguments: dict[str, Any]) -> bool:
+        """Whether the user already approved this call as part of a mode they started.
+
+        Pilot mode is the only case: the user approved it (with a visible
+        banner and Escape to stop), and that covers each of its steps.
+        """
+        return False
+
+    def iteration_limit(self) -> int | None:
+        """More steps this tool needs for the current request (pilot mode), if any."""
+        return None
+
+    async def end_request(self) -> None:  # noqa: B027 - optional hook
+        """Called when a request ends: release what was granted only for it."""
+
     @abstractmethod
     async def run(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         """Execute the tool.

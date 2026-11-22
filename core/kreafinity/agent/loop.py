@@ -260,13 +260,31 @@ class Agent:
         `AgentDone`. Provider errors propagate (`ProviderError`); the
         conversation keeps what was done so far and stays usable.
         """
+        try:
+            async for event in self._run(conversation, user_text):
+                yield event
+        finally:
+            # What was granted for this request only (pilot mode) ends with it.
+            for tool in self.tools:
+                try:
+                    await tool.end_request()
+                except Exception:
+                    logger.exception("Ending the request for %s failed", tool.name)
+
+    def _iteration_limit(self) -> int:
+        extra = [limit for tool in self.tools if (limit := tool.iteration_limit())]
+        return max([self.max_iterations, *extra])
+
+    async def _run(self, conversation: Conversation, user_text: str) -> AsyncIterator[AgentEvent]:
         conversation.messages[:] = complete_unanswered_calls(conversation.messages)
         conversation.messages.append(Message.user(user_text))
         self._system = None  # memory and date may have changed since the last request
         specs = self.tools.specs() if self.provider.supports_tools else []
         model: str | None = None
 
-        for iteration in range(1, self.max_iterations + 1):
+        iteration = 0
+        while True:
+            iteration += 1
             done: ResponseDone | None = None
             async for event in self._stream_response(conversation.messages, specs):
                 if isinstance(event, ResponseDone):
@@ -299,7 +317,7 @@ class Agent:
                 )
                 return
 
-            if iteration == self.max_iterations:
+            if iteration >= self._iteration_limit():
                 async for tool_event in self._skip_calls(
                     conversation,
                     calls,
@@ -313,8 +331,6 @@ class Agent:
             for call in calls:
                 async for tool_event in self._run_call(conversation, call, model):
                     yield tool_event
-
-        raise AssertionError("unreachable")  # pragma: no cover
 
     async def _stream_response(
         self, messages: list[Message], specs: list[ToolSpec]
@@ -392,7 +408,7 @@ class Agent:
             status, result = "error", ToolResult(f"Unknown tool: {call.name}", is_error=True)
         elif (problem := _validation_error(tool, call.arguments)) is not None:
             status, result = "error", ToolResult(f"Invalid arguments: {problem}", is_error=True)
-        elif tool.risk is RiskLevel.SAFE:
+        elif tool.risk is RiskLevel.SAFE or tool.pre_approved(call.arguments):
             status, result = await self._execute(tool, call)
         else:
             status, result = await self._run_with_approval(tool, call)

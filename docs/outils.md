@@ -35,6 +35,9 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `browser_read` | safe | Lire la page de ce navigateur : texte, liens, boutons, champs |
 | `browser_point` | safe | Vous montrer où cliquer : un cadre lumineux et une bulle |
 | `browser_act` | confirm | Cliquer, écrire, choisir, faire défiler dans ce navigateur (jamais de mot de passe) |
+| `pilot_start` | danger | Mode pilote : laisser l'assistant piloter la souris et le clavier, avec un bandeau visible |
+| `pilot_act` | confirm | Les gestes du mode pilote : cliquer, glisser, faire défiler, écrire, raccourcis (couverts par l'accord du mode pilote) |
+| `pilot_stop` | safe | Rendre la souris et le clavier |
 | `move_to_trash` | danger | Mettre à la corbeille (jamais de suppression définitive) |
 | `run_command` | danger | Exécuter une commande avec vos droits |
 | `install_package` | danger | Installer des logiciels du système (mot de passe administrateur) |
@@ -154,6 +157,53 @@ Comment c'est fait :
 - Le pilotage passe par une adresse locale (127.0.0.1), refusée aux sites web. Comme pour tout
   navigateur piloté, un autre compte de la même machine pourrait s'y connecter tant que la
   fenêtre est ouverte : fermez-la quand l'aide est finie sur un ordinateur partagé.
+
+## Le mode pilote (`pilot_start`, `pilot_act`, `pilot_stop`)
+
+Quand aucun autre outil ne convient (un réglage caché dans les fenêtres d'une application, une
+démonstration…), l'assistant peut **piloter la souris et le clavier** pendant que vous
+regardez. Il regarde l'écran, clique, écrit, et regarde le résultat après chaque série de
+gestes.
+
+![Le bandeau du mode pilote, au-dessus des fenêtres](img/pilote-bandeau.jpg)
+
+- **Démarrer demande une validation explicite** (case à cocher), à chaque fois. Sous Wayland,
+  le système affiche en plus sa propre fenêtre « Autoriser le contrôle à distance » : vous
+  pouvez lui demander de s'en souvenir, et retirer cette permission dans la Configuration du
+  système.
+- **Un bandeau reste affiché** en haut de l'écran tout le temps du pilotage : il dit ce que fait
+  l'assistant (« Clic en (640, 400) », « Écrit « Bonjour » ») et propose un bouton **Arrêter**.
+- **Reprendre la main**, à tout moment : **Échap** (KDE Plasma), **bouger la souris**, ou le
+  bouton **Arrêter**. Le mode pilote s'arrête aussi à la fin de la demande, après 3 minutes
+  sans geste, et au plus tard après 20 minutes.
+- **Garde-fous** : il n'écrit jamais dans un **terminal** (les commandes passent par
+  `run_command`, qui vous montre la commande exacte) ; il n'agit jamais dans les **fenêtres de
+  Kreafinity** (il ne peut pas valider ses propres actions) ; Échap, Ctrl+Alt+Suppr,
+  Ctrl+Alt+Retour arrière et Ctrl+Alt+F1…F12 lui sont interdits ; il ne doit jamais taper de mot
+  de passe ni de numéro de carte (il vous le demande). Chaque geste est inscrit dans le journal
+  des actions.
+- **Vie privée** : les captures d'écran prises pendant le pilotage sont envoyées à l'IA choisie
+  (elles restent sur l'ordinateur avec Ollama).
+
+Comment c'est fait :
+
+- **Sous X11** : `xdotool` (paquet recommandé) envoie les gestes.
+- **Sous Wayland** (KDE Plasma 6, la session par défaut de Kreafinity OS) : le portail
+  `org.freedesktop.portal.RemoteDesktop`, la voie officielle, qui demande l'accord du système.
+- **Sur KDE Plasma** (X11 ou Wayland), un petit script KWin reste chargé pendant le pilotage :
+  il donne Échap à l'utilisateur (raccourci global), signale les mouvements de la souris et
+  dit quelle fenêtre est sous un clic ou active. Il est retiré à la fin, ce qui libère Échap.
+- Le bandeau est une petite fenêtre GTK (comme la bulle), affichée par XWayland sous Wayland
+  pour pouvoir rester au-dessus des autres.
+- **GNOME sous Wayland** n'est pas encore pris en charge (pas moyen d'y savoir quelle fenêtre
+  est active, donc de protéger les terminaux) : choisissez une session « GNOME sur Xorg ».
+
+Essayé : sous X11 avec KWin (Plasma 5.27), saisie avec accents et guillemets, refus dans un
+terminal et sur le bandeau, reprise de la main par la souris, par Échap et par le bouton.
+Sous Plasma 6.3 Wayland : le script KWin (fenêtres, pointeur, Échap) et le bandeau. Le portail
+de contrôle à distance de KDE n'a pas pu être essayé jusqu'au bout sur la machine de test
+(sans carte graphique, KWin y désactive la capture d'écran dont il dépend) : **à vérifier sur
+un vrai ordinateur**, en particulier la saisie des majuscules et des caractères accentués.
 
 ## Commandes (`run_command`)
 

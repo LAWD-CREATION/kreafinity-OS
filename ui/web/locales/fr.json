@@ -239,5 +239,11 @@
   "tool.browser_point": "Navigateur de l'assistant : vous montrer où cliquer",
   "tool.browser_point.help": "Entourer un bouton ou un champ et afficher une bulle pour vous guider.",
   "tool.browser_act": "Navigateur de l'assistant : cliquer, écrire",
-  "tool.browser_act.help": "Cliquer, remplir un champ, faire défiler (avec votre accord ; jamais de mot de passe ni de carte bancaire)."
+  "tool.browser_act.help": "Cliquer, remplir un champ, faire défiler (avec votre accord ; jamais de mot de passe ni de carte bancaire).",
+  "tool.pilot_start": "Mode pilote : démarrer",
+  "tool.pilot_start.help": "Laisser l'assistant piloter la souris et le clavier, avec un bandeau visible (validation explicite à chaque fois ; Échap ou la souris pour reprendre la main).",
+  "tool.pilot_act": "Mode pilote : cliquer, écrire",
+  "tool.pilot_act.help": "Les gestes de l'assistant pendant le mode pilote (jamais dans un terminal ni dans Kreafinity).",
+  "tool.pilot_stop": "Mode pilote : arrêter",
+  "tool.pilot_stop.help": "Rendre la souris et le clavier quand la tâche est finie."
 }

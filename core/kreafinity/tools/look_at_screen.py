@@ -45,6 +45,12 @@ class LookAtScreen(Tool):
     # goes to the AI the user chose: always asked first.
     risk = RiskLevel.CONFIRM
 
+    def pre_approved(self, arguments: dict[str, Any]) -> bool:
+        # In pilot mode the user already lets the assistant see the screen.
+        from kreafinity import pilot
+
+        return pilot.get_session().active
+
     async def preview(self, arguments: dict[str, Any], context: ToolContext) -> ActionPreview:
         reason = printable(str(arguments.get("reason", "")).strip())[:200]
         return ActionPreview(
