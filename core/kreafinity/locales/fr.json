@@ -241,5 +241,6 @@
   "pilot.step.scroll.left": "Défilement vers la gauche",
   "pilot.step.scroll.right": "Défilement vers la droite",
   "pilot.step.type": "Écrit « {text} »",
-  "pilot.step.key": "Touches {keys}"
+  "pilot.step.key": "Touches {keys}",
+  "setup.welcome_autostart": "L'accueil (choisir son IA) s'ouvrira à la connexion tant qu'aucune IA n'est prête ({path})."
 }

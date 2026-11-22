@@ -27,7 +27,7 @@ from typing import Any, Literal
 
 import httpx
 
-from kreafinity import __version__, update
+from kreafinity import __version__, onboarding, update
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -331,6 +331,7 @@ class AssistantService:
         self._action_log = action_log or ActionLog()
         self._providers: dict[str, LLMProvider] = {}
         self._retired: list[LLMProvider] = []
+        self._pull: asyncio.Task[None] | None = None
         self._runs: dict[str, Run] = {}
         self._approvals: dict[str, PendingApproval] = {}
         self.updates = update.UpdateManager(
@@ -451,6 +452,78 @@ class AssistantService:
         except ProviderError as exc:
             raise _service_error(exc) from exc
         return [{"id": m.id, "display_name": m.display_name or m.id} for m in models]
+
+    # --- First start ---------------------------------------------------------------------
+
+    async def setup_status(self) -> Event:
+        """Whether an AI can answer, and what the welcome screen needs to help choose one."""
+        settings = self.settings()
+        try:
+            name, model = parse_model_spec(settings.provider)
+            provider_class = get_provider_class(name)
+        except (ValueError, KeyError):
+            name, model, provider_class = "", None, None
+        installed: list[str] = []
+        running = False
+        wanted = model or ""
+        if "ollama" in available_providers():
+            ollama, _ = self._provider(settings, "ollama")
+            if name == "ollama" and not wanted:
+                wanted = ollama.default_model
+            try:
+                installed = [m.id for m in await ollama.list_models()]
+                running = True
+            except ProviderError:
+                running = False
+        why = onboarding.problem(
+            requires_key=bool(provider_class and provider_class.requires_api_key),
+            key_present=api_key_source(name) in ("environment", "keyring") if name else False,
+            is_ollama=name == "ollama",
+            ollama_running=running,
+            model_present=onboarding.has_model(installed, wanted),
+        )
+        if provider_class is None:
+            why = "invalid_provider"
+        return {
+            "needed": not settings.onboarded and why is not None,
+            "onboarded": settings.onboarded,
+            "ready": why is None,
+            "problem": why,
+            "provider": settings.provider,
+            "ollama": {
+                "installed": running or onboarding.ollama_installed(),
+                "running": running,
+                "models": installed,
+            },
+            "local_models": [m.to_dict() for m in onboarding.LOCAL_MODELS],
+            "recommended": onboarding.recommended().name,
+            "memory_gb": round(onboarding.memory_gb(), 1),
+        }
+
+    def complete_setup(self) -> Event:
+        """The welcome is done: do not open it by itself any more."""
+        return self.update_config({"onboarded": True})
+
+    def pull_ollama_model(self, model: str) -> Event:
+        """Download a model with Ollama in the background (``ollama_pull`` events)."""
+        if not onboarding.MODEL_NAME.match(model):
+            raise ServiceError(f"Invalid model name: {model!r}", code="invalid")
+        if self._pull is not None and not self._pull.done():
+            raise ServiceError("A model is already being downloaded", code="busy")
+        ollama, _ = self._provider(self.settings(), "ollama")
+        base_url = str(getattr(ollama, "base_url", "http://127.0.0.1:11434"))
+        self._pull = asyncio.create_task(self._pull_model(base_url, model))
+        return {"started": True, "model": model}
+
+    async def _pull_model(self, base_url: str, model: str) -> None:
+        try:
+            async for progress in onboarding.pull(base_url, model):
+                self.events.publish({"type": "ollama_pull", "model": model, **progress})
+        except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+            logger.warning("Downloading %s failed: %s", model, exc)
+            self.events.publish({"type": "ollama_pull", "model": model, "error": str(exc)})
+        else:
+            self.events.publish({"type": "providers_updated"})
 
     def set_default_provider(self, spec: str) -> Event:
         """Choose the provider and model used by default."""

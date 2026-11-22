@@ -109,6 +109,10 @@ class DefaultProvider(BaseModel):
     provider: str = Field(min_length=1, max_length=200)
 
 
+class ModelName(BaseModel):
+    model: str = Field(min_length=1, max_length=120)
+
+
 class ApiKey(BaseModel):
     api_key: str = Field(min_length=1, max_length=1000)
 
@@ -359,6 +363,18 @@ def create_app(
     @api.delete("/providers/{name}/key")
     async def delete_api_key(service: Service, name: str) -> dict[str, Any]:
         return service.delete_api_key(name)
+
+    @api.get("/setup")
+    async def setup_status(service: Service) -> dict[str, Any]:
+        return await service.setup_status()
+
+    @api.post("/setup/complete")
+    async def complete_setup(service: Service) -> dict[str, Any]:
+        return service.complete_setup()
+
+    @api.post("/setup/ollama/pull", status_code=status.HTTP_202_ACCEPTED)
+    async def pull_ollama_model(service: Service, body: ModelName) -> dict[str, Any]:
+        return service.pull_ollama_model(body.model)
 
     @api.get("/tools")
     async def list_tools(service: Service) -> list[dict[str, Any]]:

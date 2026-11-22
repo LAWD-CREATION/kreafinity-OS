@@ -10,7 +10,7 @@ KDE Plasma, le thème Kreafinity et l'assistant déjà prêts.
 | 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | ✅ fait, à essayer sur de vrais ordinateurs |
 | 4 | **Clé USB live** : essayer sans rien installer | ✅ fait (avec l'ISO) |
 | 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | ✅ fait |
-| 6 | **Premier démarrage guidé** : choisir son IA, préparer la voix | à faire |
+| 6 | **Premier démarrage guidé** : choisir son IA, préparer la voix | ✅ fait |
 
 ## Le paquet Debian
 
@@ -228,7 +228,27 @@ directement sur le bureau, sans rien installer. L'icône « Installer » lance l
   l'écran de la session live seulement (personne ne connaît son mot de passe) ; un système
   installé garde son écran de verrouillage.
 
-## La suite
+## Le premier démarrage
 
-1. **Premier démarrage** : un assistant d'accueil (choix de l'IA, clé API, préparation de la
-   voix, découverte des fonctions).
+Tant qu'aucune IA ne peut répondre (pas de clé pour le fournisseur choisi, Ollama absent ou
+sans le modèle), l'**accueil** s'ouvre tout seul à l'ouverture de session (`kreafinity welcome
+--if-needed`, lancé par `/etc/xdg/autostart/kreafinity-welcome.desktop`) et à l'ouverture de
+l'assistant :
+
+1. **Bienvenue** : ce que fait Kreafinity.
+2. **Quelle IA ?** : sur l'ordinateur (Ollama, gratuit et privé), Claude, GPT, Mistral,
+   OpenRouter ou Ollama Cloud.
+3. **Avec une clé** : la clé est vérifiée auprès du fournisseur puis rangée dans le trousseau
+   (lien vers la page où l'obtenir). **Avec Ollama** : un modèle proposé selon la mémoire de
+   l'ordinateur (`qwen2.5:3b` ou `qwen2.5:7b`, et `qwen2.5vl:7b` qui voit l'écran), téléchargé
+   avec une barre de progression ; si Ollama n'est pas installé, la commande officielle à
+   lancer (Kreafinity ne lance jamais rien avec les droits administrateur à votre place).
+4. **La voix** (facultatif) : préparée en arrière-plan.
+5. **C'est prêt** : Meta+C, les validations, et des exemples pour commencer.
+
+![Le choix de l'IA à l'accueil](img/accueil-choix.jpg)
+
+« Plus tard » referme l'accueil sans rien changer ; il revient tant qu'aucune IA n'est prête.
+Une fois terminé, il ne s'ouvre plus seul : **Réglages › Relancer l'accueil** le rouvre
+(`kreafinity bienvenue` aussi). API : `GET /api/setup`, `POST /api/setup/complete`,
+`POST /api/setup/ollama/pull` (événements `ollama_pull`).

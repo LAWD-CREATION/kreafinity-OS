@@ -78,12 +78,15 @@ def test_install_with_systemd(
 
     autostart = (tmp_path / "xdg-config" / "autostart" / "kreafinity-bubble.desktop").read_text()
     assert f"Exec={sys.executable} -m kreafinity.cli bubble" in autostart
+    welcome = integration.welcome_autostart_path().read_text()
+    assert f"Exec={sys.executable} -m kreafinity.cli welcome --if-needed" in welcome
     keys = [key for key, _ in report.done]
     assert keys == [
         "setup.service_file",
         "setup.service_enabled",
         "setup.service_started",
         "setup.menu_entry",
+        "setup.welcome_autostart",
         "setup.bubble_autostart",
     ]
 
@@ -92,7 +95,12 @@ def test_install_without_systemd(systemctl: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("FAKE_SYSTEMCTL_EXIT", "1")  # no user manager (container, SSH…)
     report = integration.install(bubble=False, icon_source=None, autostart_comment="")
     keys = [key for key, _ in report.done]
-    assert keys == ["setup.service_file", "setup.no_systemd", "setup.menu_entry"]
+    assert keys == [
+        "setup.service_file",
+        "setup.no_systemd",
+        "setup.menu_entry",
+        "setup.welcome_autostart",
+    ]
     assert not integration.autostart_path().exists()
     assert "Icon=kreafinity" in integration.menu_entry_path().read_text()
 
@@ -110,6 +118,7 @@ def test_uninstall_removes_only_what_was_added(systemctl: Path, tmp_path: Path) 
         integration.service_path(),
         integration.menu_entry_path(),
         integration.autostart_path(),
+        integration.welcome_autostart_path(),
     ):
         assert not path.exists()
     assert keep.exists()
