@@ -184,6 +184,21 @@ def _to_anthropic_messages(
                 "tool_use_id": message.tool_call_id,
                 "content": message.content,
             }
+            if message.images:  # a tool result may hold images (a screenshot)
+                block["content"] = [
+                    {"type": "text", "text": message.content},
+                    *(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": image.media_type,
+                                "data": image.data,
+                            },
+                        }
+                        for image in message.images
+                    ),
+                ]
             if message.is_error:
                 block["is_error"] = True
             # All results of one assistant turn go back in a single user message.

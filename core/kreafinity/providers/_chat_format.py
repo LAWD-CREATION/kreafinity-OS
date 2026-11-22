@@ -10,7 +10,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from kreafinity.providers.base import Message, StopReason, ToolCall, ToolSpec, new_tool_call_id
+from kreafinity.providers.base import (
+    IMAGES_INTRO,
+    Message,
+    StopReason,
+    ToolCall,
+    ToolSpec,
+    new_tool_call_id,
+)
 
 ERROR_PREFIX = "Error: "
 
@@ -38,7 +45,18 @@ def to_chat_messages(
         tool_name_field: Add the tool name to tool result messages.
     """
     result: list[dict[str, Any]] = []
+    # Tool results are text only: their images go in a user message right after
+    # the results of the same turn (a message between them would be refused).
+    pending: list[Message] = []
+
+    def flush_images() -> None:
+        if pending:
+            result.append(images_message(pending))
+            pending.clear()
+
     for message in messages:
+        if message.role != "tool":
+            flush_images()
         if message.role == "tool":
             entry: dict[str, Any] = {
                 "role": "tool",
@@ -48,6 +66,8 @@ def to_chat_messages(
             if tool_name_field and message.name:
                 entry["name"] = message.name
             result.append(entry)
+            if message.images:
+                pending.append(message)
         elif message.role == "assistant":
             if not message.content and not message.tool_calls:
                 continue
@@ -67,7 +87,19 @@ def to_chat_messages(
             result.append(entry)
         else:
             result.append({"role": message.role, "content": message.content})
+    flush_images()
     return result
+
+
+def images_message(tool_messages: Sequence[Message]) -> dict[str, Any]:
+    """A user message holding the images of these tool results (data URLs)."""
+    names = ", ".join(dict.fromkeys(m.name or "tool" for m in tool_messages))
+    parts: list[dict[str, Any]] = [{"type": "text", "text": IMAGES_INTRO.format(names=names)}]
+    for message in tool_messages:
+        for image in message.images:
+            url = f"data:{image.media_type};base64,{image.data}"
+            parts.append({"type": "image_url", "image_url": {"url": url}})
+    return {"role": "user", "content": parts}
 
 
 def to_chat_tools(tools: Sequence[ToolSpec]) -> list[dict[str, Any]]:

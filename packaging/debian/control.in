@@ -8,7 +8,7 @@ Priority: optional
 Homepage: https://kreafinity.com
 Depends: libc6 (>= 2.31), ca-certificates, xdg-utils
 Recommends: pkexec | policykit-1, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0, wireplumber | pulseaudio-utils
-Suggests: qml6-module-qtwebengine | qml-module-qtwebengine, kdialog
+Suggests: qml6-module-qtwebengine | qml-module-qtwebengine, kdialog, kde-spectacle | gnome-screenshot | grim | scrot
 Description: assistant système piloté par IA, avec l'IA de votre choix
  Kreafinity est l'assistant de votre ordinateur : vous lui parlez (texte ou
  voix) pour trouver et ranger vos fichiers, lancer des applications ou régler

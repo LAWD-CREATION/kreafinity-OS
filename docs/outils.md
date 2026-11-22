@@ -30,6 +30,7 @@ Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `too
 | `set_brightness` | confirm | Régler la luminosité de l'écran (ordinateurs portables) |
 | `arrange_window` | confirm | Mettre une fenêtre au premier plan, la réduire, l'agrandir, la placer à gauche ou à droite (KDE Plasma) |
 | `set_appearance` | confirm | Thème clair, sombre ou Kreafinity, et fond d'écran (KDE Plasma, GNOME) |
+| `look_at_screen` | confirm | Regarder votre écran (une capture d'écran) pour vous guider |
 | `move_to_trash` | danger | Mettre à la corbeille (jamais de suppression définitive) |
 | `run_command` | danger | Exécuter une commande avec vos droits |
 | `install_package` | danger | Installer des logiciels du système (mot de passe administrateur) |
@@ -84,6 +85,26 @@ Sur KDE Plasma uniquement : Kreafinity envoie à KWin (le gestionnaire de fenêt
 petit script par D-Bus (`org.kde.kwin.Scripting`), qui lui renvoie sa réponse puis est
 déchargé. Fermer une application passe toujours par `close_application`, qui lui demande
 poliment de se fermer.
+
+## Regarder l'écran (`look_at_screen`)
+
+« Je ne comprends pas ce message d'erreur », « où est le réglage du Wi-Fi ? » : l'assistant peut
+regarder votre écran pour vous guider pas à pas. **Chaque capture vous est demandée** : la carte
+de validation dit pourquoi il veut regarder et rappelle où part l'image. Il ne voit rien d'autre
+que ce que vous acceptez, et il ne bouge ni la souris ni le clavier.
+
+- **Vie privée** : la capture est envoyée à l'IA choisie. Avec Ollama elle reste sur
+  l'ordinateur ; avec Claude, GPT, Mistral ou OpenRouter elle part chez ce fournisseur. Fermez
+  ce qui est privé (messages, mots de passe…) avant d'accepter. Les captures ne sont jamais
+  enregistrées dans l'historique ni sur le disque.
+- **Taille** : la capture est réduite (1568 pixels au plus grand côté, JPEG) pour rester lisible
+  sans coûter trop cher. Dans une longue conversation, seules les 3 dernières sont renvoyées.
+- **Modèles qui voient** : Claude, GPT-4o et suivants, Mistral Small 3.1+ ou Pixtral, et avec
+  Ollama les modèles « vision » (`qwen2.5vl`, `llava`, `gemma3`…). Avec un modèle qui ne lit pas
+  les images, l'assistant reçoit une note à la place et vous propose d'en choisir un autre.
+- **Outil de capture** : celui du bureau, le seul que Wayland autorise : Spectacle (KDE
+  Plasma), gnome-screenshot (GNOME), grim (Sway…) ; sous X11, aussi `scrot` ou `import`
+  (ImageMagick).
 
 ## Commandes (`run_command`)
 

@@ -12,6 +12,8 @@ from typing import Any
 import httpx
 
 from kreafinity.providers.base import (
+    IMAGES_INTRO,
+    NO_VISION_NOTE,
     LLMProvider,
     Message,
     ModelInfo,
@@ -64,6 +66,27 @@ class OllamaProvider(LLMProvider):
         self._headers = dict(headers or {})
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+        self._vision: dict[str, bool] = {}
+
+    async def sees_images(self, model: str) -> bool:
+        """Whether `model` reads images (Ollama's ``vision`` capability).
+
+        Unknown (old Ollama, server error): assumed yes, the server then decides.
+        """
+        if model not in self._vision:
+            try:
+                response = await self._client.post(
+                    f"{self.base_url}/api/show",
+                    json={"model": model},
+                    headers=self._request_headers(),
+                )
+                capabilities = response.json().get("capabilities") if response.is_success else None
+            except (httpx.HTTPError, ValueError, ProviderError):
+                capabilities = None
+            self._vision[model] = (
+                "vision" in capabilities if isinstance(capabilities, list) else True
+            )
+        return self._vision[model]
 
     async def chat(
         self,
@@ -73,9 +96,12 @@ class OllamaProvider(LLMProvider):
         model: str | None = None,
     ) -> AsyncIterator[StreamEvent]:
         model = model or self.default_model
+        if any(m.images for m in messages) and not await self.sees_images(model):
+            note = NO_VISION_NOTE.format(model=model)
+            messages = [m.without_images(note) if m.images else m for m in messages]
         payload: dict[str, Any] = {
             "model": model,
-            "messages": [_to_ollama_message(m) for m in messages],
+            "messages": _to_ollama_messages(messages),
             "stream": True,
         }
         if tools:
@@ -150,6 +176,31 @@ class OllamaProvider(LLMProvider):
         if response.status_code in (401, 403):
             return ProviderAuthError(message, provider=self.name)
         return ProviderError(message, provider=self.name, retryable=response.status_code >= 500)
+
+
+def _to_ollama_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
+    """Convert the conversation; tool images go in a user message after the turn's results."""
+    result: list[dict[str, Any]] = []
+    pending: list[Message] = []
+    for message in messages:
+        if message.role != "tool" and pending:
+            result.append(_images_message(pending))
+            pending.clear()
+        result.append(_to_ollama_message(message))
+        if message.role == "tool" and message.images:
+            pending.append(message)
+    if pending:
+        result.append(_images_message(pending))
+    return result
+
+
+def _images_message(tool_messages: Sequence[Message]) -> dict[str, Any]:
+    names = ", ".join(dict.fromkeys(m.name or "tool" for m in tool_messages))
+    return {
+        "role": "user",
+        "content": IMAGES_INTRO.format(names=names),
+        "images": [image.data for m in tool_messages for image in m.images],
+    }
 
 
 def _to_ollama_message(message: Message) -> dict[str, Any]:

@@ -17,6 +17,7 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - 🛡️ **Vous gardez le contrôle** : aucune action sensible (suppression, commande système, installation) sans votre validation.
 - 🧠 **Une mémoire qui s'améliore** : Kreafinity se souvient de vous et apprend de chaque conversation, comme Hermes Agent ; vous pouvez tout lire, corriger ou effacer ([docs/memoire.md](docs/memoire.md)).
 - 🎙️ **La voix** : parlez-lui avec le micro, il vous répond à voix haute ; reconnaissance et voix sur l'ordinateur, sans rien envoyer ([docs/voix.md](docs/voix.md)).
+- 👀 **Il voit votre écran, si vous le voulez** : « c'est quoi ce message d'erreur ? » — il demande la permission pour chaque capture, puis vous guide ([docs/outils.md](docs/outils.md#regarder-lécran-look_at_screen)).
 - ✨ **Une âme** : Kreafinity a sa propre personnalité, qu'il construit lui-même au fil de vos échanges (plus taquin, plus bref…), sans jamais toucher à ses règles ; vous pouvez la lire, la modifier ou la réinitialiser.
 - 🔒 **Vie privée** : fonctionne entièrement hors ligne avec un modèle local.
 - 🪟 **Interface familière** : barre des tâches, menu démarrer, fenêtres… avec l'IA intégrée partout.
@@ -125,6 +126,7 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - 🛡️ **You stay in control**: no sensitive action (deletion, shell command, install) without your approval.
 - 🧠 **A memory that improves**: Kreafinity remembers you and learns from each conversation, like Hermes Agent; you can read, fix or erase it all.
 - 🎙️ **Voice**: talk to it with the microphone, it answers aloud; recognition and voice run on the computer.
+- 👀 **Sees your screen, if you want**: "what does this error mean?" — it asks before each screenshot, then guides you.
 - ✨ **A soul**: Kreafinity has its own personality, which it builds itself as you talk, without ever touching its rules; you can read, edit or reset it.
 - 🔒 **Privacy**: runs fully offline with a local model.
 - 🪟 **Familiar interface**: taskbar, start menu, windows… with AI built in everywhere.

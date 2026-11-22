@@ -1,6 +1,7 @@
 """LLM provider adapters behind a common, provider-neutral interface."""
 
 from kreafinity.providers.base import (
+    Image,
     LLMProvider,
     Message,
     ModelInfo,
@@ -24,6 +25,7 @@ from kreafinity.providers.registry import (
 )
 
 __all__ = [
+    "Image",
     "LLMProvider",
     "Message",
     "ModelInfo",

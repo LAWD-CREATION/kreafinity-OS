@@ -6,13 +6,13 @@ import json
 import os
 import unicodedata
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar
 
-from kreafinity.providers.base import ToolSpec
+from kreafinity.providers.base import Image, ToolSpec
 
 # Folders holding secrets or Kreafinity's own data: never exposed to the
 # model, even inside an allowed root.
@@ -45,15 +45,20 @@ class ToolError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ToolResult:
-    """Output of a tool, sent back to the model as text."""
+    """Output of a tool, sent back to the model as text (and images, such as a screenshot)."""
 
     content: str
     is_error: bool = False
+    images: tuple[Image, ...] = ()
 
     @classmethod
-    def json(cls, data: Any, *, is_error: bool = False) -> ToolResult:
+    def json(cls, data: Any, *, is_error: bool = False, images: Sequence[Image] = ()) -> ToolResult:
         """Build a result holding `data` serialized as JSON."""
-        return cls(json.dumps(data, ensure_ascii=False, default=str), is_error=is_error)
+        return cls(
+            json.dumps(data, ensure_ascii=False, default=str),
+            is_error=is_error,
+            images=tuple(images),
+        )
 
 
 @dataclass(frozen=True, slots=True)

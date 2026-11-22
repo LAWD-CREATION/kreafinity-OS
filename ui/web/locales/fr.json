@@ -229,5 +229,7 @@
   "settings.voice.missing": "La voix n'est pas encore installée sur cet ordinateur (environ 600 Mo à télécharger).",
   "settings.voice.unavailable": "Voix indisponible.",
   "settings.voice.error": "La préparation a échoué : {message}",
-  "settings.updates.managed": "Kreafinity a été installé par un paquet du système : ses mises à jour arrivent avec celles du système."
+  "settings.updates.managed": "Kreafinity a été installé par un paquet du système : ses mises à jour arrivent avec celles du système.",
+  "tool.look_at_screen": "Regarder l'écran",
+  "tool.look_at_screen.help": "Prendre une capture d'écran pour vous guider (avec votre accord à chaque fois)."
 }

@@ -198,5 +198,7 @@
   "voice.cli.ready": "Voice is ready: click the microphone in the interface to talk to Kreafinity.",
   "update.cli.apt": "Kreafinity was installed from a system package: it is updated with the system (sudo apt update && sudo apt upgrade, or the software center).",
   "version.package": "package {version}",
-  "uninstall.packaged": "The program itself was installed from a system package: to remove it, sudo apt remove kreafinity."
+  "uninstall.packaged": "The program itself was installed from a system package: to remove it, sudo apt remove kreafinity.",
+  "tool.look_at_screen.summary": "Look at your screen (one screenshot)",
+  "tool.look_at_screen.privacy": "The screenshot goes to the AI you chose (it stays on the computer with Ollama). Close anything private first."
 }
