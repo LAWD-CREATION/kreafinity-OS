@@ -944,6 +944,12 @@ class AssistantService:
             except Exception:
                 logger.exception("Closing provider %s failed", provider.name)
         self._providers.clear()
+        from kreafinity import browser
+
+        try:
+            await browser.shutdown()  # the assistant's browser window stays open
+        except Exception:
+            logger.exception("Closing the browser connection failed")
         self._retired.clear()
 
 

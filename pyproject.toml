@@ -83,6 +83,10 @@ src = ["core", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# JavaScript run in web pages, kept readable as written.
+"core/kreafinity/browser/scripts.py" = ["E501", "UP031"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
