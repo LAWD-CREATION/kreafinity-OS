@@ -19,6 +19,7 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - 🎙️ **La voix** : parlez-lui avec le micro, il vous répond à voix haute ; reconnaissance et voix sur l'ordinateur, sans rien envoyer ([docs/voix.md](docs/voix.md)).
 - 👀 **Il voit votre écran, si vous le voulez** : « c'est quoi ce message d'erreur ? » — il demande la permission pour chaque capture, puis vous guide ([docs/outils.md](docs/outils.md#regarder-lécran-look_at_screen)).
 - 🧭 **Il vous guide sur le web** : dans sa propre fenêtre de navigateur, il vous montre où cliquer, ou remplit les formulaires pour vous avec votre accord — jamais vos mots de passe ([docs/outils.md](docs/outils.md#le-navigateur-de-lassistant-browser_open-browser_read-browser_point-browser_act)).
+- 🕹️ **Le mode pilote** : avec votre accord, il prend la souris et le clavier pour faire à votre place pendant que vous regardez ; un bandeau reste affiché, et Échap ou un mouvement de souris vous rend la main ([docs/outils.md](docs/outils.md#le-mode-pilote-pilot_start-pilot_act-pilot_stop)).
 - ✨ **Une âme** : Kreafinity a sa propre personnalité, qu'il construit lui-même au fil de vos échanges (plus taquin, plus bref…), sans jamais toucher à ses règles ; vous pouvez la lire, la modifier ou la réinitialiser.
 - 🔒 **Vie privée** : fonctionne entièrement hors ligne avec un modèle local.
 - 🪟 **Interface familière** : barre des tâches, menu démarrer, fenêtres… avec l'IA intégrée partout.
@@ -129,6 +130,7 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - 🎙️ **Voice**: talk to it with the microphone, it answers aloud; recognition and voice run on the computer.
 - 👀 **Sees your screen, if you want**: "what does this error mean?" — it asks before each screenshot, then guides you.
 - 🧭 **Guides you on the web**: in its own browser window, it shows you where to click, or fills in forms for you with your approval — never your passwords.
+- 🕹️ **Pilot mode**: with your approval, it takes the mouse and keyboard to do things for you while you watch; a banner stays on screen, and Escape or a mouse move gives you control back.
 - ✨ **A soul**: Kreafinity has its own personality, which it builds itself as you talk, without ever touching its rules; you can read, edit or reset it.
 - 🔒 **Privacy**: runs fully offline with a local model.
 - 🪟 **Familiar interface**: taskbar, start menu, windows… with AI built in everywhere.

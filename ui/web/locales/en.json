@@ -239,5 +239,11 @@
   "tool.browser_point": "Assistant's browser: show where to click",
   "tool.browser_point.help": "Frame a button or a field and show a bubble to guide you.",
   "tool.browser_act": "Assistant's browser: click, type",
-  "tool.browser_act.help": "Click, fill in a field, scroll (with your approval; never passwords or bank cards)."
+  "tool.browser_act.help": "Click, fill in a field, scroll (with your approval; never passwords or bank cards).",
+  "tool.pilot_start": "Pilot mode: start",
+  "tool.pilot_start.help": "Let the assistant drive the mouse and keyboard, with a visible banner (explicit approval every time; Escape or the mouse to take back control).",
+  "tool.pilot_act": "Pilot mode: click, type",
+  "tool.pilot_act.help": "The assistant's moves in pilot mode (never in a terminal or in Kreafinity).",
+  "tool.pilot_stop": "Pilot mode: stop",
+  "tool.pilot_stop.help": "Give the mouse and keyboard back when the task is done."
 }

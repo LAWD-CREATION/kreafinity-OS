@@ -31,6 +31,10 @@ _TOOLS: tuple[tuple[str, list[str]], ...] = (
 )
 
 
+#: The latest screenshot shown to the AI (pilot mode clicks at its coordinates).
+LAST: Screenshot | None = None
+
+
 class ScreenError(Exception):
     """The screen cannot be captured (no graphical session, no tool…)."""
 
@@ -94,7 +98,9 @@ def capture() -> Screenshot:
                 errors.append(f"{name}: {exc}")
                 continue
             if result.returncode == 0 and output.is_file() and output.stat().st_size > 0:
-                return prepare(output.read_bytes(), tool=name)
+                global LAST
+                LAST = prepare(output.read_bytes(), tool=name)
+                return LAST
             detail = (result.stderr or result.stdout).strip().splitlines()
             errors.append(f"{name}: {detail[-1] if detail else result.returncode}")
     raise ScreenError("; ".join(errors))

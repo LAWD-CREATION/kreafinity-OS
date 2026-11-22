@@ -226,5 +226,20 @@
   "tool.browser.key.ArrowRight": "Right arrow",
   "tool.browser.key.PageUp": "Page Up",
   "tool.browser.key.PageDown": "Page Down",
-  "tool.browser.key.Space": "Space"
+  "tool.browser.key.Space": "Space",
+  "tool.pilot_start.summary": "Let the assistant drive the mouse and keyboard",
+  "tool.pilot_start.banner": "A banner stays at the top of the screen the whole time.",
+  "tool.pilot_start.take_back_escape": "To take back control: Escape, move the mouse, or “Stop” on the banner.",
+  "tool.pilot_start.take_back": "To take back control: move the mouse, or “Stop” on the banner.",
+  "tool.pilot_start.limits": "It never types in a terminal or in Kreafinity, every action is written to the log, and pilot mode ends with the request.",
+  "tool.pilot_start.privacy": "Screenshots are sent to the chosen AI (they stay on the computer with Ollama).",
+  "pilot.banner": "Kreafinity is driving your computer. Move the mouse to take back control.",
+  "pilot.step.click": "Click at ({x}, {y})",
+  "pilot.step.drag": "Drag and drop",
+  "pilot.step.scroll.down": "Scrolling down",
+  "pilot.step.scroll.up": "Scrolling up",
+  "pilot.step.scroll.left": "Scrolling left",
+  "pilot.step.scroll.right": "Scrolling right",
+  "pilot.step.type": "Typing “{text}”",
+  "pilot.step.key": "Keys {keys}"
 }
