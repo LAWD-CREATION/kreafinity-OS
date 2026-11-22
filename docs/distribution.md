@@ -7,8 +7,8 @@ KDE Plasma, le thème Kreafinity et l'assistant déjà prêts.
 |---|---|---|
 | 1 | **Paquet Debian** (`.deb`) de Kreafinity | ✅ fait (ce document) |
 | 2 | **Dépôt APT** : `apt install kreafinity` et mises à jour avec le système | ✅ fait, à activer (voir plus bas) |
-| 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | configurée, premier essai en cours |
-| 4 | **Clé USB live** : essayer sans rien installer | avec l'ISO |
+| 3 | **Image ISO** Debian 13 + KDE Plasma + Kreafinity (live-build) | ✅ fait, à essayer sur de vrais ordinateurs |
+| 4 | **Clé USB live** : essayer sans rien installer | ✅ fait (avec l'ISO) |
 | 5 | **Installateur graphique** Calamares aux couleurs Kreafinity | à faire |
 | 6 | **Premier démarrage guidé** : choisir son IA, préparer la voix | à faire |
 
@@ -155,6 +155,27 @@ Une image **Debian 13 « trixie » + KDE Plasma 6 + Kreafinity**, construite ave
 - **Essai sans rien installer** (session live, utilisateur `kreafinity`) et **installation**
   avec Calamares (« Installer Debian » pour l'instant : ses couleurs Kreafinity sont l'étape
   suivante).
+
+![Le bureau de la session live : Meta+C ouvre l'assistant](img/iso-bureau.jpg)
+
+### Essayé
+
+Une image construite pour de vrai (2,6 Go), démarrée dans QEMU (BIOS, processeur émulé, sans
+accélération graphique) : menu de démarrage, session live en français ouverte toute seule,
+**bureau Kreafinity** (fond d'écran, barre des tâches en bas, menu ∞, assistant à côté de
+l'horloge), démon Kreafinity démarré avec la session, et **Meta+C ouvre l'assistant**
+(capture ci-dessus).
+
+À savoir pour cette première version :
+
+- dans cette machine sans accélération graphique, KWin (qui dessine les fenêtres) a planté une
+  fois au démarrage puis a redémarré tout seul, et le gestionnaire d'énergie aussi (fréquent
+  dans les machines virtuelles) : à vérifier sur de vrais ordinateurs et dans VirtualBox ;
+- le menu de démarrage et l'installateur portent encore le nom de Debian (« Install Debian »),
+  et le menu attend Entrée sans délai : c'est l'étape suivante (couleurs Kreafinity) ;
+- pas encore essayé en UEFI ni sur un vrai ordinateur ;
+- sans clé API ni Ollama, l'assistant ne peut pas encore répondre : le premier démarrage guidé
+  (choisir son IA) viendra ensuite.
 
 ### Construire l'ISO
 
