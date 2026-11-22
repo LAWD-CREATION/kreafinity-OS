@@ -10,3 +10,19 @@ systemctl --global is-enabled kreafinity.service >/dev/null
 sed -i 's/^# *fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen >/dev/null
 echo 'LANG=fr_FR.UTF-8' >/etc/default/locale
+
+# The installer (Calamares) in Kreafinity's colors, with its name.
+if [ -f /etc/calamares/settings.conf ]; then
+    sed -i 's/^branding: debian$/branding: kreafinity/' /etc/calamares/settings.conf
+    grep -q '^branding: kreafinity$' /etc/calamares/settings.conf
+fi
+launcher=/usr/share/applications/calamares-install-debian.desktop
+if [ -f "$launcher" ]; then
+    sed -i -e 's/^Name=Install Debian$/Name=Install Kreafinity OS\nName[fr]=Installer Kreafinity OS/' \
+        -e 's/^Comment=.*/Comment=Install Kreafinity OS on this computer\nComment[fr]=Installer Kreafinity OS sur cet ordinateur/' \
+        -e 's/^Icon=install-debian$/Icon=kreafinity/' "$launcher"
+fi
+if [ -f /usr/bin/add-calamares-desktop-icon ]; then
+    sed -i -e 's/Install Debian/Installer Kreafinity OS/g' -e 's/Icon=install-debian/Icon=kreafinity/g' \
+        /usr/bin/add-calamares-desktop-icon
+fi

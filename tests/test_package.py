@@ -290,3 +290,24 @@ def test_iso_scripts() -> None:
         and "--mirror-binary https://deb.debian.org/debian" in build
     )
     assert "locales=fr_FR.UTF-8" in build and "keyboard-layouts=fr" in build
+
+
+def test_installer_and_boot_menu_branding() -> None:
+    import yaml
+
+    branding = ISO / "config" / "includes.chroot" / "etc" / "calamares" / "branding" / "kreafinity"
+    desc = yaml.safe_load((branding / "branding.desc").read_text())
+    assert desc["componentName"] == "kreafinity" == branding.name
+    assert desc["strings"]["productName"] == "Kreafinity OS"
+    for image in desc["images"].values():
+        assert (branding / image).is_file()
+    assert (branding / desc["slideshow"]).is_file()
+    assert "Bienvenue dans Kreafinity OS" in (branding / "show.qml").read_text()
+    hook = (ISO / "config" / "hooks" / "live" / "0100-kreafinity.hook.chroot").read_text()
+    assert "branding: kreafinity" in hook and "Installer Kreafinity OS" in hook
+    # The boot menu: Kreafinity's title and background, and it starts by itself after 5 s.
+    loaders = ISO / "config" / "bootloaders"
+    assert "timeout 50" in (loaders / "isolinux" / "isolinux.cfg").read_text()
+    assert "set timeout=5" in (loaders / "grub-pc" / "config.cfg").read_text()
+    assert "menu title Kreafinity OS" in (loaders / "syslinux_common" / "menu.cfg").read_text()
+    assert "Kreafinity OS" in (loaders / "splash.svg").read_text()

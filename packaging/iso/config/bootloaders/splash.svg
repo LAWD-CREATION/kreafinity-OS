@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <!-- Kreafinity OS boot menu background (the menu is drawn below the title) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0f19"/>
+      <stop offset="1" stop-color="#1b1536"/>
+    </linearGradient>
+    <linearGradient id="kf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b6cff"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <g transform="translate(250 28) scale(1)">
+    <path d="M70 50C60 30 30 28 24 50s36 20 46 0 40-22 46 0-36 20-46 0Z" fill="none"
+          stroke="url(#kf)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="320" y="150" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="28"
+        font-weight="bold" fill="#ffffff">Kreafinity OS</text>
+  <text x="320" y="176" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="13"
+        fill="#9aa3b8">L'ordinateur qui vous écoute, avec l'IA de votre choix</text>
+</svg>

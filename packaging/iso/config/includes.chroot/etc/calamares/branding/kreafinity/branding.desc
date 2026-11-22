@@ -1,0 +1,38 @@
+# Kreafinity OS: the look of the installer (Calamares).
+---
+componentName:  kreafinity
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 900px,620px
+windowPlacement: center
+
+strings:
+    productName:         Kreafinity OS
+    shortProductName:    Kreafinity
+    version:             "0.1"
+    shortVersion:        "0.1"
+    versionedName:       Kreafinity OS 0.1
+    shortVersionedName:  Kreafinity 0.1
+    bootloaderEntryName: Kreafinity
+    productUrl:          https://kreafinity.com
+    supportUrl:          https://github.com/LAWD-CREATION/kreafinity-OS/issues
+    knownIssuesUrl:      https://github.com/LAWD-CREATION/kreafinity-OS/issues
+    releaseNotesUrl:     https://github.com/LAWD-CREATION/kreafinity-OS
+
+sidebar: widget
+navigation: widget
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+slideshowAPI:            2
+
+style:
+   SidebarBackground:        "#0b0f19"
+   SidebarText:              "#e8eaf2"
+   SidebarTextCurrent:       "#ffffff"
+   SidebarBackgroundCurrent: "#5b3fd1"
