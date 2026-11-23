@@ -354,5 +354,16 @@
   "attach.too_big": "{name} is larger than 25 MB.",
   "attach.default_text": "Here are some files.",
   "attach.kb": "{size} KB",
-  "attach.mb": "{size} MB"
+  "attach.mb": "{size} MB",
+  "live.start": "Voice conversation",
+  "live.listening": "I'm listening… speak whenever you like.",
+  "live.hearing": "You're speaking…",
+  "live.transcribing": "Writing down what you said…",
+  "live.thinking": "Thinking…",
+  "live.speaking": "Answering… speak to interrupt me.",
+  "live.muted": "Microphone off.",
+  "live.mute": "Mute",
+  "live.unmute": "Unmute",
+  "live.end": "End",
+  "live.approval": "I need your approval: look at the screen."
 }

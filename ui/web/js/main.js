@@ -8,6 +8,7 @@ import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
 import { Welcome } from "./welcome.js";
 import { Attachments, attachmentChips, splitAttachments } from "./attachments.js";
+import { LiveConversation } from "./live.js";
 import { UpdateBanner } from "./update.js";
 import { Voice } from "./voice.js";
 
@@ -47,6 +48,7 @@ let welcome;
 let settings;
 let onboarding;
 let files;
+let liveTalk;
 let updates;
 let voice;
 // The conversation whose last question was said aloud (its answer is read aloud).
@@ -116,11 +118,30 @@ async function start() {
     toast,
     openSettings: () => settings.open("voice"),
     onText: (text) => send(text, { spoken: true }),
+    onUpdate: (info, available) => {
+      $("live-start").hidden = !available || !window.AudioContext;
+    },
   });
   voice.refresh();
   files = new Attachments(api, {
     list: $("attachments"), button: $("attach"), input: $("attach-input"),
     dropZone: document.querySelector(".chat"), toast,
+  });
+  liveTalk = new LiveConversation(api, {
+    panel: $("live"), toast,
+    send: async (text) => {
+      if (!(await send(text, { spoken: true }))) throw new Error("not sent");
+    },
+    cancel: stopRequest,
+    running: () => Boolean(state.current && state.running.has(state.current.id)),
+  });
+  $("live-start").addEventListener("click", () => {
+    if (!voice?.info?.listening) {
+      toast(t(voice?.info?.preparing ? "voice.preparing" : "voice.not_ready"), "warning");
+      if (!voice?.info?.preparing) settings.open("voice");
+      return;
+    }
+    liveTalk.start();
   });
   onboarding = new Welcome({ api, toast, onDone: refreshProviders, onPrompt: (text) => send(text) });
   settings = new SettingsDialog({
@@ -576,10 +597,12 @@ async function send(rawText, { spoken = false } = {}) {
     spokenQuestion = spoken ? state.current.id : null;
     await api.post(`/api/conversations/${state.current.id}/messages`, body);
     if (withFiles) files.clear();
+    return true;
   } catch (error) {
     $("prompt").value = rawText.trim();
     autosize();
     toast(errorMessage(error), "error");
+    return false;
   } finally {
     $("send").disabled = false;
   }
@@ -667,6 +690,7 @@ function onEvent(event) {
       break;
     }
     case "text_delta": {
+      if (liveTalk?.active && event.conversation_id === state.current?.id) liveTalk.onText(event.text);
       const live = liveFor(event);
       if (!live) break;
       hideThinking(live);
@@ -686,6 +710,7 @@ function onEvent(event) {
     }
     case "approval_required": {
       state.approvals.set(event.approval_id, event);
+      if (liveTalk?.active && event.conversation_id === state.current?.id) liveTalk.say(t("live.approval"));
       const live = liveFor(event);
       if (live) {
         addToLive(live, approvalCard(event));
@@ -767,7 +792,9 @@ function finishRun(event) {
   state.running.delete(event.conversation_id);
   const spoken = spokenQuestion === event.conversation_id;
   if (spoken) spokenQuestion = null;
-  if (event.type === "run_finished" && voice?.shouldSpeak(spoken) && state.current?.id === event.conversation_id) {
+  if (liveTalk?.active && state.current?.id === event.conversation_id) {
+    liveTalk.onAnswerEnd(); // the live conversation reads the answer as it comes
+  } else if (event.type === "run_finished" && voice?.shouldSpeak(spoken) && state.current?.id === event.conversation_id) {
     readAnswerAloud(event.conversation_id);
   }
   const live = state.live?.runId === event.run_id ? state.live : null;

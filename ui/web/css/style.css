@@ -376,6 +376,31 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); }
 .settings-footer .version { flex: 1; color: var(--text-muted); font-size: 13px; }
 
+/* --- Live conversation ------------------------------------------------------------------- */
+
+.live-panel {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
+  width: min(820px, 100%); margin: 0 auto 10px; padding: 12px 16px;
+  border: 1px solid var(--border); border-radius: 22px; background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.live-orb {
+  --level: 0; --tint: var(--kf-violet);
+  width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tint) 75%, white), var(--tint) 60%, #0b0f19 120%);
+  box-shadow: 0 0 calc(10px + 40px * var(--level)) color-mix(in srgb, var(--tint) 70%, transparent);
+  transform: scale(calc(1 + .25 * var(--level))); transition: transform .08s linear, box-shadow .08s linear;
+}
+.live-orb .logo-mark { filter: brightness(10); opacity: .85; }
+.live-panel[data-state="hearing"] .live-orb { --tint: var(--kf-cyan); }
+.live-panel[data-state="thinking"] .live-orb, .live-panel[data-state="transcribing"] .live-orb { animation: pulse 1.2s ease-in-out infinite; }
+.live-panel[data-state="speaking"] .live-orb { --tint: #22c55e; animation: live-talk .9s ease-in-out infinite; }
+@keyframes live-talk { 50% { transform: scale(1.12); } }
+.live-status { margin: 0; font-weight: 600; }
+.live-actions { display: flex; gap: 8px; }
+.live-actions svg { width: 16px; height: 16px; }
+@media (max-width: 560px) { .live-panel { grid-template-columns: auto 1fr; } .live-actions { grid-column: 1 / -1; justify-content: flex-end; } }
+
 /* --- Attachments --------------------------------------------------------------------------- */
 
 .attachment-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 auto 8px; width: min(820px, 100%); }

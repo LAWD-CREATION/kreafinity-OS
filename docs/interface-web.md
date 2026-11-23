@@ -24,6 +24,23 @@ ui/web/
 L'API utilisée est décrite dans [api.md](api.md). Le paquet Python embarque ce dossier
 (`kreafinity/web`) ; dans une copie du dépôt, le démon le sert directement depuis `ui/web`.
 
+## Les pièces jointes
+
+Le trombone (ou glisser-déposer un fichier, ou coller une image dans le champ de texte) joint
+des fichiers au message : 10 fichiers au plus, 25 Mo chacun.
+
+- **Images** : montrées à l'IA (réduites comme les captures d'écran), si son modèle lit les
+  images ; sinon elle reçoit une note.
+- **Textes** (notes, code, CSV, JSON…), **PDF**, **Word** (.docx) et **LibreOffice** (.odt, .ods,
+  .odp) : leur texte est ajouté au message, encadré comme une donnée (jamais comme une
+  instruction), 60 000 caractères au plus par fichier.
+- Autres fichiers : seul leur nom est donné.
+
+Les fichiers passent par `POST /api/uploads` (nom dans l'en-tête `X-Filename`) et restent un jour
+dans `~/.local/share/kreafinity/uploads` (accessible à vous seul), puis le message les cite par
+leur identifiant (`attachments`). Ils ne sont pas copiés dans vos dossiers. L'historique garde
+leur nom et leur texte, pas les images.
+
 ## Règles de sécurité
 
 Les textes affichés viennent de l'IA, de noms de fichiers ou de pages web : ce sont des données

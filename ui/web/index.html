@@ -96,11 +96,13 @@
       </section>
 
       <form id="composer" class="composer">
+        <div id="live" class="live-panel" hidden></div>
         <div id="attachments" class="attachment-list" hidden></div>
         <div class="composer-box">
           <button id="attach" class="round-button ghost" type="button" data-i18n-aria="attach.add"><span data-icon="paperclip"></span></button>
           <input id="attach-input" type="file" multiple hidden>
           <textarea id="prompt" rows="1" data-i18n-placeholder="composer.placeholder"></textarea>
+          <button id="live-start" class="round-button ghost" type="button" hidden data-i18n-aria="live.start"><span data-icon="wave"></span></button>
           <button id="voice" class="round-button ghost" type="button" hidden data-i18n-aria="voice.start"><span data-icon="mic"></span></button>
           <button id="send" class="round-button" type="submit" data-i18n-aria="composer.send"><span data-icon="send"></span></button>
           <button id="stop" class="round-button stop" type="button" hidden data-i18n-aria="composer.stop"><span data-icon="stop"></span></button>
