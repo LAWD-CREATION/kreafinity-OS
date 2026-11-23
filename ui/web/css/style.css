@@ -376,6 +376,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); }
 .settings-footer .version { flex: 1; color: var(--text-muted); font-size: 13px; }
 
+/* --- Extensions (MCP) -------------------------------------------------------------------- */
+
+.mcp-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.mcp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mcp-switch { display: flex; align-items: center; gap: 8px; }
+.mcp-actions { margin-left: auto; display: flex; gap: 6px; }
+.mcp-target { font-family: var(--mono); font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.mcp-secret { display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center; }
+.mcp-secret .mono { font-family: var(--mono); font-size: 13px; }
+.mcp-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.mcp-tool { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.mcp-add summary { cursor: pointer; font-weight: 600; }
+.mcp-add[open] { display: grid; gap: 10px; }
+.checkbox-row { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+@media (max-width: 560px) { .mcp-secret { grid-template-columns: 1fr 1fr; } }
+
 /* --- First start (welcome) --------------------------------------------------------------- */
 
 .onboarding { width: min(680px, calc(100% - 24px)); }

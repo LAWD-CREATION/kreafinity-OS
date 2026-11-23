@@ -3,6 +3,7 @@
 import { ApiError } from "./api.js";
 import { el, icon } from "./dom.js";
 import { t } from "./i18n.js";
+import { McpSection } from "./mcp.js";
 
 const THEME_KEY = "kreafinity.theme";
 const RISK_ORDER = { safe: 0, confirm: 1, danger: 2 };
@@ -131,7 +132,7 @@ export class SettingsDialog {
     this.toolBoxes = new Map();
     this.error = el("p", { class: "form-error", hidden: true });
 
-    const sortedTools = [...tools].sort(
+    const sortedTools = tools.filter((tool) => !tool.server).sort(
       (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk] || a.name.localeCompare(b.name),
     );
 
@@ -163,6 +164,7 @@ export class SettingsDialog {
           el("p", {}, t("settings.tools.text")),
           sortedTools.map((tool) => this.toolRow(tool)),
         ),
+        new McpSection({ api: this.api, toast: this.toast }).element(),
         this.renderMemory(),
         this.renderVoice(),
         el(

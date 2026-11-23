@@ -109,6 +109,27 @@ class DefaultProvider(BaseModel):
     provider: str = Field(min_length=1, max_length=200)
 
 
+class McpServerIn(BaseModel):
+    name: str = Field(min_length=1, max_length=24)
+    command: str = Field(default="", max_length=500)
+    args: list[str] = Field(default_factory=list, max_length=50)
+    env: dict[str, str] = Field(default_factory=dict)
+    secret_env: list[str] = Field(default_factory=list, max_length=20)
+    url: str = Field(default="", max_length=500)
+    token: bool = False
+    enabled: bool = True
+    auto_approve: list[str] = Field(default_factory=list, max_length=200)
+
+
+class McpServerChange(BaseModel):
+    enabled: bool | None = None
+    auto_approve: list[str] | None = Field(default=None, max_length=200)
+
+
+class SecretValue(BaseModel):
+    value: str = Field(min_length=1, max_length=4000)
+
+
 class ModelName(BaseModel):
     model: str = Field(min_length=1, max_length=120)
 
@@ -375,6 +396,37 @@ def create_app(
     @api.post("/setup/ollama/pull", status_code=status.HTTP_202_ACCEPTED)
     async def pull_ollama_model(service: Service, body: ModelName) -> dict[str, Any]:
         return service.pull_ollama_model(body.model)
+
+    @api.get("/mcp")
+    async def mcp_status(service: Service) -> dict[str, Any]:
+        return await service.mcp_status()
+
+    @api.post("/mcp/servers", status_code=status.HTTP_201_CREATED)
+    async def add_mcp_server(service: Service, body: McpServerIn) -> dict[str, Any]:
+        entry = body.model_dump(exclude={"name"})
+        return service.add_mcp_server(
+            body.name, {k: v for k, v in entry.items() if v not in ("", [], {})}
+        )
+
+    @api.patch("/mcp/servers/{name}")
+    async def update_mcp_server(
+        service: Service, name: str, body: McpServerChange
+    ) -> dict[str, Any]:
+        return service.update_mcp_server(name, body.model_dump(exclude_none=True))
+
+    @api.delete("/mcp/servers/{name}")
+    async def remove_mcp_server(service: Service, name: str) -> dict[str, Any]:
+        return service.remove_mcp_server(name)
+
+    @api.put("/mcp/servers/{name}/secrets/{secret}")
+    async def set_mcp_secret(
+        service: Service, name: str, secret: str, body: SecretValue
+    ) -> dict[str, Any]:
+        return service.set_mcp_secret(name, secret, body.value)
+
+    @api.post("/mcp/servers/{name}/restart")
+    async def restart_mcp_server(service: Service, name: str) -> dict[str, Any]:
+        return service.restart_mcp_server(name)
 
     @api.get("/tools")
     async def list_tools(service: Service) -> list[dict[str, Any]]:

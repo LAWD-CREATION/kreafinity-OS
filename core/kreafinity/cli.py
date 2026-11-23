@@ -16,7 +16,7 @@ import webbrowser
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import httpx
 import typer
@@ -89,6 +89,18 @@ voice_app = typer.Typer(
 )
 app.add_typer(voice_app, name="voice")
 app.add_typer(voice_app, name="voix", hidden=True)
+
+
+def _add_mcp_commands() -> None:
+    from kreafinity.mcp.cli import app as mcp_app
+
+    app.add_typer(mcp_app, name="mcp")
+
+
+_add_mcp_commands()
+if TYPE_CHECKING:
+    from kreafinity.mcp import McpManager
+
 console = Console()
 err_console = Console(stderr=True)
 
@@ -231,11 +243,13 @@ def ask(
     history = _History(_open_store(), Conversation(), stored=False, provider=provider)
 
     async def run() -> bool:
+        mcp = await _start_mcp(agent)
         try:
             return await _run_turn(agent, history.conversation, question)
         finally:
             history.save()
             await _close_providers(agent)
+            await mcp.aclose()
 
     if not asyncio.run(run()):
         raise typer.Exit(1)
@@ -284,6 +298,7 @@ def chat(
 
     async def run() -> None:
         replaced: list[LLMProvider] = []
+        mcp = await _start_mcp(agent)
         try:
             while True:
                 try:
@@ -309,6 +324,7 @@ def chat(
                         history.save()
         finally:
             await _close_providers(agent, *replaced)
+            await mcp.aclose()
 
     asyncio.run(run())
     console.print(t("chat.bye"))
@@ -1072,6 +1088,21 @@ def _switch_provider(
 
 def _describe(provider: LLMProvider, model: str | None) -> str:
     return f"{provider.display_name} · {model or provider.default_model}"
+
+
+async def _start_mcp(agent: Agent) -> McpManager:
+    """Start the MCP servers (extensions) and give their tools to the agent."""
+    from kreafinity.mcp import McpManager
+
+    manager = McpManager(log_dir=data_dir() / "mcp")
+    servers = _load_settings().mcp_servers
+    if servers:
+        manager.configure(servers)
+        await manager.wait_ready(20)
+        tools = manager.tools()
+        if tools:
+            agent.tools = ToolRegistry([*agent.tools, *tools])
+    return manager
 
 
 async def _close_providers(agent: Agent, *others: LLMProvider) -> None:

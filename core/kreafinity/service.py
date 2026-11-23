@@ -58,6 +58,8 @@ from kreafinity.config import (
     set_api_key,
 )
 from kreafinity.i18n import set_language
+from kreafinity.mcp import McpConfigError, McpManager
+from kreafinity.mcp import config as mcp_config
 from kreafinity.memory import (
     MAX_SECTION,
     MAX_SOUL,
@@ -65,6 +67,7 @@ from kreafinity.memory import (
     MemoryRefusedError,
     MemoryStore,
 )
+from kreafinity.paths import data_dir
 from kreafinity.providers import (
     LLMProvider,
     Message,
@@ -342,6 +345,7 @@ class AssistantService:
             client=update_client,
         )
         self.voice = VoiceManager(self.settings, self.events.publish, get_api_key)
+        self.mcp = McpManager(log_dir=data_dir() / "mcp")
         self._background: list[asyncio.Task[None]] = []
         self._reviews: dict[str, asyncio.Task[None]] = {}
         self.review_delay = REVIEW_DELAY
@@ -525,6 +529,89 @@ class AssistantService:
         else:
             self.events.publish({"type": "providers_updated"})
 
+    # --- MCP servers ---------------------------------------------------------------------
+
+    async def mcp_status(self) -> Event:
+        """The configured MCP servers, their state and their tools."""
+        self.mcp.configure(self.settings().mcp_servers)
+        await self.mcp.wait_ready(3)
+        return {"servers": self.mcp.status(), "keyring_available": keyring_available()}
+
+    def _mcp_servers(self) -> dict[str, dict[str, Any]]:
+        return {name: dict(entry) for name, entry in self.settings().mcp_servers.items()}
+
+    def _save_mcp(self, servers: dict[str, dict[str, Any]]) -> None:
+        self.update_config({"mcp_servers": servers})
+        self.mcp.configure(servers)
+        self.mcp.start_all()
+        self.events.publish({"type": "mcp_updated"})
+
+    def add_mcp_server(self, name: str, entry: dict[str, Any]) -> Event:
+        """Add a server (the user's choice: a program or an address)."""
+        servers = self._mcp_servers()
+        if name in servers:
+            raise ServiceError(f"An MCP server is already called {name!r}", code="invalid")
+        try:
+            server = mcp_config.parse_server(name, entry)
+        except McpConfigError as exc:
+            raise ServiceError(str(exc), code="invalid") from exc
+        servers[name] = mcp_config.to_mapping(server)
+        self._save_mcp(servers)
+        return {"name": name, **servers[name]}
+
+    def update_mcp_server(self, name: str, changes: dict[str, Any]) -> Event:
+        """Turn a server on or off, or choose the tools that run without approval."""
+        servers = self._mcp_servers()
+        if name not in servers:
+            raise ServiceError(f"No MCP server called {name!r}", code="not_found")
+        allowed = {"enabled", "auto_approve"}
+        if set(changes) - allowed:
+            raise ServiceError(f"Only {', '.join(sorted(allowed))} can be changed", code="invalid")
+        entry = {**servers[name], **changes}
+        try:
+            server = mcp_config.parse_server(name, entry)
+        except McpConfigError as exc:
+            raise ServiceError(str(exc), code="invalid") from exc
+        servers[name] = mcp_config.to_mapping(server)
+        self._save_mcp(servers)
+        return {"name": name, **servers[name]}
+
+    def remove_mcp_server(self, name: str) -> Event:
+        """Remove a server and its secrets."""
+        servers = self._mcp_servers()
+        entry = servers.pop(name, None)
+        if entry is None:
+            raise ServiceError(f"No MCP server called {name!r}", code="not_found")
+        for secret in [*entry.get("secret_env", []), "token"]:
+            mcp_config.delete_secret(name, secret)
+        self._save_mcp(servers)
+        return {"removed": name}
+
+    def set_mcp_secret(self, name: str, secret: str, value: str) -> Event:
+        """Store a server's secret (an environment variable or its token) in the keyring."""
+        entry = self._mcp_servers().get(name)
+        if entry is None:
+            raise ServiceError(f"No MCP server called {name!r}", code="not_found")
+        expected = list(entry.get("secret_env", [])) + (["token"] if entry.get("token") else [])
+        if secret not in expected:
+            raise ServiceError(f"{secret!r} is not a secret of {name!r}", code="invalid")
+        try:
+            mcp_config.set_secret(name, secret, value)
+        except ValueError as exc:
+            raise ServiceError("Invalid secret", code="invalid") from exc
+        except SecretStoreError as exc:
+            raise ServiceError(str(exc), code="keyring_unavailable") from exc
+        self.restart_mcp_server(name)
+        return {"name": name, "secret": secret, "stored": True}
+
+    def restart_mcp_server(self, name: str) -> Event:
+        server = self.mcp.servers.get(name)
+        if server is None:
+            raise ServiceError(f"No MCP server called {name!r}", code="not_found")
+        server.status = "stopped"
+        server.start_soon()
+        return {"name": name, "status": "starting"}
+
     def set_default_provider(self, spec: str) -> Event:
         """Choose the provider and model used by default."""
         self._provider(self.settings(), spec)  # validate
@@ -555,6 +642,15 @@ class AssistantService:
                 "enabled": settings.tools is None or tool.name in settings.tools,
             }
             for tool in ToolRegistry.load()
+        ] + [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "risk": tool.risk.value,
+                "enabled": True,
+                "server": tool.server.name,
+            }
+            for tool in self.mcp.tools()
         ]
 
     # --- Conversations -----------------------------------------------------------------------
@@ -705,6 +801,12 @@ class AssistantService:
             self.store.replace_messages(conversation_id, messages)
         conversation = Conversation(id=conversation_id, messages=messages)
         saved = len(messages)
+        # Tools of the MCP servers (a starting server gets a few seconds).
+        self.mcp.configure(self.settings().mcp_servers)
+        await self.mcp.wait_ready(8)
+        mcp_tools = self.mcp.tools()
+        if mcp_tools:
+            agent.tools = ToolRegistry([*agent.tools, *mcp_tools])
 
         def persist() -> None:
             nonlocal saved
@@ -979,6 +1081,8 @@ class AssistantService:
         from kreafinity.pilot.desktop import release_leftovers
 
         self._background.append(asyncio.create_task(release_leftovers()))
+        self.mcp.configure(self.settings().mcp_servers)
+        self.mcp.start_all()
 
     def update_info(self) -> Event:
         """Installed version, available update, progress of an installation."""
@@ -1025,6 +1129,7 @@ class AssistantService:
         try:
             await browser.shutdown()  # the assistant's browser window stays open
             await pilot.end_request()  # the user gets the mouse and keyboard back
+            await self.mcp.aclose()
         except Exception:
             logger.exception("Closing the browser or pilot mode failed")
         self._retired.clear()
