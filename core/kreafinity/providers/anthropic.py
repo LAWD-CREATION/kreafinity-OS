@@ -211,7 +211,15 @@ def _to_anthropic_messages(
             if content:
                 result.append({"role": "assistant", "content": content})
         else:
-            result.append({"role": "user", "content": [{"type": "text", "text": message.content}]})
+            images = [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": i.media_type, "data": i.data},
+                }
+                for i in message.images  # files the user attached
+            ]
+            text = [{"type": "text", "text": message.content}] if message.content else []
+            result.append({"role": "user", "content": [*images, *text]})
     for entry in result:
         entry.pop("_tool_results", None)
     return "\n\n".join(p for p in system_parts if p), result

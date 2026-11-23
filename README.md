@@ -16,7 +16,8 @@ Kreafinity OS est une distribution Linux open source dont l'intelligence artific
 - 🔓 **Liberté du fournisseur IA** : Claude, GPT, Mistral, Ollama Cloud, les centaines de modèles d'OpenRouter, ou un modèle 100 % local avec Ollama. Vous changez quand vous voulez.
 - 🛡️ **Vous gardez le contrôle** : aucune action sensible (suppression, commande système, installation) sans votre validation.
 - 🧠 **Une mémoire qui s'améliore** : Kreafinity se souvient de vous et apprend de chaque conversation, comme Hermes Agent ; vous pouvez tout lire, corriger ou effacer ([docs/memoire.md](docs/memoire.md)).
-- 🎙️ **La voix** : parlez-lui avec le micro, il vous répond à voix haute ; reconnaissance et voix sur l'ordinateur, sans rien envoyer ([docs/voix.md](docs/voix.md)).
+- 🎙️ **La voix** : parlez-lui avec le micro, ou lancez une **conversation orale** mains libres (il répond phrase par phrase et vous pouvez lui couper la parole) ; reconnaissance et voix sur l'ordinateur ([docs/voix.md](docs/voix.md)).
+- 📎 **Des fichiers dans la conversation** : images, PDF, documents Word ou LibreOffice, textes… ([docs/interface-web.md](docs/interface-web.md#les-pièces-jointes)).
 - 👀 **Il voit votre écran, si vous le voulez** : « c'est quoi ce message d'erreur ? » — il demande la permission pour chaque capture, puis vous guide ([docs/outils.md](docs/outils.md#regarder-lécran-look_at_screen)).
 - 🧭 **Il vous guide sur le web** : dans sa propre fenêtre de navigateur, il vous montre où cliquer, ou remplit les formulaires pour vous avec votre accord — jamais vos mots de passe ([docs/outils.md](docs/outils.md#le-navigateur-de-lassistant-browser_open-browser_read-browser_point-browser_act)).
 - 🕹️ **Le mode pilote** : avec votre accord, il prend la souris et le clavier pour faire à votre place pendant que vous regardez ; un bandeau reste affiché, et Échap ou un mouvement de souris vous rend la main ([docs/outils.md](docs/outils.md#le-mode-pilote-pilot_start-pilot_act-pilot_stop)).
@@ -128,7 +129,8 @@ Kreafinity OS is an open source Linux distribution with artificial intelligence 
 - 🔓 **Freedom of AI provider**: Claude, GPT, Mistral, Ollama Cloud, hundreds of models through OpenRouter, or a fully local model via Ollama. Switch anytime.
 - 🛡️ **You stay in control**: no sensitive action (deletion, shell command, install) without your approval.
 - 🧠 **A memory that improves**: Kreafinity remembers you and learns from each conversation, like Hermes Agent; you can read, fix or erase it all.
-- 🎙️ **Voice**: talk to it with the microphone, it answers aloud; recognition and voice run on the computer.
+- 🎙️ **Voice**: talk with the microphone, or start a hands-free **voice conversation** (it answers sentence by sentence and you can interrupt it); recognition and voice run on the computer.
+- 📎 **Files in the conversation**: images, PDF, Word or LibreOffice documents, text files…
 - 👀 **Sees your screen, if you want**: "what does this error mean?" — it asks before each screenshot, then guides you.
 - 🧭 **Guides you on the web**: in its own browser window, it shows you where to click, or fills in forms for you with your approval — never your passwords.
 - 🕹️ **Pilot mode**: with your approval, it takes the mouse and keyboard to do things for you while you watch; a banner stays on screen, and Escape or a mouse move gives you control back.

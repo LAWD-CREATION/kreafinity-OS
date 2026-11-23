@@ -73,9 +73,9 @@ class Message:
         tool_call_id: Id of the call this message answers (``tool`` only).
         name: Name of the tool that produced this result (``tool`` only).
         is_error: Whether the tool failed (``tool`` only).
-        images: Images that come with a tool result (``tool`` only), such as a
-            screenshot. They are never saved in the history: the model sees
-            them during the request that produced them.
+        images: Images that come with a tool result (a screenshot) or that the
+            user attached (``user``). They are never saved in the history: the
+            model sees them during the request that brought them.
         provider_data: Opaque data an adapter attaches to the messages it
             produces, keyed by provider name, and reads back when the same
             provider sees the conversation again (e.g. Anthropic thinking
@@ -98,9 +98,9 @@ class Message:
         return cls(role="system", content=content)
 
     @classmethod
-    def user(cls, content: str) -> Message:
-        """Build a user message."""
-        return cls(role="user", content=content)
+    def user(cls, content: str, images: Sequence[Image] = ()) -> Message:
+        """Build a user message (with the images the user attached, if any)."""
+        return cls(role="user", content=content, images=tuple(images))
 
     @classmethod
     def assistant(cls, content: str = "", tool_calls: Sequence[ToolCall] = ()) -> Message:

@@ -34,6 +34,29 @@ Par défaut, tout se passe **sur votre ordinateur**, même sans Internet :
 Les modèles sont rangés dans `~/.local/share/kreafinity/voice` ; l'enregistrement de votre voix
 n'est gardé nulle part : il est transcrit puis oublié.
 
+## La conversation orale
+
+Le bouton **Conversation orale** (l'onde, à côté du micro) ouvre une conversation à voix haute,
+sans rien toucher, à la façon de Gemini Live :
+
+- **Parlez quand vous voulez** : Kreafinity détecte quand vous commencez et quand vous avez fini
+  (un petit silence), puis envoie ce que vous avez dit.
+- **Il répond à voix haute phrase par phrase**, pendant que la réponse s'écrit (sans lire le
+  code ni la mise en forme). Le texte reste affiché dans la conversation.
+- **Coupez-lui la parole** : si vous parlez pendant qu'il répond, il se tait, arrête la demande
+  en cours et vous écoute.
+- **Couper le micro** met la conversation en pause ; **Terminer** la ferme.
+- Les actions à valider s'affichent comme d'habitude : il vous le dit à voix haute et attend
+  votre clic.
+
+![La conversation orale : l'orbe devient verte quand Kreafinity parle](img/conversation-orale.jpg)
+
+Tout se passe **sur l'ordinateur** (reconnaissance Whisper, voix Piper) : seul le texte va à l'IA
+choisie. La détection de la parole se fait dans la page, avec l'annulation d'écho du navigateur,
+pour que la voix de Kreafinity ne soit pas prise pour la vôtre. Comptez quelques secondes entre
+la fin de votre phrase et le début de la réponse (reconnaissance, IA, voix) : moins instantané
+que Gemini Live, dont le modèle entend directement le son, mais avec l'IA de votre choix.
+
 ## Réglages
 
 Dans **Réglages › Voix** (ou dans `~/.config/kreafinity/config.yaml`) :

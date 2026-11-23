@@ -16,6 +16,7 @@ from kreafinity.memory import MemoryStore
 from kreafinity.paths import user_dirs
 from kreafinity.providers.base import (
     NO_VISION_NOTE,
+    Image,
     LLMProvider,
     Message,
     ProviderAuthError,
@@ -253,7 +254,9 @@ class Agent:
             parts.append(snapshot)
         return "\n\n".join(parts)
 
-    async def run(self, conversation: Conversation, user_text: str) -> AsyncIterator[AgentEvent]:
+    async def run(
+        self, conversation: Conversation, user_text: str, images: Sequence[Image] = ()
+    ) -> AsyncIterator[AgentEvent]:
         """Handle one user request, appending every message to `conversation`.
 
         Yields text as it streams, tool call notifications, and finally one
@@ -261,7 +264,7 @@ class Agent:
         conversation keeps what was done so far and stays usable.
         """
         try:
-            async for event in self._run(conversation, user_text):
+            async for event in self._run(conversation, user_text, images):
                 yield event
         finally:
             # What was granted for this request only (pilot mode) ends with it.
@@ -275,9 +278,11 @@ class Agent:
         extra = [limit for tool in self.tools if (limit := tool.iteration_limit())]
         return max([self.max_iterations, *extra])
 
-    async def _run(self, conversation: Conversation, user_text: str) -> AsyncIterator[AgentEvent]:
+    async def _run(
+        self, conversation: Conversation, user_text: str, images: Sequence[Image] = ()
+    ) -> AsyncIterator[AgentEvent]:
         conversation.messages[:] = complete_unanswered_calls(conversation.messages)
-        conversation.messages.append(Message.user(user_text))
+        conversation.messages.append(Message.user(user_text, images))
         self._system = None  # memory and date may have changed since the last request
         specs = self.tools.specs() if self.provider.supports_tools else []
         model: str | None = None

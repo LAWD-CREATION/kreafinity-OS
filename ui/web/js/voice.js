@@ -12,8 +12,9 @@ export class Voice {
    * `button`: the microphone button. `onText(text)`: what was said, to send.
    * `onState()`: called when listening/speaking starts or stops.
    */
-  constructor(api, { button, onText, toast, openSettings }) {
+  constructor(api, { button, onText, toast, openSettings, onUpdate }) {
     this.api = api;
+    this.onUpdate = onUpdate;
     this.button = button;
     this.onText = onText;
     this.toast = toast;
@@ -35,6 +36,7 @@ export class Voice {
   update(info) {
     this.info = info;
     this.button.hidden = !info || info.input === "off" || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder;
+    this.onUpdate?.(info, !this.button.hidden);
   }
 
   /** Whether answers should be read aloud (`spoken`: the question was said aloud). */

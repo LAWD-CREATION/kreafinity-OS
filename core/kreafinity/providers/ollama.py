@@ -210,6 +210,8 @@ def _to_ollama_message(message: Message) -> dict[str, Any]:
             result["tool_name"] = message.name
         return result
     result = {"role": message.role, "content": message.content}
+    if message.images and message.role == "user":  # files the user attached
+        result["images"] = [image.data for image in message.images]
     if message.tool_calls:
         result["tool_calls"] = [
             {"function": {"name": call.name, "arguments": call.arguments}}

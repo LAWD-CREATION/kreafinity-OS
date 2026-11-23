@@ -87,6 +87,7 @@ class ConversationUpdate(BaseModel):
 class NewMessage(BaseModel):
     content: str = Field(min_length=1, max_length=100_000)
     provider: str | None = Field(None, min_length=1, max_length=200)
+    attachments: list[str] = Field(default_factory=list, max_length=10)
 
 
 class MemoryText(BaseModel):
@@ -257,7 +258,30 @@ def create_app(
     async def send_message(
         service: Service, conversation_id: str, body: NewMessage
     ) -> dict[str, Any]:
-        return await service.send_message(conversation_id, body.content, provider=body.provider)
+        return await service.send_message(
+            conversation_id, body.content, provider=body.provider, attachments=body.attachments
+        )
+
+    @api.post("/uploads", status_code=status.HTTP_201_CREATED)
+    async def upload(service: Service, request: Request) -> dict[str, Any]:
+        """A file sent as the request body (its name in the X-Filename header, URL-encoded)."""
+        from urllib.parse import unquote
+
+        from kreafinity import attachments
+
+        data = bytearray()
+        async for chunk in request.stream():
+            data += chunk
+            if len(data) > attachments.MAX_SIZE:
+                raise ServiceError("File too large (25 MB at most)", code="invalid")
+        name = unquote(request.headers.get("x-filename", "fichier"))
+        try:
+            saved = await asyncio.to_thread(
+                attachments.save, name, request.headers.get("content-type", ""), bytes(data)
+            )
+        except attachments.AttachmentError as exc:
+            raise ServiceError(str(exc), code="invalid") from exc
+        return saved.to_dict()
 
     @api.post("/conversations/{conversation_id}/cancel")
     async def cancel(service: Service, conversation_id: str) -> dict[str, str]:
@@ -557,7 +581,9 @@ class _SecurityHeaders:
         websockets = " ".join(f"ws://{host}:{port}" for host in allowed_hosts)
         self.headers = {
             "Content-Security-Policy": (
-                "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+                "default-src 'none'; script-src 'self'; style-src 'self'; "
+                # Thumbnails of the files about to be sent: blob: addresses of the page.
+                "img-src 'self' data: blob:; "
                 f"font-src 'self'; connect-src 'self' {websockets}; manifest-src 'self'; "
                 # Answers read aloud: audio the page itself received from the daemon.
                 "media-src blob:; "

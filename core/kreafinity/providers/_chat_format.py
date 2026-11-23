@@ -85,6 +85,13 @@ def to_chat_messages(
                     for call in message.tool_calls
                 ]
             result.append(entry)
+        elif message.images:  # files the user attached
+            parts: list[dict[str, Any]] = [{"type": "text", "text": message.content}]
+            parts += [
+                {"type": "image_url", "image_url": {"url": f"data:{i.media_type};base64,{i.data}"}}
+                for i in message.images
+            ]
+            result.append({"role": message.role, "content": parts})
         else:
             result.append({"role": message.role, "content": message.content})
     flush_images()
