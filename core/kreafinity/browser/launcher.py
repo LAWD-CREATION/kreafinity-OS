@@ -32,7 +32,7 @@ CHROMIUM = (
     "brave-browser",
     "microsoft-edge",
 )
-START_TIMEOUT = 30.0
+START_TIMEOUT = 60.0  # a first start (new profile) on a slow or busy computer
 
 # Firefox settings for the assistant's profile: no first-run pages, never
 # remember passwords. The remote agent's "recommended" automation settings are
