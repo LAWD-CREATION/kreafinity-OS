@@ -21,7 +21,7 @@ jobs:
     outputs:
       signed: ${{ steps.key.outputs.signed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # the version holds the commit date and hash
       - name: Signing key
@@ -49,7 +49,7 @@ jobs:
         env:
           KREAFINITY_APT_KEY: ${{ steps.key.outputs.fingerprint }}
         run: packaging/apt/build-repo.sh dist site
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: steps.key.outputs.signed == 'true'
         with:
           path: site
@@ -66,4 +66,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

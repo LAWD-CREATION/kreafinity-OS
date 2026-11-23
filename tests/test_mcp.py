@@ -351,6 +351,9 @@ def daemon(tmp_path: Path, home: Path) -> Iterator[httpx.Client]:
     from test_ui import free_port
 
     port = free_port()
+    config = tmp_path / "xdg-config" / "kreafinity"
+    config.mkdir(parents=True)
+    (config / "config.yaml").write_text("onboarded: true\n")  # no welcome dialog
     env = {
         **os.environ,
         "HOME": str(home),
@@ -446,8 +449,6 @@ def test_settings_section(daemon: httpx.Client) -> None:
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(str(daemon.base_url))
         page.wait_for_selector("#connection.online")
-        if page.locator("#welcome-dialog[open]").count():
-            page.click("#welcome-dialog >> text=Plus tard")
         page.click("#open-settings")
         section = page.wait_for_selector("[data-section=mcp]")
         page.wait_for_selector("[data-section=mcp] >> text=Aucune extension")

@@ -16,8 +16,8 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -46,7 +46,7 @@ jobs:
     # removed, and kept as a download of the run (Actions › this run › Artifacts).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # the version holds the commit date and hash
       - name: Install uv (downloads the package's own Python)
@@ -74,7 +74,7 @@ jobs:
           sudo apt-get purge -y -q kreafinity
           test ! -e /opt/kreafinity && test ! -e /usr/bin/kreafinity
           test ! -e /usr/share/plasma/plasmoids/org.kreafinity.assistant
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: kreafinity-deb
           path: dist/kreafinity_*.deb
