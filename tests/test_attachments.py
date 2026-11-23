@@ -226,7 +226,8 @@ def test_send_files_in_the_interface(daemon: tuple[str, Any], tmp_path: Path) ->
         page.fill("#prompt", "Que contient ce fichier ?")
         page.keyboard.press("Enter")
         page.wait_for_selector("text=Bien reçu, merci.")
-        assert page.locator("#attachments").is_hidden()
+        # Emptied once the daemon accepted the message (the answer may stream in first).
+        page.wait_for_selector("#attachments[hidden]", state="attached")
         bubble = page.locator(".message.user .bubble").last
         assert bubble.inner_text().startswith("Que contient ce fichier ?")
         assert page.locator(".message.user .message-attachments .attachment").all_inner_texts() == [
