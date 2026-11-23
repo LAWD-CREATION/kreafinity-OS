@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # the version holds the commit date and hash
       - name: Make room (the image needs about 15 GB)
@@ -34,7 +34,7 @@ jobs:
             apt-get install -y -q --no-install-recommends live-build mount ca-certificates xorriso \
               squashfs-tools dosfstools mtools grub-efi-amd64-bin grub-pc-bin syslinux-common isolinux
             packaging/iso/build-iso.sh dist/kreafinity_*.deb dist'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: kreafinity-os-iso
@@ -43,7 +43,7 @@ jobs:
             dist/kreafinity-os-*.iso.sha256
           retention-days: 14
           compression-level: 0  # already compressed
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: kreafinity-os-build-log
