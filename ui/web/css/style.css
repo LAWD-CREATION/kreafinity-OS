@@ -376,6 +376,21 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); }
 .settings-footer .version { flex: 1; color: var(--text-muted); font-size: 13px; }
 
+/* --- Attachments --------------------------------------------------------------------------- */
+
+.attachment-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 auto 8px; width: min(820px, 100%); }
+.attachment {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 260px; padding: 5px 6px 5px 8px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 13px;
+}
+.attachment img { width: 34px; height: 34px; object-fit: cover; border-radius: 7px; }
+.attachment .attachment-icon svg, .attachment.small svg { width: 16px; height: 16px; color: var(--kf-violet); }
+.attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.attachment-size { color: var(--text-muted); white-space: nowrap; }
+.message-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.attachment.small { padding: 3px 8px; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.chat.dragging .composer-box { border-color: var(--kf-violet); box-shadow: 0 0 0 3px color-mix(in srgb, var(--kf-violet) 35%, transparent); }
+
 /* --- Extensions (MCP) -------------------------------------------------------------------- */
 
 .mcp-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }

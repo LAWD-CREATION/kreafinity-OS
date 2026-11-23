@@ -69,6 +69,7 @@ from kreafinity.memory import (
 )
 from kreafinity.paths import data_dir
 from kreafinity.providers import (
+    Image,
     LLMProvider,
     Message,
     ProviderAuthError,
@@ -730,7 +731,11 @@ class AssistantService:
     # --- Requests ---------------------------------------------------------------------------
 
     async def send_message(
-        self, conversation_id: str, text: str, provider: str | None = None
+        self,
+        conversation_id: str,
+        text: str,
+        provider: str | None = None,
+        attachments: list[str] | None = None,
     ) -> Event:
         """Start processing a user message; progress is published as events.
 
@@ -747,6 +752,15 @@ class AssistantService:
             raise ServiceError("A request is already running in this conversation", code="busy")
         info = self._info(conversation_id)
         settings = self.settings()
+        images: list[Image] = []
+        if attachments:
+            from kreafinity import attachments as files
+
+            try:
+                prepared = await asyncio.to_thread(files.prepare, attachments, settings.language)
+            except files.AttachmentError as exc:
+                raise ServiceError(str(exc), code="invalid") from exc
+            text, images = text + prepared.text, prepared.images
         spec = (provider or info["provider"] or settings.provider).strip()
         llm, model = self._provider(settings, spec)
         if provider:
@@ -781,7 +795,7 @@ class AssistantService:
         if pending is not None:  # the conversation goes on: review it later
             pending.cancel()
         self._runs[conversation_id] = run
-        run.task = asyncio.create_task(self._process(run, agent, text))
+        run.task = asyncio.create_task(self._process(run, agent, text, images))
         return {"run_id": run.id, "provider": run.provider, "model": run.model}
 
     async def cancel_run(self, conversation_id: str) -> None:
@@ -792,7 +806,9 @@ class AssistantService:
         run.task.cancel()
         await asyncio.wait([run.task])
 
-    async def _process(self, run: Run, agent: Agent, text: str) -> None:
+    async def _process(
+        self, run: Run, agent: Agent, text: str, images: list[Image] | None = None
+    ) -> None:
         conversation_id = run.conversation_id
         base = {"conversation_id": conversation_id, "run_id": run.id}
         loaded = self.store.messages(conversation_id)
@@ -831,7 +847,7 @@ class AssistantService:
         )
         completed = False
         try:
-            async for event in agent.run(conversation, text):
+            async for event in agent.run(conversation, text, images or ()):
                 persist()
                 self.events.publish({**base, **_event_to_dict(event)})
             completed = True

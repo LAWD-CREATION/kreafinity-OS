@@ -347,5 +347,12 @@
   "mcp.warning": "Une extension est un programme qui s'exécute avec vos droits : n'ajoutez que des extensions de confiance.",
   "mcp.add": "Ajouter",
   "mcp.added": "Extension « {name} » ajoutée.",
-  "mcp.status.needs_secret": "Secret à renseigner"
+  "mcp.status.needs_secret": "Secret à renseigner",
+  "attach.add": "Joindre des fichiers",
+  "attach.remove": "Retirer {name}",
+  "attach.too_many": "{count} fichiers au plus par message.",
+  "attach.too_big": "{name} dépasse 25 Mo.",
+  "attach.default_text": "Voici des fichiers.",
+  "attach.kb": "{size} Ko",
+  "attach.mb": "{size} Mo"
 }

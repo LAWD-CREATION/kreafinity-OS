@@ -7,6 +7,7 @@ import { language, setLanguage, t, translatePage } from "./i18n.js";
 import { renderMarkdown } from "./markdown.js";
 import { SettingsDialog, applyTheme } from "./settings.js";
 import { Welcome } from "./welcome.js";
+import { Attachments, attachmentChips, splitAttachments } from "./attachments.js";
 import { UpdateBanner } from "./update.js";
 import { Voice } from "./voice.js";
 
@@ -45,6 +46,7 @@ const state = {
 let welcome;
 let settings;
 let onboarding;
+let files;
 let updates;
 let voice;
 // The conversation whose last question was said aloud (its answer is read aloud).
@@ -116,6 +118,10 @@ async function start() {
     onText: (text) => send(text, { spoken: true }),
   });
   voice.refresh();
+  files = new Attachments(api, {
+    list: $("attachments"), button: $("attach"), input: $("attach-input"),
+    dropZone: document.querySelector(".chat"), toast,
+  });
   onboarding = new Welcome({ api, toast, onDone: refreshProviders, onPrompt: (text) => send(text) });
   settings = new SettingsDialog({
     api, info: () => state.info, onSaved: settingsSaved, toast, updates,
@@ -160,6 +166,7 @@ function bindInterface() {
     }
   });
   $("prompt").addEventListener("input", autosize);
+  $("prompt").addEventListener("paste", (event) => files.paste(event));
   $("stop").addEventListener("click", stopRequest);
   $("compact-new").addEventListener("click", showNewConversation);
   $("expand").addEventListener("click", () => {
@@ -419,8 +426,9 @@ function renderConversation() {
   scrollToBottom(true);
 }
 
-function userMessage(text) {
-  return el("div", { class: "message user" }, el("div", { class: "bubble" }, text));
+function userMessage(content) {
+  const { text, names } = splitAttachments(content);
+  return el("div", { class: "message user" }, el("div", { class: "bubble" }, text, attachmentChips(names)));
 }
 
 function appendAssistant(container) {
@@ -546,7 +554,8 @@ function updateComposer() {
 }
 
 async function send(rawText, { spoken = false } = {}) {
-  const text = rawText.trim();
+  const withFiles = files?.count > 0;
+  const text = rawText.trim() || (withFiles ? t("attach.default_text") : "");
   if (!text || (state.current && state.running.has(state.current.id))) return;
   $("send").disabled = true;
   try {
@@ -558,6 +567,7 @@ async function send(rawText, { spoken = false } = {}) {
       $("messages").replaceChildren();
     }
     const body = { content: text };
+    if (withFiles) body.attachments = await files.upload();
     const spec = pickerSpec();
     if (spec && spec !== state.current.provider) body.provider = spec;
     else if (!spec && state.current.provider && state.current.provider !== state.config.provider) body.provider = state.config.provider;
@@ -565,8 +575,9 @@ async function send(rawText, { spoken = false } = {}) {
     autosize();
     spokenQuestion = spoken ? state.current.id : null;
     await api.post(`/api/conversations/${state.current.id}/messages`, body);
+    if (withFiles) files.clear();
   } catch (error) {
-    $("prompt").value = text;
+    $("prompt").value = rawText.trim();
     autosize();
     toast(errorMessage(error), "error");
   } finally {

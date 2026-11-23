@@ -38,6 +38,7 @@ dependencies = [
     "keyring>=25",
     "dbus-fast>=5.0",  # screen brightness via systemd-logind (D-Bus)
     "Pillow>=10",  # screenshots made small enough for the AI
+    "pypdf>=4",  # the text of PDF files sent in the conversation
 ]
 
 [project.optional-dependencies]

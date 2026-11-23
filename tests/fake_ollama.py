@@ -26,8 +26,16 @@ class FakeOllama:
                 self.end_headers()
                 self.wfile.write(body)
 
-            def do_POST(self) -> None:  # /api/chat
+            def do_POST(self) -> None:  # /api/chat (and /api/show: what the model can do)
                 request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if self.path == "/api/show":
+                    body = json.dumps({"capabilities": ["completion", "tools", "vision"]}).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
                 fake.requests.append(request)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/x-ndjson")

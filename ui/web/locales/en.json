@@ -347,5 +347,12 @@
   "mcp.warning": "An extension is a program running with your rights: only add extensions you trust.",
   "mcp.add": "Add",
   "mcp.added": "Extension “{name}” added.",
-  "mcp.status.needs_secret": "Secret needed"
+  "mcp.status.needs_secret": "Secret needed",
+  "attach.add": "Attach files",
+  "attach.remove": "Remove {name}",
+  "attach.too_many": "{count} files at most per message.",
+  "attach.too_big": "{name} is larger than 25 MB.",
+  "attach.default_text": "Here are some files.",
+  "attach.kb": "{size} KB",
+  "attach.mb": "{size} MB"
 }
