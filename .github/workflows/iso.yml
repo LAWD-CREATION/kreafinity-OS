@@ -28,7 +28,7 @@ jobs:
           APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
         run: |
           # With the APT key, the installed system gets updates from the repository.
-          if [ -n "$APT_SIGNING_KEY" ]; then packaging/apt/public-key-from-secret.sh; fi
+          if [ -n "$APT_SIGNING_KEY" ]; then packaging/apt/export-public-key.sh; fi
           pip install uv
           packaging/debian/build-deb.sh dist
       - name: Image (live-build, in Debian 13)

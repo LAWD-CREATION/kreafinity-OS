@@ -109,7 +109,7 @@ jamais être dans le code ni envoyée à quelqu'un. Sur votre ordinateur, depuis
    `~/kreafinity-apt-signing-key.asc`.
 2. Facultatif : validez et poussez la clé publique
    (`git add packaging/apt/kreafinity-archive-keyring.asc`). Sinon, la CI la tire elle-même du
-   secret (`packaging/apt/public-key-from-secret.sh`) pour le paquet et l'ISO ; si elle est
+   secret (`packaging/apt/export-public-key.sh`) pour le paquet et l'ISO ; si elle est
    poussée, la CI vérifie que c'est bien la même clé que le secret.
 3. Sur GitHub : **Settings › Secrets and variables › Actions › New repository secret**, nom
    `APT_SIGNING_KEY`, valeur : tout le contenu de `~/kreafinity-apt-signing-key.asc`.
