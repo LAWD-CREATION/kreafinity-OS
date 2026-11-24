@@ -223,7 +223,7 @@ def test_package_configures_the_repository() -> None:
     # Never over a repository already set up by hand.
     assert "[ ! -e /etc/apt/sources.list.d/kreafinity.sources ]" in postinst
     assert "rm -f /etc/apt/sources.list.d/kreafinity.sources" in (DEBIAN / "postrm").read_text()
-    for script in ("build-repo.sh", "new-signing-key.sh"):
+    for script in ("build-repo.sh", "new-signing-key.sh", "export-public-key.sh"):
         assert (APT / script).stat().st_mode & 0o111
     # The private key never belongs in the repository.
     assert not list(ROOT.glob("packaging/apt/*secret*")) and not list(
