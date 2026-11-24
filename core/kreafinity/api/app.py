@@ -104,6 +104,11 @@ class ShowRequest(BaseModel):
 
 class ApprovalDecision(BaseModel):
     approved: StrictBool
+    always: str | None = Field(default=None, max_length=2100)  # rule from always_options
+
+
+class PermissionRule(BaseModel):
+    rule: str = Field(min_length=1, max_length=2100)
 
 
 class DefaultProvider(BaseModel):
@@ -385,7 +390,15 @@ def create_app(
     async def resolve_approval(
         service: Service, approval_id: str, body: ApprovalDecision
     ) -> dict[str, Any]:
-        return service.resolve_approval(approval_id, body.approved)
+        return service.resolve_approval(approval_id, body.approved, always=body.always)
+
+    @api.get("/permissions")
+    async def list_permissions(service: Service) -> list[dict[str, Any]]:
+        return service.always_allowed()
+
+    @api.post("/permissions/remove")
+    async def remove_permission(service: Service, body: PermissionRule) -> list[dict[str, Any]]:
+        return service.forbid_again(body.rule)
 
     # --- Providers, keys, tools and settings ----------------------------------------------
 

@@ -9,6 +9,7 @@ Example::
     port: 27494                    # port of the local daemon (127.0.0.1 only)
     allowed_paths: ["~"]           # folders the tools may access
     tools: null                    # enabled tools (null = all)
+    always_allow: []               # actions run without asking (« Toujours autoriser »)
     check_updates: true            # look for a new version once a day (GitHub)
     memory: true                   # remember things across conversations
     memory_review: true            # after a conversation, learn from it (one more AI call)
@@ -63,6 +64,7 @@ class Settings:
     port: int = 27494
     allowed_paths: list[str] = field(default_factory=lambda: ["~"])
     tools: list[str] | None = None
+    always_allow: list[str] = field(default_factory=list)
     check_updates: bool = True
     memory: bool = True
     memory_review: bool = True
@@ -143,6 +145,17 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
             isinstance(value, list) and all(isinstance(v, str) for v in value)
         ):
             raise ConfigError(f"{path}: {key!r} must be a list of strings")
+    if "always_allow" in values:
+        from kreafinity.permissions import is_valid
+
+        rules = values["always_allow"] or []
+        if not isinstance(rules, list) or not all(
+            isinstance(rule, str) and is_valid(rule) for rule in rules
+        ):
+            raise ConfigError(
+                f"{path}: 'always_allow' must list tool names, or 'run_command' and one command"
+            )
+        values["always_allow"] = rules
 
     providers = values.get("providers") or {}
     if not isinstance(providers, dict) or not all(isinstance(v, dict) for v in providers.values()):

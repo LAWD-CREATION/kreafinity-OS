@@ -477,9 +477,13 @@ function statusOfResult(message) {
   return "error";
 }
 
-function toolChip(callId, name, description) {
+function toolLabel(name) {
   const key = `tool.${name}`;
-  const label = t(key) === key ? name : t(key);
+  return t(key) === key ? name : t(key);
+}
+
+function toolChip(callId, name, description) {
+  const label = toolLabel(name);
   return el(
     "details",
     { class: "tool running", dataset: { callId } },
@@ -530,17 +534,31 @@ function approvalCard(approval) {
     });
     card.append(el("label", { class: "approval-confirm", for: id }, checkbox, t("approval.confirm_check")));
   }
-  const actions = el("div", { class: "approval-actions" }, allow, deny);
+  // « Toujours autoriser »: this exact command, or every call of this tool.
+  const always = (approval.always_options ?? []).map((option) => {
+    const button = el("button", { class: "button ghost small always", type: "button", dataset: { rule: option.rule } },
+      option.scope === "command" ? t("approval.always_command") : t("approval.always_tool", { tool: toolLabel(approval.tool) }));
+    if (danger) button.disabled = true;
+    button.addEventListener("click", () => decide(approval, true, card, option.rule));
+    return button;
+  });
+  if (danger) {
+    card.querySelector(".approval-confirm input").addEventListener("change", (event) => {
+      for (const button of always) button.disabled = !event.target.checked;
+    });
+  }
+  const actions = el("div", { class: "approval-actions" }, allow, deny, always.length ? el("div", { class: "approval-always" }, always) : null);
   card.append(actions, el("p", { class: "approval-state", hidden: true }));
   allow.addEventListener("click", () => decide(approval, true, card));
   deny.addEventListener("click", () => decide(approval, false, card));
   return card;
 }
 
-async function decide(approval, approved, card) {
+async function decide(approval, approved, card, always = null) {
   for (const button of card.querySelectorAll("button, input")) button.disabled = true;
   try {
-    await api.post(`/api/approvals/${approval.approval_id}`, { approved });
+    await api.post(`/api/approvals/${approval.approval_id}`, always ? { approved, always } : { approved });
+    if (always) toast(t("approval.always_saved"));
   } catch (error) {
     if (error.status === 404) {
       settleApprovalCard(card, { approved: false, reason: "timeout" });

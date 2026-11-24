@@ -51,6 +51,10 @@ def scenario(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return words(XSS_TEXT)
     if "lentement" in request:
         return SlowWords(words(SLOW_ANSWER))
+    if "Dis bonjour" in request:
+        if not results:
+            return [tool_call("run_command", command="echo bonjour")]
+        return words("Commande lancée.")
     if "plus gros fichiers" not in request:
         return words("Bonjour ! Je suis **Kreafinity**, votre assistant.")
     if not results:
@@ -183,6 +187,38 @@ def test_denial_in_the_browser(page: Any, downloads: Path) -> None:
     page.wait_for_selector("text=Action refusée.")
     page.wait_for_selector("text=D'accord, je n'ai rien mis à la corbeille.")
     assert all((downloads / f"fichier{i}.bin").exists() for i in range(1, 8))
+
+
+def test_always_allow_in_the_browser(page: Any, tmp_path: Path) -> None:
+    """« Toujours autoriser cette commande », then no more card; removed in the settings."""
+
+    def ask() -> None:
+        page.fill("#prompt", "Dis bonjour")
+        page.press("#prompt", "Enter")
+
+    ask()
+    page.wait_for_selector(".approval.danger")
+    always = page.locator(".approval.danger >> text=Toujours autoriser cette commande")
+    assert always.is_disabled()  # the same explicit confirmation first
+    assert page.locator(".approval.danger >> text=Toujours autoriser « Commande système »").count()
+    page.check(".approval-confirm input")
+    always.click()
+    page.wait_for_selector(".message.assistant >> text=Commande lancée.")
+    config_file = tmp_path / "xdg-config" / "kreafinity" / "config.yaml"
+    assert "run_command echo bonjour" in config_file.read_text()
+
+    page.click("#new-conversation")
+    ask()
+    page.wait_for_selector(".message.assistant >> text=Commande lancée.")
+    assert page.locator(".approval").count() == 0  # done without asking
+    assert page.locator(".tool.ok").count() == 1  # and still shown
+
+    page.click("#open-settings")
+    row = page.wait_for_selector("[data-section=permissions] .permission")
+    assert "Cette commande exacte" in row.inner_text() and "echo bonjour" in row.inner_text()
+    page.click("[data-section=permissions] .permission >> text=Retirer")
+    page.wait_for_selector("[data-section=permissions] >> text=Aucune pour l'instant")
+    assert "echo bonjour" not in config_file.read_text()
 
 
 def test_ai_text_is_never_html(page: Any) -> None:

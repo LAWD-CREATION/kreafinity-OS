@@ -15,6 +15,7 @@ import unicodedata
 import webbrowser
 from dataclasses import asdict
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -26,7 +27,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from kreafinity import __version__
+from kreafinity import __version__, permissions
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -1059,6 +1060,7 @@ def _build_agent(settings: Settings, provider_spec: str | None) -> Agent:
         model=model,
         language=settings.language,
         max_iterations=settings.max_iterations,
+        always_allowed=partial(permissions.allows, tuple(settings.always_allow)),
         action_log=ActionLog(),
         fallback=fallback,
         memory=MemoryStore() if settings.memory else None,

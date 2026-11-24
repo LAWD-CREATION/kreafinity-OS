@@ -186,6 +186,7 @@ class Agent:
         language: str = "fr",
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         approver: Approver | None = None,
+        always_allowed: Callable[[str, dict[str, Any]], bool] | None = None,
         action_log: ActionLog | None = None,
         fallback: tuple[LLMProvider, str | None] | None = None,
         memory: MemoryStore | None = None,
@@ -203,6 +204,8 @@ class Agent:
             max_iterations: Maximum LLM calls per request.
             approver: Asked before every `confirm`/`danger` tool call. Without
                 one, those calls are always refused.
+            always_allowed: Tells whether the user allowed a call for good
+                (« Toujours autoriser »): it then runs without asking.
             action_log: Where tool calls are recorded (none: not recorded).
             fallback: Provider and model to switch to when the current
                 provider cannot be reached (e.g. a local Ollama model when
@@ -223,6 +226,7 @@ class Agent:
         self.language = language
         self.max_iterations = max_iterations
         self.approver = approver
+        self.always_allowed = always_allowed
         self.action_log = action_log
         self.fallback = fallback
         self.memory = memory
@@ -413,7 +417,11 @@ class Agent:
             status, result = "error", ToolResult(f"Unknown tool: {call.name}", is_error=True)
         elif (problem := _validation_error(tool, call.arguments)) is not None:
             status, result = "error", ToolResult(f"Invalid arguments: {problem}", is_error=True)
-        elif tool.risk is RiskLevel.SAFE or tool.pre_approved(call.arguments):
+        elif (
+            tool.risk is RiskLevel.SAFE
+            or tool.pre_approved(call.arguments)
+            or self._allowed_for_good(tool, call)
+        ):
             status, result = await self._execute(tool, call)
         else:
             status, result = await self._run_with_approval(tool, call)
@@ -431,6 +439,15 @@ class Agent:
             )
         )
         yield ToolCallFinished(call=call, status=status, result=result)
+
+    def _allowed_for_good(self, tool: Tool, call: ToolCall) -> bool:
+        if self.always_allowed is None:
+            return False
+        try:
+            return self.always_allowed(tool.name, call.arguments)
+        except Exception:
+            logger.exception("Checking the always-allowed actions failed; asking instead")
+            return False
 
     async def _run_with_approval(
         self, tool: Tool, call: ToolCall

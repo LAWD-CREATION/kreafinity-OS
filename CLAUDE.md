@@ -50,7 +50,7 @@ Chaque outil déclare un **niveau de risque** :
 | `danger` | Validation explicite + affichage clair de la commande exacte | supprimer des fichiers, exécuter une commande shell, installer un paquet |
 
 Règles impératives :
-- **Aucune** action `confirm`/`danger` sans validation de l'utilisateur, quel que soit le fournisseur.
+- **Aucune** action `confirm`/`danger` sans validation de l'utilisateur, quel que soit le fournisseur — sauf celles que l'utilisateur a lui-même autorisées pour de bon depuis une carte de validation (« Toujours autoriser » : un outil, ou une commande exacte ; liste et retrait dans les réglages). L'IA ne peut jamais s'accorder ces autorisations elle-même.
 - Suppression = envoi à la corbeille (spécification freedesktop Trash), jamais `rm` direct.
 - Jamais de `sudo` automatique ; les actions root passent par `pkexec`/polkit, donc par une demande système visible.
 - Accès fichiers limité au dossier personnel de l'utilisateur par défaut (liste blanche configurable).

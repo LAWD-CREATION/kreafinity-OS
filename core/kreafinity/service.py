@@ -27,7 +27,7 @@ from typing import Any, Literal
 
 import httpx
 
-from kreafinity import __version__, onboarding, update
+from kreafinity import __version__, onboarding, permissions, update
 from kreafinity.agent import (
     ActionLog,
     Agent,
@@ -266,6 +266,7 @@ class PendingApproval:
             "summary": self.request.summary,
             "details": list(self.request.details),
             "arguments": self.request.call.arguments,
+            "always_options": permissions.options(self.request.tool, self.request.call.arguments),
             "created_at": self.created_at,
         }
 
@@ -786,6 +787,7 @@ class AssistantService:
             language=settings.language,
             max_iterations=settings.max_iterations,
             approver=partial(self._ask_approval, run),
+            always_allowed=self._always_allowed,
             action_log=self._action_log,
             fallback=fallback,
             memory=MemoryStore() if settings.memory else None,
@@ -1055,15 +1057,50 @@ class AssistantService:
             self._approvals.pop(approval.id, None)
         return approved is True
 
+    def _always_allowed(self, tool: str, arguments: dict[str, Any]) -> bool:
+        return permissions.allows(self.settings().always_allow, tool, arguments)
+
+    def always_allowed(self) -> list[Event]:
+        """Actions the user allowed for good, as shown in the settings."""
+        return [permissions.describe(rule) for rule in self.settings().always_allow]
+
+    def allow_for_good(self, rule: str) -> list[Event]:
+        """Run such actions without asking from now on."""
+        rules = self.settings().always_allow
+        if rule not in rules:
+            self.update_config({"always_allow": [*rules, rule]})
+        logger.info("Always allowed: %s", rule)
+        return self.always_allowed()
+
+    def forbid_again(self, rule: str) -> list[Event]:
+        """Ask again before such actions."""
+        rules = self.settings().always_allow
+        if rule not in rules:
+            raise ServiceError("No such rule", code="not_found")
+        self.update_config({"always_allow": [r for r in rules if r != rule]})
+        return self.always_allowed()
+
     def pending_approvals(self) -> list[Event]:
         """Actions waiting for the user's decision."""
         return [a.to_dict() for a in self._approvals.values() if not a.future.done()]
 
-    def resolve_approval(self, approval_id: str, approved: bool) -> Event:
-        """Record the user's decision about a pending action."""
+    def resolve_approval(
+        self, approval_id: str, approved: bool, *, always: str | None = None
+    ) -> Event:
+        """Record the user's decision about a pending action.
+
+        Args:
+            always: With an approval, one of the approval's ``always_options``
+                rules: such actions then run without asking (« Toujours autoriser »).
+        """
         approval = self._approvals.get(approval_id)
         if approval is None or approval.future.done():
             raise ServiceError("No pending approval with this id", code="not_found")
+        if always is not None:
+            offered = {o["rule"] for o in approval.to_dict()["always_options"]}
+            if approved is not True or always not in offered:
+                raise ServiceError("This rule was not offered for this action", code="invalid")
+            self.allow_for_good(always)
         approval.future.set_result(approved is True)
         event = {
             "type": "approval_resolved",

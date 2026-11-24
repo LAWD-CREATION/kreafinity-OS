@@ -301,6 +301,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .approval-confirm { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
 .approval-confirm input { width: 18px; height: 18px; accent-color: var(--danger); }
 .approval-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.approval-always { display: flex; gap: 8px; flex-wrap: wrap; flex-basis: 100%; }
+.approval-always .button { font-size: 13px; }
 .approval-state { margin: 0; font-weight: 600; }
 .approval.approved { border-color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--surface)); }
 .approval.approved .approval-state { color: var(--success); }
@@ -367,6 +369,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--kf-violet); }
 .tool-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 6px 0; }
 .tool-row input { width: 18px; height: 18px; accent-color: var(--kf-violet); }
 .tool-row .tool-name { font-weight: 600; font-size: 14px; }
+.permission-list { list-style: none; margin: 0; padding: 0; }
+.permission { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 6px 0; }
+.permission > div { min-width: 0; }
+.permission .tool-name { font-weight: 600; font-size: 14px; }
+.permission code { display: block; font-size: 12.5px; overflow-wrap: anywhere; }
 .risk { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
 .risk.safe { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
 .risk.confirm { color: var(--kf-violet); background: color-mix(in srgb, var(--kf-violet) 16%, transparent); }
