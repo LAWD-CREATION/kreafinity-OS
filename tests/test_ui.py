@@ -214,6 +214,7 @@ def test_always_allow_in_the_browser(page: Any, tmp_path: Path) -> None:
     assert page.locator(".tool.ok").count() == 1  # and still shown
 
     page.click("#open-settings")
+    page.click("#settings-tab-security")
     row = page.wait_for_selector("[data-section=permissions] .permission")
     assert "Cette commande exacte" in row.inner_text() and "echo bonjour" in row.inner_text()
     page.click("[data-section=permissions] .permission >> text=Retirer")
@@ -246,6 +247,13 @@ def test_history_and_settings(page: Any, daemon: str, tmp_path: Path) -> None:
 
     page.click("#open-settings")
     page.wait_for_selector("#settings[open]")
+    # Tabs: one part of the settings at a time, the first one when opened.
+    assert page.get_attribute("#settings-tab-ai", "aria-selected") == "true"
+    assert page.is_visible("#settings-provider") and not page.is_visible("#settings-language")
+    page.focus("#settings-tab-ai")
+    page.keyboard.press("End")  # arrows, Home and End move between tabs
+    assert page.get_attribute("#settings-tab-general", "aria-selected") == "true"
+    assert page.is_visible("#settings-language") and not page.is_visible("#settings-provider")
     page.select_option("#settings-language", "en")
     page.click("#settings button[type=submit]")
     page.wait_for_selector("#new-conversation >> text=New conversation")
@@ -420,6 +428,7 @@ def test_update_banner(browser: Any, daemon: str, tmp_path: Path) -> None:
 
         # Settings: installed version and « Rechercher maintenant ».
         page.click("#open-settings")
+        page.click("#settings-tab-general")
         page.wait_for_selector("text=Version installée : aaaaaaa (branche main)")
         page.click("#settings-update-check")
         page.wait_for_selector("text=Une mise à jour est disponible.")
@@ -442,6 +451,7 @@ def test_soul_in_the_settings(page: Any, tmp_path: Path) -> None:
     soul_file = tmp_path / "xdg-data" / "kreafinity" / "memory" / "soul.md"
     page.click("#open-settings")
     page.wait_for_selector("#settings[open]")
+    page.click("#settings-tab-memory")
     page.wait_for_selector("#settings-soul")
     assert page.input_value("#settings-soul").startswith("Je suis Kreafinity")
     assert page.is_visible("#settings-soul-seed") and not page.is_visible("#settings-soul-reset")
@@ -456,7 +466,7 @@ def test_soul_in_the_settings(page: Any, tmp_path: Path) -> None:
     config = (tmp_path / "xdg-config" / "kreafinity" / "config.yaml").read_text()
     assert "soul_evolution: false" in config
 
-    page.click("#open-settings")
+    page.click("#open-settings")  # back on the tab seen last
     page.wait_for_selector("#settings-soul-reset:visible")
     assert not page.is_visible("#settings-soul-seed")
     page.once("dialog", lambda dialog: dialog.accept())

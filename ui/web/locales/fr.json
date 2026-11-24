@@ -375,5 +375,12 @@
   "settings.permissions.command": "Cette commande exacte",
   "settings.permissions.every": "Toujours : {tool}",
   "settings.permissions.remove": "Retirer",
-  "settings.permissions.remove_label": "Redemander avant : {what}"
+  "settings.permissions.remove_label": "Redemander avant : {what}",
+  "settings.tab.ai": "IA",
+  "settings.tab.tools": "Outils",
+  "settings.tab.extensions": "Extensions",
+  "settings.tab.memory": "Mémoire",
+  "settings.tab.voice": "Voix",
+  "settings.tab.general": "Général",
+  "settings.tab.security": "Autorisations"
 }

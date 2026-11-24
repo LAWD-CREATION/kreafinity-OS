@@ -8,6 +8,17 @@ import { McpSection } from "./mcp.js";
 const THEME_KEY = "kreafinity.theme";
 const RISK_ORDER = { safe: 0, confirm: 1, danger: 2 };
 
+/** The tabs of the dialog, and the sections each one shows. */
+const TABS = [
+  { id: "ai", icon: "sparkle", sections: ["ai", "keys"] },
+  { id: "tools", icon: "tool", sections: ["tools"] },
+  { id: "security", icon: "shield", sections: ["permissions", "folders"] },
+  { id: "extensions", icon: "puzzle", sections: ["mcp"] },
+  { id: "memory", icon: "book", sections: ["memory"] },
+  { id: "voice", icon: "mic", sections: ["voice"] },
+  { id: "general", icon: "sliders", sections: ["general"] },
+];
+
 /** Apply the theme preference ("system", "dark" or "light"). */
 export function applyTheme(preference) {
   let choice = preference;
@@ -66,8 +77,52 @@ export class SettingsDialog {
       this.toast(error.message, "error");
       return;
     }
+    const tab = section ? TABS.find((entry) => entry.sections.includes(section)) : null;
+    this.showTab(tab?.id ?? this.tab ?? TABS[0].id);
     this.dialog.showModal();
-    if (section) this.dialog.querySelector(`[data-section="${section}"]`)?.scrollIntoView();
+    if (section && tab?.sections[0] !== section) this.dialog.querySelector(`[data-section="${section}"]`)?.scrollIntoView();
+  }
+
+  /** Show one tab of the dialog. */
+  showTab(id, { focus = false } = {}) {
+    this.tab = id;
+    for (const button of this.dialog.querySelectorAll("[role=tab]")) {
+      const selected = button.dataset.tab === id;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      if (selected && focus) button.focus();
+    }
+    for (const panel of this.dialog.querySelectorAll("[role=tabpanel]")) panel.hidden = panel.dataset.tab !== id;
+    const body = this.dialog.querySelector(".settings-panels");
+    if (body) body.scrollTop = 0;
+  }
+
+  /** The tab list and its panels, from the dialog's sections. */
+  renderTabs(sections) {
+    const byName = new Map(sections.filter(Boolean).map((section) => [section.dataset.section, section]));
+    const tabs = el("div", { class: "settings-tabs", role: "tablist", "aria-label": t("settings.title"), "aria-orientation": "vertical" },
+      TABS.map((tab) => el("button", {
+        type: "button", role: "tab", id: `settings-tab-${tab.id}`, dataset: { tab: tab.id },
+        "aria-controls": `settings-panel-${tab.id}`, "aria-selected": "false", tabIndex: -1,
+        onclick: () => this.showTab(tab.id),
+      }, icon(tab.icon), el("span", {}, t(`settings.tab.${tab.id}`)))));
+    tabs.addEventListener("keydown", (event) => {
+      const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+      const index = TABS.findIndex((tab) => tab.id === this.tab);
+      let next = null;
+      if (step) next = (index + step + TABS.length) % TABS.length;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = TABS.length - 1;
+      if (next === null) return;
+      event.preventDefault();
+      this.showTab(TABS[next].id, { focus: true });
+    });
+    const panels = el("div", { class: "settings-panels" },
+      TABS.map((tab) => el("div", {
+        role: "tabpanel", id: `settings-panel-${tab.id}`, dataset: { tab: tab.id },
+        "aria-labelledby": `settings-tab-${tab.id}`, hidden: true,
+      }, tab.sections.map((name) => byName.get(name)).filter(Boolean))));
+    return [tabs, panels];
   }
 
   providerOptions(selected, { none } = {}) {
@@ -148,6 +203,7 @@ export class SettingsDialog {
       el(
         "div",
         { class: "settings-body" },
+        ...this.renderTabs([
         el(
           "section",
           { class: "settings-section", dataset: { section: "ai" } },
@@ -185,8 +241,9 @@ export class SettingsDialog {
           el("div", { class: "field-row two" }, el("label", { for: "settings-check-updates" }, t("settings.updates.auto")), el("div", {}, this.fields.checkUpdates)),
           this.renderUpdates(),
         ),
-        this.error,
+        ]),
       ),
+      this.error,
       el(
         "div",
         { class: "settings-footer" },
@@ -201,6 +258,11 @@ export class SettingsDialog {
         el("button", { class: "button primary", type: "submit" }, t("settings.save")),
       ),
     );
+    // A wrong value in a hidden tab: show that tab, so the browser can point at it.
+    form.addEventListener("invalid", (event) => {
+      const panel = event.target.closest("[role=tabpanel]");
+      if (panel?.hidden) this.showTab(panel.dataset.tab);
+    }, true);
     this.dialog.replaceChildren(form);
   }
 
