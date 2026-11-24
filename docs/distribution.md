@@ -107,7 +107,10 @@ jamais être dans le code ni envoyée à quelqu'un. Sur votre ordinateur, depuis
 1. `packaging/apt/new-signing-key.sh` : crée la clé, écrit la clé **publique** dans
    `packaging/apt/kreafinity-archive-keyring.asc` et la clé **privée** dans
    `~/kreafinity-apt-signing-key.asc`.
-2. Validez et poussez la clé publique (`git add packaging/apt/kreafinity-archive-keyring.asc`).
+2. Facultatif : validez et poussez la clé publique
+   (`git add packaging/apt/kreafinity-archive-keyring.asc`). Sinon, la CI la tire elle-même du
+   secret (`packaging/apt/public-key-from-secret.sh`) pour le paquet et l'ISO ; si elle est
+   poussée, la CI vérifie que c'est bien la même clé que le secret.
 3. Sur GitHub : **Settings › Secrets and variables › Actions › New repository secret**, nom
    `APT_SIGNING_KEY`, valeur : tout le contenu de `~/kreafinity-apt-signing-key.asc`.
 4. Sur GitHub : **Settings › Pages › Source : GitHub Actions**.
@@ -116,8 +119,8 @@ jamais être dans le code ni envoyée à quelqu'un. Sur votre ordinateur, depuis
    clé, et chaque ordinateur devrait réinstaller le paquet pour l'avoir.
 
 Tant que le secret n'existe pas, la CI construit le paquet mais ne publie rien (un avertissement
-le rappelle). Les paquets construits avant l'étape 2 n'ont pas la clé : ils ne recevront pas de
-mises à jour, il faudra les réinstaller une fois depuis le dépôt.
+le rappelle). Les paquets (et les ISO) construits avant le secret n'ont pas la clé : ils ne
+recevront pas de mises à jour, il faudra réinstaller le paquet une fois depuis le dépôt.
 
 ### Comment c'est fait
 
