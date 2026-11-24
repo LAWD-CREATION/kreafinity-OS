@@ -12,11 +12,23 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 public="$here/kreafinity-archive-keyring.asc"
 
+# The key as pasted in GitHub, without Windows line ends or indentation.
+key() { printf '%s\n' "$APT_SIGNING_KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'; }
+# What the secret holds, to explain a mistake: its armor header lines only, never the key.
+headers="$(key | grep -o -- '-----BEGIN [A-Z ]*-----' | sort -u | paste -sd ' ' || true)"
+expected="the whole content of ~/kreafinity-apt-signing-key.asc, from -----BEGIN PGP PRIVATE KEY BLOCK----- to -----END PGP PRIVATE KEY BLOCK-----"
+
 home="$(mktemp -d)"
 trap 'rm -rf "$home"' EXIT
-printf '%s\n' "$APT_SIGNING_KEY" | gpg --homedir "$home" --batch --quiet --import 2>/dev/null
+if ! key | gpg --homedir "$home" --batch --quiet --import; then
+  echo "::error::The APT_SIGNING_KEY secret is not a readable OpenPGP key (found: ${headers:-no -----BEGIN PGP …----- line}). It must hold $expected." >&2
+  exit 1
+fi
 fingerprint="$(gpg --homedir "$home" --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
-[ -n "$fingerprint" ] || { echo "APT_SIGNING_KEY holds no private key" >&2; exit 1; }
+if [ -z "$fingerprint" ]; then
+  echo "::error::The APT_SIGNING_KEY secret holds no private key (found: ${headers:-nothing}). It must hold $expected." >&2
+  exit 1
+fi
 
 if [ -f "$public" ]; then
   committed="$(gpg --homedir "$home" --show-keys --with-colons "$public" | awk -F: '/^fpr/ { print $10; exit }')"
