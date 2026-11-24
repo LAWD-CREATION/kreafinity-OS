@@ -129,7 +129,7 @@
   "settings.keys.saved": "Clé de {provider} enregistrée dans le trousseau.",
   "settings.keys.deleted": "Clé de {provider} supprimée.",
   "settings.tools.title": "Outils autorisés",
-  "settings.tools.text": "Ce que l'IA peut faire sur votre ordinateur. Les actions avec validation vous sont toujours demandées.",
+  "settings.tools.text": "Ce que l'IA peut faire sur votre ordinateur. Les actions avec validation vous sont demandées, sauf celles que vous avez autorisées pour de bon.",
   "settings.folders.title": "Dossiers accessibles",
   "settings.folders.text": "Un dossier par ligne (~ désigne votre dossier personnel). Les dossiers sensibles (.ssh, trousseaux…) restent toujours inaccessibles.",
   "settings.general.title": "Général",
@@ -365,5 +365,15 @@
   "live.mute": "Couper le micro",
   "live.unmute": "Rétablir le micro",
   "live.end": "Terminer",
-  "live.approval": "J'ai besoin de votre accord : regardez l'écran."
+  "live.approval": "J'ai besoin de votre accord : regardez l'écran.",
+  "approval.always_command": "Toujours autoriser cette commande",
+  "approval.always_tool": "Toujours autoriser « {tool} »",
+  "approval.always_saved": "C'est noté : ce sera fait sans vous demander. Modifiable dans Réglages › Autorisations permanentes.",
+  "settings.permissions.title": "Autorisations permanentes",
+  "settings.permissions.text": "Les actions que vous avez autorisées pour de bon (« Toujours autoriser ») : l'IA les fait sans vous demander. Elles restent notées dans le journal des actions, les suppressions vont à la corbeille et le système demande toujours votre mot de passe pour les actions administrateur. Attention : une page web ou un fichier lu par l'IA peut contenir des instructions cachées ; n'autorisez pour de bon que ce que vous accepteriez de voir faire sans vous.",
+  "settings.permissions.empty": "Aucune pour l'instant : toutes les actions avec validation vous sont demandées.",
+  "settings.permissions.command": "Cette commande exacte",
+  "settings.permissions.every": "Toujours : {tool}",
+  "settings.permissions.remove": "Retirer",
+  "settings.permissions.remove_label": "Redemander avant : {what}"
 }

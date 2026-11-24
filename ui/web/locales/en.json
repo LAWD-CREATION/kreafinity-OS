@@ -129,7 +129,7 @@
   "settings.keys.saved": "{provider} key saved in the keyring.",
   "settings.keys.deleted": "{provider} key deleted.",
   "settings.tools.title": "Allowed tools",
-  "settings.tools.text": "What the AI can do on your computer. Actions needing approval are always shown to you first.",
+  "settings.tools.text": "What the AI can do on your computer. Actions needing approval are shown to you first, except those you allowed for good.",
   "settings.folders.title": "Accessible folders",
   "settings.folders.text": "One folder per line (~ is your home folder). Sensitive folders (.ssh, keyrings…) always stay off-limits.",
   "settings.general.title": "General",
@@ -365,5 +365,15 @@
   "live.mute": "Mute",
   "live.unmute": "Unmute",
   "live.end": "End",
-  "live.approval": "I need your approval: look at the screen."
+  "live.approval": "I need your approval: look at the screen.",
+  "approval.always_command": "Always allow this command",
+  "approval.always_tool": "Always allow “{tool}”",
+  "approval.always_saved": "Noted: this will be done without asking. You can change it in Settings › Permanent permissions.",
+  "settings.permissions.title": "Permanent permissions",
+  "settings.permissions.text": "Actions you allowed for good (“Always allow”): the AI does them without asking. They are still recorded in the action log, deletions go to the trash, and the system still asks your password for administrator actions. Beware: a web page or file read by the AI may hide instructions; only allow for good what you would accept to see done without you.",
+  "settings.permissions.empty": "None yet: every action needing approval is shown to you first.",
+  "settings.permissions.command": "This exact command",
+  "settings.permissions.every": "Always: {tool}",
+  "settings.permissions.remove": "Remove",
+  "settings.permissions.remove_label": "Ask again before: {what}"
 }

@@ -3,9 +3,37 @@
 Chaque outil a un **niveau de risque**. Les outils `confirm` et `danger` ne s'exécutent
 qu'après votre accord, quel que soit le fournisseur d'IA. Pour un outil `danger`, la carte de
 validation montre l'action exacte (commande, paquets…) et demande une confirmation explicite.
+Sur chaque carte, **« Toujours autoriser »** permet de ne plus être sollicité : pour cet outil,
+ou, pour les commandes système, pour cette commande exacte (voir plus bas).
 Chaque outil peut être désactivé dans les **Réglages** (ou avec la clé `tools` de
 `~/.config/kreafinity/config.yaml`). Toutes les actions exécutées sont inscrites dans
 `~/.local/share/kreafinity/actions.log`.
+
+## Toujours autoriser
+
+Pour une action que vous faites souvent, la carte de validation propose aussi :
+
+- **« Toujours autoriser cette commande »** (commandes système) : cette commande exacte, et
+  seulement elle, ne vous sera plus demandée. Une commande sur plusieurs lignes ne peut pas être
+  autorisée ainsi ;
+- **« Toujours autoriser « l'outil » »** : toutes les actions de cet outil se font sans vous
+  demander (par exemple ouvrir une application, régler le volume… ou toutes les commandes
+  système).
+
+Pour une action sensible, il faut d'abord cocher « J'ai vérifié la liste et je confirme ».
+L'action autorisée s'affiche toujours dans la conversation et reste notée dans le journal des
+actions ; les garde-fous des outils restent en place (dossiers autorisés, corbeille au lieu de
+la suppression, mot de passe demandé par le système pour les actions administrateur).
+**Réglages › Autorisations permanentes** liste ce que vous avez autorisé et permet de le
+retirer (clé `always_allow` de `config.yaml`).
+
+À savoir : une page web, un fichier ou une extension lus par l'IA peuvent contenir des
+instructions cachées. Une action autorisée pour de bon serait alors faite sans que vous la
+validiez : n'autorisez ainsi que ce que vous accepteriez de voir faire sans vous.
+
+![« Toujours autoriser » sur une carte de validation](img/toujours-autoriser.jpg)
+
+## Les outils
 
 | Outil | Risque | Rôle |
 |---|---|---|

@@ -164,6 +164,7 @@ export class SettingsDialog {
           el("p", {}, t("settings.tools.text")),
           sortedTools.map((tool) => this.toolRow(tool)),
         ),
+        this.renderPermissions(config.always_allow ?? []),
         new McpSection({ api: this.api, toast: this.toast }).element(),
         this.renderMemory(),
         this.renderVoice(),
@@ -201,6 +202,43 @@ export class SettingsDialog {
       ),
     );
     this.dialog.replaceChildren(form);
+  }
+
+  /** Actions allowed for good from an approval card (« Toujours autoriser »). */
+  renderPermissions(rules) {
+    const list = el("ul", { class: "permission-list" });
+    const empty = el("p", { class: "hint" }, t("settings.permissions.empty"));
+    const show = (entries) => {
+      empty.hidden = entries.length > 0;
+      list.replaceChildren(...entries.map((entry) => {
+        const label = t(`tool.${entry.tool}`) === `tool.${entry.tool}` ? entry.tool : t(`tool.${entry.tool}`);
+        const remove = el("button", { class: "button small ghost", type: "button", "aria-label": t("settings.permissions.remove_label", { what: entry.command ?? label }) }, t("settings.permissions.remove"));
+        remove.addEventListener("click", async () => {
+          try {
+            show(await this.api.post("/api/permissions/remove", { rule: entry.rule }));
+          } catch (error) {
+            this.toast(error.message, "error");
+          }
+        });
+        return el("li", { class: "permission", dataset: { rule: entry.rule } },
+          el("div", {},
+            el("div", { class: "tool-name" }, entry.command ? t("settings.permissions.command") : t("settings.permissions.every", { tool: label })),
+            entry.command ? el("code", {}, entry.command) : null),
+          remove);
+      }));
+    };
+    show(rules.map((rule) => {
+      const [tool, ...rest] = rule.split(" ");
+      return rest.length ? { rule, tool, command: rest.join(" ") } : { rule, tool };
+    }));
+    return el(
+      "section",
+      { class: "settings-section", dataset: { section: "permissions" } },
+      el("h3", {}, t("settings.permissions.title")),
+      el("p", {}, t("settings.permissions.text")),
+      empty,
+      list,
+    );
   }
 
   toolRow(tool) {
