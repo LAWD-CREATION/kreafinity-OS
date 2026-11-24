@@ -450,6 +450,7 @@ def test_settings_section(daemon: httpx.Client) -> None:
         page.goto(str(daemon.base_url))
         page.wait_for_selector("#connection.online")
         page.click("#open-settings")
+        page.click("#settings-tab-extensions")
         section = page.wait_for_selector("[data-section=mcp]")
         page.wait_for_selector("[data-section=mcp] >> text=Aucune extension")
         page.click(".mcp-add summary")

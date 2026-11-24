@@ -375,5 +375,12 @@
   "settings.permissions.command": "This exact command",
   "settings.permissions.every": "Always: {tool}",
   "settings.permissions.remove": "Remove",
-  "settings.permissions.remove_label": "Ask again before: {what}"
+  "settings.permissions.remove_label": "Ask again before: {what}",
+  "settings.tab.ai": "AI",
+  "settings.tab.tools": "Tools",
+  "settings.tab.extensions": "Extensions",
+  "settings.tab.memory": "Memory",
+  "settings.tab.voice": "Voice",
+  "settings.tab.general": "General",
+  "settings.tab.security": "Permissions"
 }
