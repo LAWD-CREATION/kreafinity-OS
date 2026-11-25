@@ -20,13 +20,27 @@ expected="the whole content of ~/kreafinity-apt-signing-key.asc, from -----BEGIN
 
 home="$(mktemp -d)"
 trap 'rm -rf "$home"' EXIT
-if ! key | gpg --homedir "$home" --batch --quiet --import; then
-  echo "::error::The APT_SIGNING_KEY secret is not a readable OpenPGP key (found: ${headers:-no -----BEGIN PGP …----- line}). It must hold $expected." >&2
+# What kind of key it is, read without importing it: "sec" (private) or "pub" only.
+kinds="$(key | gpg --homedir "$home" --batch --show-keys --with-colons 2>/dev/null \
+  | awk -F: '$1 == "sec" || $1 == "pub" { print $1 }' | sort -u | paste -sd ' ' || true)"
+echo "APT_SIGNING_KEY: ${#APT_SIGNING_KEY} characters, $(key | wc -l) lines, key records: ${kinds:-none}" >&2
+if [[ " $kinds " != *" sec "* ]]; then
+  if [ -n "$kinds" ]; then
+    what="only a public key"
+  else
+    what="no OpenPGP key"
+  fi
+  echo "::error::The APT_SIGNING_KEY secret holds $what (found: ${headers:-no armor line}). It must hold $expected." >&2
+  exit 1
+fi
+# Import it (GnuPG's summary says what was imported; it never prints key material).
+if ! key | gpg --homedir "$home" --batch --import; then
+  echo "::error::GnuPG could not import the private key of APT_SIGNING_KEY (see its messages above)." >&2
   exit 1
 fi
 fingerprint="$(gpg --homedir "$home" --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
 if [ -z "$fingerprint" ]; then
-  echo "::error::The APT_SIGNING_KEY secret holds no private key (found: ${headers:-nothing}). It must hold $expected." >&2
+  echo "::error::GnuPG read a private key in APT_SIGNING_KEY but did not keep it (see its messages above)." >&2
   exit 1
 fi
 
