@@ -1,4 +1,4 @@
-"""Kreafinity installed from the Debian package: updates come from the system (APT)."""
+"""Kreafinity installed from the Debian package (its updates: see test_update)."""
 
 import json
 import shutil
@@ -32,22 +32,16 @@ def test_not_packaged_by_default() -> None:
     )
 
 
-async def test_updates_come_from_the_system(packaged: Path) -> None:
-    manager = update.UpdateManager(publish=lambda event: None, enabled=lambda: True)
-    info = manager.info()
-    assert info["managed"] == "deb" and info["supported"] is False
-    with pytest.raises(update.UpdateError, match="system's package manager") as error:
-        await manager.check()
-    assert error.value.code == "unsupported"
-    with pytest.raises(update.UpdateError, match="system's package manager"):
-        manager.start()
+def test_package_updates_from_github_releases(packaged: Path) -> None:
+    """The package follows the packages published on GitHub Releases (see test_update)."""
+    info = update.UpdateManager(publish=lambda event: None, enabled=lambda: True).info()
+    assert info["managed"] == "deb" and info["supported"] is True
+    assert info["current"]["commit"] == "abc1234"
 
 
 def test_commands(packaged: Path) -> None:
     runner = CliRunner()
     assert "paquet 0.2.0+git20261121.abc1234" in runner.invoke(cli.app, ["version"]).output
-    result = runner.invoke(cli.app, ["update"])
-    assert result.exit_code == 1 and "sudo apt update && sudo apt upgrade" in result.output
     # « uninstall » leaves the program to APT, and --purge still erases the user's data.
     data = Path(cli.data_dir())
     data.mkdir(parents=True, exist_ok=True)

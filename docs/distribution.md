@@ -61,9 +61,15 @@ WebKitGTK (la bulle), les outils du son. Le démon démarre à la prochaine ouve
 d'ici là, « Kreafinity » dans le menu le lance aussi. Sur KDE Plasma, chaque utilisateur peut
 ajouter le widget à sa barre et le raccourci Meta+C avec `kreafinity desktop install`.
 
-- **Mises à jour** : avec celles du système (`sudo apt upgrade`, ou la logithèque, une fois le
-  dépôt APT en place). Le bouton « Mettre à jour » de l'interface l'indique, au lieu de tenter
-  de modifier `/opt` lui-même.
+- **Mises à jour** : le bouton « Mettre à jour » de l'interface (ou `kreafinity update`).
+  Chaque modification de `main` publie le paquet dans les **Releases** de GitHub
+  (`packaging/release/publish.sh`, sans clé ni secret à configurer) ; Kreafinity y cherche
+  chaque jour la dernière version, la télécharge, vérifie son empreinte SHA-256 puis
+  l'installe avec `pkexec apt-get install` : le système demande le mot de passe, puis
+  Kreafinity redémarre. Les 10 dernières versions sont gardées. Une fois le dépôt APT signé en
+  place (plus bas), les mises à jour arrivent aussi avec celles du système (`apt upgrade`).
+  Les paquets construits avant le 26 novembre 2026 ne savent pas encore se mettre à jour
+  ainsi : il faut installer une fois à la main le dernier paquet des Releases.
 - **La voix** : `/opt` étant en lecture seule, ses moteurs s'installent dans le dossier de
   l'utilisateur (`~/.local/share/kreafinity/voice/site-packages`).
 - **Retirer** : `sudo apt remove kreafinity` (ou `purge`). Les données de chacun restent ; pour
