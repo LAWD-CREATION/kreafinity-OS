@@ -97,7 +97,7 @@
   "approval.elsewhere": "An action is waiting for your approval in another conversation.",
   "approval.show": "Show",
   "notice.fallback": "{unavailable} cannot be reached: continuing with {fallback}.",
-  "notice.iteration_limit": "Request stopped: the step limit was reached.",
+  "notice.iteration_limit": "Request stopped: the step limit was reached. To raise or remove it: Settings › General.",
   "notice.max_tokens": "Answer cut off: the length limit was reached.",
   "notice.refusal": "The model declined this request.",
   "notice.cancelled": "Request stopped.",
@@ -383,5 +383,6 @@
   "settings.tab.voice": "Voice",
   "settings.tab.general": "General",
   "settings.tab.security": "Permissions",
-  "attach.refused": "Not read (too large or unreadable): {names}"
+  "attach.refused": "Not read (too large or unreadable): {names}",
+  "settings.general.no_limit": "No limit"
 }

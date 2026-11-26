@@ -377,7 +377,16 @@ async def test_model_knows_which_ai_it_is(context: ToolContext) -> None:
 
 def test_invalid_iteration_limit(context: ToolContext) -> None:
     with pytest.raises(ValueError):
-        make_agent(ScriptedProvider(reply("ok")), context, max_iterations=0)
+        make_agent(ScriptedProvider(reply("ok")), context, max_iterations=-1)
+
+
+async def test_no_iteration_limit(context: ToolContext) -> None:
+    """0: as many steps as the task needs (the user can stop the request)."""
+    steps = [reply("", [call("system_info")]) for _ in range(30)]
+    provider = ScriptedProvider(*steps, reply("Fini."))
+    events = await run(make_agent(provider, context, max_iterations=0), Conversation(), "Long")
+    assert len(provider.requests) == 31
+    assert events[-1] == AgentDone(reason="completed", model="fake-model")
 
 
 # --- Fallback when the provider cannot be reached ----------------------------------------

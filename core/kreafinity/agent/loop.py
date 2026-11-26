@@ -201,7 +201,8 @@ class Agent:
             context: What the tools may access.
             model: Model to use; defaults to the provider's default model.
             language: Language of the system prompt and of the answers.
-            max_iterations: Maximum LLM calls per request.
+            max_iterations: Maximum LLM calls per request (0: no limit; the
+                user stops a request themselves).
             approver: Asked before every `confirm`/`danger` tool call. Without
                 one, those calls are always refused.
             always_allowed: Tells whether the user allowed a call for good
@@ -217,8 +218,8 @@ class Agent:
             soul: The assistant's personality (none: no particular one). It
                 may grow when the soul tool is available.
         """
-        if max_iterations < 1:
-            raise ValueError("max_iterations must be at least 1")
+        if max_iterations < 0:
+            raise ValueError("max_iterations must be 0 (no limit) or more")
         self.provider = provider
         self.model = model
         self.tools = tools
@@ -279,6 +280,9 @@ class Agent:
                     logger.exception("Ending the request for %s failed", tool.name)
 
     def _iteration_limit(self) -> int:
+        """LLM calls allowed for this request; 0 means no limit."""
+        if self.max_iterations == 0:
+            return 0
         extra = [limit for tool in self.tools if (limit := tool.iteration_limit())]
         return max([self.max_iterations, *extra])
 
@@ -326,7 +330,8 @@ class Agent:
                 )
                 return
 
-            if iteration >= self._iteration_limit():
+            limit = self._iteration_limit()
+            if limit and iteration >= limit:
                 async for tool_event in self._skip_calls(
                     conversation,
                     calls,
