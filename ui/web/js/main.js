@@ -22,6 +22,8 @@ const params = new URLSearchParams(location.search);
 const compact = params.has("compact");
 const initialConversation = params.get("conversation");
 const bubble = window.webkit?.messageHandlers?.kreafinity ?? null;
+/** The compact page inside the KDE taskbar's widget (not the desktop bubble). */
+const inPanel = compact && !bubble;
 
 function tellBubble(message) {
   try {
@@ -126,6 +128,8 @@ async function start() {
   files = new Attachments(api, {
     list: $("attachments"), button: $("attach"), input: $("attach-input"),
     dropZone: document.querySelector(".chat"), toast,
+    // The KDE panel cannot show a file dialog: the daemon shows the desktop's.
+    picker: inPanel ? () => api.post("/api/uploads/pick", {}) : null,
   });
   liveTalk = new LiveConversation(api, {
     panel: $("live"), toast,
@@ -192,7 +196,9 @@ function bindInterface() {
   $("compact-new").addEventListener("click", showNewConversation);
   $("expand").addEventListener("click", () => {
     if (bubble) tellBubble({ type: "expand" });
-    else window.open(`${location.origin}/`, "_blank", "noopener");
+    else if (inPanel) {
+      api.post("/api/ui/open-full", { conversation_id: state.current?.id ?? null }).catch((error) => toast(errorMessage(error), "error"));
+    } else window.open(`${location.origin}/`, "_blank", "noopener");
   });
   $("close-panel").hidden = !bubble;
   $("close-panel").addEventListener("click", () => tellBubble({ type: "close" }));

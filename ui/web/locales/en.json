@@ -382,5 +382,6 @@
   "settings.tab.memory": "Memory",
   "settings.tab.voice": "Voice",
   "settings.tab.general": "General",
-  "settings.tab.security": "Permissions"
+  "settings.tab.security": "Permissions",
+  "attach.refused": "Not read (too large or unreadable): {names}"
 }

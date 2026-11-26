@@ -109,6 +109,7 @@ ErrorCode = Literal[
     "keyring_unavailable",
     "update_unavailable",
     "voice_unavailable",
+    "desktop_unavailable",
 ]
 Event = dict[str, Any]
 
@@ -703,6 +704,10 @@ class AssistantService:
         self.events.publish(request)
         await self.ui_requests.push(request)
         return {"delivered": delivered}
+
+    async def show_panels(self) -> None:
+        """Ask the assistant panels to show themselves (no conversation change)."""
+        await self.ui_requests.push({"type": "show_conversation", "conversation_id": ""})
 
     async def wait_ui_requests(self, after: int | None, timeout: float) -> Event:
         """Requests to show a conversation, for a panel polling over HTTP."""

@@ -382,5 +382,6 @@
   "settings.tab.memory": "Mémoire",
   "settings.tab.voice": "Voix",
   "settings.tab.general": "Général",
-  "settings.tab.security": "Autorisations"
+  "settings.tab.security": "Autorisations",
+  "attach.refused": "Pas lu (trop gros ou illisible) : {names}"
 }

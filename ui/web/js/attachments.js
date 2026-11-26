@@ -29,13 +29,17 @@ function sizeLabel(bytes) {
 }
 
 export class Attachments {
-  constructor(api, { list, button, input, dropZone, toast, onChange }) {
+  /**
+   * @param picker In the KDE panel, which cannot show a file dialog: asks the
+   *   daemon to show the desktop's and returns the files it already kept.
+   */
+  constructor(api, { list, button, input, dropZone, toast, onChange, picker }) {
     this.api = api;
     this.list = list;
     this.toast = toast;
     this.onChange = onChange;
-    this.files = []; // { file, url }
-    button.addEventListener("click", () => input.click());
+    this.files = []; // { file, url } or, picked by the daemon, { remote: {id, name, size} }
+    button.addEventListener("click", () => (picker ? this.pick(picker, button) : input.click()));
     input.addEventListener("change", () => {
       this.add(input.files);
       input.value = "";
@@ -62,6 +66,27 @@ export class Attachments {
     if (!files.length) return;
     event.preventDefault();
     this.add(files);
+  }
+
+  /** Files chosen in the desktop's dialog (already kept by the daemon). */
+  async pick(picker, button) {
+    button.disabled = true;
+    try {
+      const { files, refused } = await picker();
+      for (const remote of files) {
+        if (this.files.length >= MAX_FILES) {
+          this.toast(t("attach.too_many", { count: MAX_FILES }), "warning");
+          break;
+        }
+        this.files.push({ remote, url: null });
+      }
+      if (refused?.length) this.toast(t("attach.refused", { names: refused.join(", ") }), "warning");
+      this.render();
+    } catch (error) {
+      this.toast(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
   }
 
   get count() {
@@ -98,15 +123,17 @@ export class Attachments {
 
   render() {
     this.list.replaceChildren(
-      ...this.files.map((entry) =>
-        el("div", { class: "attachment", title: entry.file.name },
+      ...this.files.map((entry) => {
+        const { name, size } = entry.file ?? entry.remote;
+        return el("div", { class: "attachment", title: name },
           entry.url ? el("img", { src: entry.url, alt: "" }) : el("span", { class: "attachment-icon" }, icon("paperclip")),
-          el("span", { class: "attachment-name" }, entry.file.name),
-          el("span", { class: "attachment-size" }, sizeLabel(entry.file.size)),
+          el("span", { class: "attachment-name" }, name),
+          el("span", { class: "attachment-size" }, sizeLabel(size)),
           el("button", {
-            class: "icon-button small", type: "button", "aria-label": t("attach.remove", { name: entry.file.name }),
+            class: "icon-button small", type: "button", "aria-label": t("attach.remove", { name }),
             onclick: () => this.remove(entry),
-          }, icon("close")))),
+          }, icon("close")));
+      }),
     );
     this.list.hidden = !this.files.length;
     this.onChange?.();
@@ -115,7 +142,11 @@ export class Attachments {
   /** Send the files to the daemon; their ids, for the message. */
   async upload() {
     const ids = [];
-    for (const { file } of this.files) {
+    for (const { file, remote } of this.files) {
+      if (remote) {
+        ids.push(remote.id);
+        continue;
+      }
       const headers = {
         "X-Kreafinity-Client": "web",
         "Content-Type": file.type || "application/octet-stream",
