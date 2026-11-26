@@ -297,9 +297,12 @@ def test_history_and_settings(page: Any, daemon: str, tmp_path: Path) -> None:
     assert page.get_attribute("#settings-tab-general", "aria-selected") == "true"
     assert page.is_visible("#settings-language") and not page.is_visible("#settings-provider")
     page.select_option("#settings-language", "en")
+    page.check("#settings-no-limit")  # « Sans limite »: no step limit
+    assert page.is_disabled("#settings-iterations")
     page.click("#settings button[type=submit]")
     page.wait_for_selector("#new-conversation >> text=New conversation")
-    assert "language: en" in (tmp_path / "xdg-config" / "kreafinity" / "config.yaml").read_text()
+    config = (tmp_path / "xdg-config" / "kreafinity" / "config.yaml").read_text()
+    assert "language: en" in config and "max_iterations: 0" in config
 
 
 def test_compact_panel_of_the_desktop_bubble(browser: Any, daemon: str, downloads: Path) -> None:

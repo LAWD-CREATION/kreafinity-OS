@@ -97,7 +97,7 @@
   "approval.elsewhere": "Une action attend votre validation dans une autre conversation.",
   "approval.show": "Voir",
   "notice.fallback": "{unavailable} est injoignable : je continue avec {fallback}.",
-  "notice.iteration_limit": "Demande interrompue : la limite d'étapes a été atteinte.",
+  "notice.iteration_limit": "Demande interrompue : la limite d'étapes a été atteinte. Pour l'augmenter ou la retirer : Réglages › Général.",
   "notice.max_tokens": "Réponse tronquée : la limite de longueur a été atteinte.",
   "notice.refusal": "Le modèle a refusé de traiter cette demande.",
   "notice.cancelled": "Demande arrêtée.",
@@ -383,5 +383,6 @@
   "settings.tab.voice": "Voix",
   "settings.tab.general": "Général",
   "settings.tab.security": "Autorisations",
-  "attach.refused": "Pas lu (trop gros ou illisible) : {names}"
+  "attach.refused": "Pas lu (trop gros ou illisible) : {names}",
+  "settings.general.no_limit": "Sans limite"
 }

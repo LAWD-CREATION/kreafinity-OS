@@ -149,7 +149,8 @@ export class SettingsDialog {
         el("option", { value: "fr", selected: config.language === "fr" }, "Français"),
         el("option", { value: "en", selected: config.language === "en" }, "English"),
       ),
-      iterations: el("input", { id: "settings-iterations", type: "number", min: 1, max: 50, value: config.max_iterations }),
+      iterations: el("input", { id: "settings-iterations", type: "number", min: 1, max: 200, value: config.max_iterations || 10, disabled: config.max_iterations === 0 }),
+      noLimit: el("input", { id: "settings-no-limit", type: "checkbox", checked: config.max_iterations === 0 }),
       theme: el(
         "select",
         { id: "settings-theme" },
@@ -186,6 +187,9 @@ export class SettingsDialog {
     this.fields.folders.value = config.allowed_paths.join("\n");
     this.toolBoxes = new Map();
     this.error = el("p", { class: "form-error", hidden: true });
+    this.fields.noLimit.addEventListener("change", () => {
+      this.fields.iterations.disabled = this.fields.noLimit.checked;
+    });
 
     const sortedTools = tools.filter((tool) => !tool.server).sort(
       (a, b) => RISK_ORDER[a.risk] - RISK_ORDER[b.risk] || a.name.localeCompare(b.name),
@@ -236,7 +240,9 @@ export class SettingsDialog {
           { class: "settings-section", dataset: { section: "general" } },
           el("h3", {}, t("settings.general.title")),
           el("div", { class: "field-row two" }, el("label", { for: "settings-language" }, t("settings.general.language")), this.fields.language),
-          el("div", { class: "field-row two" }, el("label", { for: "settings-iterations" }, t("settings.general.iterations")), this.fields.iterations),
+          el("div", { class: "field-row two" }, el("label", { for: "settings-iterations" }, t("settings.general.iterations")),
+            el("div", { class: "iterations" }, this.fields.iterations,
+              el("label", { class: "inline-check", for: "settings-no-limit" }, this.fields.noLimit, t("settings.general.no_limit")))),
           el("div", { class: "field-row two" }, el("label", { for: "settings-theme" }, t("settings.general.theme")), this.fields.theme),
           el("div", { class: "field-row two" }, el("label", { for: "settings-check-updates" }, t("settings.updates.auto")), el("div", {}, this.fields.checkUpdates)),
           this.renderUpdates(),
@@ -533,7 +539,7 @@ export class SettingsDialog {
     const folders = fields.folders.value.split("\n").map((line) => line.trim()).filter(Boolean);
     if (JSON.stringify(folders) !== JSON.stringify(this.config.allowed_paths)) changes.allowed_paths = folders;
     if (fields.language.value !== this.config.language) changes.language = fields.language.value;
-    const iterations = Number(fields.iterations.value);
+    const iterations = fields.noLimit.checked ? 0 : Number(fields.iterations.value);
     if (iterations !== this.config.max_iterations) changes.max_iterations = iterations;
     if (fields.checkUpdates.checked !== (this.config.check_updates !== false)) {
       changes.check_updates = fields.checkUpdates.checked;

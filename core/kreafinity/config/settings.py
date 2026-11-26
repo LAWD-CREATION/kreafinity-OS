@@ -5,7 +5,7 @@ Example::
     provider: ollama/llama3.1      # default provider and model
     fallback: ollama/llama3.1      # used when the provider cannot be reached (optional)
     language: fr                   # language of the assistant
-    max_iterations: 10             # LLM calls allowed per request
+    max_iterations: 10             # LLM calls allowed per request (0 = no limit)
     port: 27494                    # port of the local daemon (127.0.0.1 only)
     allowed_paths: ["~"]           # folders the tools may access
     tools: null                    # enabled tools (null = all)
@@ -122,8 +122,8 @@ def _from_mapping(data: dict[str, Any], path: Path) -> Settings:
         check("fallback", str, "a string such as 'ollama/llama3.1'")
     check("language", str, "a language code such as 'fr'")
     check("max_iterations", int, "an integer")
-    if values.get("max_iterations", 1) < 1:
-        raise ConfigError(f"{path}: 'max_iterations' must be at least 1")
+    if values.get("max_iterations", 1) < 0:
+        raise ConfigError(f"{path}: 'max_iterations' must be 0 (no limit) or more")
     check("port", int, "an integer")
     if not 1024 <= values.get("port", 27494) <= 65535:
         raise ConfigError(f"{path}: 'port' must be between 1024 and 65535")

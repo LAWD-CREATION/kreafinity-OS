@@ -55,7 +55,7 @@ future_option: true
     ("text", "message"),
     [
         ("max_iterations: beaucoup", "max_iterations"),
-        ("max_iterations: 0", "at least 1"),
+        ("max_iterations: -1", "0 \\(no limit\\) or more"),
         ("max_iterations: true", "max_iterations"),
         ("allowed_paths: ~", "allowed_paths"),
         ("providers: [ollama]", "providers"),
@@ -142,7 +142,7 @@ def test_save_setting_creates_file_and_validates() -> None:
     save_setting("fallback", "ollama/llama3.1")
     assert load_settings().fallback == "ollama/llama3.1"
     with pytest.raises(ConfigError):
-        save_setting("max_iterations", 0)
+        save_setting("max_iterations", -1)
     with pytest.raises(ConfigError):
         save_setting("no_such_setting", 1)
     assert load_settings().max_iterations == 10
