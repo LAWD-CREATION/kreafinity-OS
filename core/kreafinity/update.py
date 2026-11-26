@@ -4,9 +4,12 @@ The installer records what it installed in ``~/.local/share/kreafinity/install.j
 (repository, branch, exact commit). Checking asks GitHub's API what changed on
 that branch since; installing downloads the new commit into the same Python
 environment, refreshes the integration with the session and restarts
-Kreafinity. A development checkout has no record: it is updated with git, and
-an installation from a system package (Debian package) is updated with the
-system (APT), like any other software.
+Kreafinity. A development checkout has no record: it is updated with git.
+
+An installation from the Debian package (Kreafinity OS) follows the packages
+published on GitHub Releases by the CI: the newest release's package is
+downloaded, its SHA-256 checked, and installed with ``pkexec apt-get install``
+(the system asks for the user's password), then Kreafinity restarts.
 
 ``python -m kreafinity.update apply <commit>`` installs an update; the daemon
 starts it in its own process, so that it survives the daemon's restart.
@@ -41,8 +44,16 @@ CHECK_INTERVAL = timedelta(hours=24)
 MAX_CHANGES = 20
 _COMMIT = re.compile(r"[0-9a-f]{7,40}")
 _GITHUB = re.compile(r"https://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$")
-#: Written by the Debian package next to its Python: updates come from the system.
+#: Written by the Debian package next to its Python (format, version, repository).
 PACKAGE_MARKER = "kreafinity-package.json"
+#: Where a package without a repository in its marker looks for new versions.
+DEFAULT_REPOSITORY = "https://github.com/LAWD-CREATION/kreafinity-OS"
+#: The commit at the end of a package version (``0.1.0~dev0+git20261126.071424.6bb26d9``).
+_PACKAGE_COMMIT = re.compile(r"\.([0-9a-f]{7,40})$")
+#: The package in a release, and its checksum file.
+_DEB_ASSET = re.compile(r"kreafinity_([A-Za-z0-9.+~:-]+)_amd64\.deb")
+#: Seconds the package download may take.
+DOWNLOAD_TIMEOUT = 600
 
 
 class UpdateError(Exception):
@@ -92,6 +103,7 @@ class Installation:
         commit: Exact commit installed, if known.
         installed_at: When it was installed (ISO 8601), if known.
         api: Address of the repository in GitHub's API (other forges: given explicitly).
+        package: Installed from the Debian package: updated from GitHub Releases.
     """
 
     repository: str
@@ -99,6 +111,7 @@ class Installation:
     commit: str | None = None
     installed_at: str | None = None
     api: str | None = None
+    package: bool = False
 
     def api_url(self) -> str | None:
         if self.api:
@@ -117,13 +130,24 @@ def package_info() -> dict[str, Any] | None:
     return _read_json(Path(sys.base_prefix) / PACKAGE_MARKER)
 
 
+def package_installation() -> Installation | None:
+    """What the Debian package installed, or None when not installed from it."""
+    package = package_info()
+    if package is None:
+        return None
+    match = _PACKAGE_COMMIT.search(str(package.get("version", "")))
+    repository = package.get("repository")
+    api = package.get("api")
+    return Installation(
+        repository=repository if isinstance(repository, str) and repository else DEFAULT_REPOSITORY,
+        ref="main",
+        commit=match.group(1) if match else None,
+        api=api if isinstance(api, str) and api else None,
+        package=True,
+    )
+
+
 def _unsupported() -> UpdateError:
-    if package_info() is not None:
-        return UpdateError(
-            "Kreafinity was installed by the system's package manager: it is updated with the "
-            "system's updates",
-            code="unsupported",
-        )
     return UpdateError("this is a development installation: update it with git", code="unsupported")
 
 
@@ -132,7 +156,10 @@ def install_record_path() -> Path:
 
 
 def installation() -> Installation | None:
-    """What the installer installed, or None for a development checkout."""
+    """What the installer (or the Debian package) installed; None for a development checkout."""
+    package = package_installation()
+    if package is not None:
+        return package
     data = _read_json(install_record_path())
     if data is None:
         return None
@@ -152,7 +179,11 @@ def installation() -> Installation | None:
 
 
 def record_installation(record: Installation) -> None:
-    data = {key: value for key, value in asdict(record).items() if value is not None}
+    data = {
+        key: value
+        for key, value in asdict(record).items()
+        if value is not None and key != "package"
+    }
     _write_json(install_record_path(), data)
 
 
@@ -234,8 +265,64 @@ def _change(entry: dict[str, Any]) -> Change:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class Release:
+    """The newest package published on GitHub Releases.
+
+    Attributes:
+        version: Package version.
+        commit: Commit it was built from.
+        package_url: Download address of the ``.deb``.
+        checksum_url: Download address of its ``.sha256`` file.
+    """
+
+    version: str
+    commit: str
+    package_url: str
+    checksum_url: str
+
+
+_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "Kreafinity"}
+
+
+async def latest_release(record: Installation, client: httpx.AsyncClient) -> Release:
+    """The newest package published on the repository's GitHub Releases.
+
+    Raises:
+        UpdateError: GitHub cannot be asked, or the release has no usable package.
+    """
+    api = record.api_url()
+    if api is None:
+        raise UpdateError(
+            f"updates are only checked on GitHub ({record.repository})", code="unsupported"
+        )
+    return _release_from(await _get(client, f"{api}/releases/latest", _HEADERS))
+
+
+def _release_from(data: Any) -> Release:
+    if not isinstance(data, dict):
+        raise UpdateError("unexpected answer from GitHub")
+    assets = {
+        str(asset.get("name")): str(asset.get("browser_download_url"))
+        for asset in data.get("assets") or []
+        if isinstance(asset, dict) and asset.get("browser_download_url")
+    }
+    for name, url in assets.items():
+        match = _DEB_ASSET.fullmatch(name)
+        if match is None or f"{name}.sha256" not in assets:
+            continue
+        commit = _PACKAGE_COMMIT.search(match.group(1))
+        if commit is None:
+            continue
+        return Release(match.group(1), commit.group(1), url, assets[f"{name}.sha256"])
+    raise UpdateError("the latest release has no Kreafinity package")
+
+
 async def check(record: Installation, client: httpx.AsyncClient | None = None) -> UpdateCheck:
-    """Ask GitHub what changed on the followed branch since the installed version.
+    """Ask GitHub what changed since the installed version.
+
+    A package installation compares itself with the newest release; another
+    one with the followed branch.
 
     Raises:
         UpdateError: The repository cannot be asked (no network, rate limit…).
@@ -245,10 +332,29 @@ async def check(record: Installation, client: httpx.AsyncClient | None = None) -
         raise UpdateError(
             f"updates are only checked on GitHub ({record.repository})", code="unsupported"
         )
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "Kreafinity"}
+    headers = _HEADERS
     own_client = client is None
     client = client or httpx.AsyncClient(timeout=20, follow_redirects=True)
     try:
+        if record.package:
+            release = await latest_release(record, client)
+            if release.commit == record.commit:
+                return UpdateCheck(available=False, latest=record.commit, checked_at=_now())
+            entries: Any = []
+            if record.commit:
+                with contextlib.suppress(UpdateError):  # the list is a bonus
+                    data = await _get(
+                        client, f"{api}/compare/{record.commit}...{release.commit}", headers
+                    )
+                    entries = data.get("commits") or []
+            changes = [_change(entry) for entry in entries if isinstance(entry, dict)]
+            shown = [c for c in changes if c.title and not c.title.startswith("Merge ")]
+            return UpdateCheck(
+                available=True,
+                latest=release.commit,
+                changes=shown[-MAX_CHANGES:],
+                checked_at=_now(),
+            )
         if record.commit:
             data = await _get(client, f"{api}/compare/{record.commit}...{record.ref}", headers)
             entries = data.get("commits") if data.get("status") in ("ahead", "diverged") else []
@@ -363,6 +469,9 @@ def apply(target: str, *, run: Runner = _run, log: Callable[[str], None] = logge
         )
     if not _COMMIT.fullmatch(target):
         raise UpdateError(f"invalid version: {target!r}", code="unsupported")
+    if record.package:
+        apply_package(record, target, run=run, log=log)
+        return
     write_status("running", target)
     try:
         log(f"Downloading and installing {target[:7]}…")
@@ -389,12 +498,129 @@ def apply(target: str, *, run: Runner = _run, log: Callable[[str], None] = logge
     restart(run=run)
 
 
+def _download(client: httpx.Client, url: str, path: Path) -> None:
+    try:
+        with client.stream("GET", url) as response:
+            if response.status_code != 200:
+                raise UpdateError(f"download failed: HTTP {response.status_code} ({url})")
+            with path.open("wb") as out:
+                for chunk in response.iter_bytes():
+                    out.write(chunk)
+    except httpx.HTTPError as exc:
+        raise UpdateError(f"download failed: {exc}") from exc
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def apply_package(
+    record: Installation,
+    target: str,
+    *,
+    run: Runner = _run,
+    log: Callable[[str], None] = logger.info,
+    client: httpx.Client | None = None,
+) -> None:
+    """Install the newest released package (built from `target` or later), then restart.
+
+    The package is checked against its published SHA-256 before ``pkexec
+    apt-get install`` (the system asks for the user's password).
+
+    Raises:
+        UpdateError: No release, download or checksum failed, password refused,
+            or the installation failed.
+    """
+    write_status("running", target)
+    folder = data_dir() / "updates"
+    try:
+        own_client = client is None
+        sync = client or httpx.Client(timeout=DOWNLOAD_TIMEOUT, follow_redirects=True)
+        try:
+            release = _latest_release_now(record, sync)
+            if release.commit == record.commit:
+                raise UpdateError("Kreafinity is up to date", code="up_to_date")
+            folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+            for old in folder.glob("kreafinity_*.deb"):
+                old.unlink(missing_ok=True)
+            package = folder / f"kreafinity_{release.version}_amd64.deb"
+            checksum = folder / f"{package.name}.sha256"
+            log(f"Downloading Kreafinity {release.version}…")
+            _download(sync, release.package_url, package)
+            _download(sync, release.checksum_url, checksum)
+        finally:
+            if own_client:
+                sync.close()
+        expected = checksum.read_text(encoding="utf-8").split()[:1]
+        if not expected or _sha256(package) != expected[0].lower():
+            package.unlink(missing_ok=True)
+            raise UpdateError("the downloaded package does not match its checksum")
+        log("Installing (the system asks for your password)…")
+        result = run(
+            [
+                "pkexec",
+                "apt-get",
+                "install",
+                "-y",
+                "-q",
+                "--allow-downgrades",
+                "-o",
+                "DPkg::Lock::Timeout=120",
+                str(package),
+            ]
+        )
+        if result.returncode in (126, 127):
+            raise UpdateError("administrator rights were not granted (password dialog cancelled)")
+        _check(result)
+        package.unlink(missing_ok=True)
+        checksum.unlink(missing_ok=True)
+    except UpdateError as exc:
+        write_status("failed", target, str(exc))
+        raise
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        write_status("failed", target, str(exc))
+        raise UpdateError(str(exc)) from exc
+    write_status("done", release.commit)
+    log("Restarting Kreafinity…")
+    restart(run=run)
+
+
+def _latest_release_now(record: Installation, client: httpx.Client) -> Release:
+    api = record.api_url()
+    if api is None:
+        raise UpdateError(f"updates are only checked on GitHub ({record.repository})")
+    try:
+        response = client.get(f"{api}/releases/latest", headers=_HEADERS, timeout=20)
+    except httpx.HTTPError as exc:
+        raise UpdateError(f"cannot reach GitHub: {exc}") from exc
+    if response.status_code != 200:
+        raise UpdateError(f"GitHub answered HTTP {response.status_code}")
+    try:
+        return _release_from(response.json())
+    except ValueError as exc:
+        raise UpdateError("unexpected answer from GitHub") from exc
+
+
 def restart(*, run: Runner = _run) -> None:
     """Restart what runs the old version: daemon, bubble, desktop search."""
     import psutil
 
     from kreafinity.system import integration
 
+    if package_info() is not None:  # the Debian package: its daemon is a systemd user service
+        if shutil.which("systemctl"):
+            run(["systemctl", "--user", "try-restart", integration.SERVICE_NAME])
+        for tool in ("kquitapp6", "kquitapp5"):  # the search reloads its plugin
+            if shutil.which(tool):
+                run([tool, "krunner"])
+                break
+        return
     venv = Path(sys.prefix)
     if venv == Path(sys.base_prefix):
         return  # not an installed environment: nothing of ours to restart
@@ -457,7 +683,8 @@ def launch(target: str) -> None:
 
     command = [sys.executable, "-m", "kreafinity.update", "apply", target]
     systemd_run = shutil.which("systemd-run")
-    if systemd_run and integration.service_installed() and integration.systemd_available():
+    service = integration.service_installed() or package_info() is not None
+    if systemd_run and service and integration.systemd_available():
         # Outside the daemon's service, which systemd stops entirely on restart.
         started = subprocess.run(
             [

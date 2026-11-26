@@ -441,8 +441,7 @@ export class SettingsDialog {
   renderUpdates() {
     const info = this.updates?.info;
     if (!info) return null;
-    if (info.managed) return el("p", { class: "hint" }, t("settings.updates.managed"));
-    if (!info.supported) return el("p", { class: "hint" }, t("settings.updates.dev"));
+    if (!info.supported) return el("p", { class: "hint" }, t(info.managed ? "settings.updates.managed" : "settings.updates.dev"));
     const result = el("span", { class: "hint", id: "settings-update-result" });
     const button = el("button", { class: "button small", type: "button", id: "settings-update-check" }, t("settings.updates.check"));
     button.addEventListener("click", async () => {

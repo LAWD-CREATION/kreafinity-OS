@@ -44,6 +44,7 @@ if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 version="${KREAFINITY_VERSION:-$version}"
 apt_url="${KREAFINITY_APT_URL:-https://lawd-creation.github.io/kreafinity-OS}"
+repository="${KREAFINITY_REPOSITORY:-https://github.com/LAWD-CREATION/kreafinity-OS}"
 apt_keyring="${KREAFINITY_APT_KEYRING:-$repo/packaging/apt/kreafinity-archive-keyring.asc}"
 say "Kreafinity $version ($arch), Python $python_version"
 
@@ -67,10 +68,11 @@ find "$root$prefix/python/lib" -maxdepth 2 -name EXTERNALLY-MANAGED -delete
 # --- Kreafinity --------------------------------------------------------------------------------
 say "Kreafinity and its dependencies"
 "$py" -m pip install --quiet --no-cache-dir --disable-pip-version-check --no-warn-script-location "$repo"
-"$py" - "$root$prefix/python/kreafinity-package.json" "$version" <<'EOF'
+# Kreafinity updates itself from the packages published on this repository's GitHub Releases.
+"$py" - "$root$prefix/python/kreafinity-package.json" "$version" "$repository" <<'EOF'
 import json, sys
 with open(sys.argv[1], "w", encoding="utf-8") as handle:
-    json.dump({"format": "deb", "version": sys.argv[2]}, handle)
+    json.dump({"format": "deb", "version": sys.argv[2], "repository": sys.argv[3]}, handle)
 EOF
 # Kreafinity must start with nothing but what the package holds.
 env -i HOME=/nonexistent "$py" -s -c 'import kreafinity.cli, kreafinity.api.app, kreafinity.plasma.krunner' || {

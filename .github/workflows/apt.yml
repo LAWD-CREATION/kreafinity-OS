@@ -1,8 +1,9 @@
 name: APT repository
 
-# The Kreafinity APT repository, on GitHub Pages: rebuilt and signed for every
-# change on main. It needs, once (see docs/distribution.md): the APT_SIGNING_KEY
-# secret (packaging/apt/new-signing-key.sh) and Pages set to « GitHub Actions ».
+# For every change on main, the Kreafinity package is built and published:
+# - on GitHub Releases, where installed computers find their updates (no setup);
+# - in the signed APT repository on GitHub Pages, once the APT_SIGNING_KEY
+#   secret exists and Pages is set to « GitHub Actions » (see docs/distribution.md).
 on:
   push:
     branches: [main]
@@ -18,6 +19,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # GitHub Releases
     outputs:
       signed: ${{ steps.key.outputs.signed }}
     steps:
@@ -35,7 +38,12 @@ jobs:
             exit 0
           fi
           # The package carries the public key (updates for installed computers).
-          packaging/apt/export-public-key.sh
+          # A wrong secret only leaves out the APT repository: Releases still work.
+          if ! packaging/apt/export-public-key.sh; then
+            echo "::warning::APT_SIGNING_KEY cannot sign: the APT repository is not published; updates still come from GitHub Releases."
+            echo "signed=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
           printf '%s\n' "$APT_SIGNING_KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
             | gpg --batch --quiet --import
           fingerprint="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
@@ -47,6 +55,11 @@ jobs:
           sudo apt-get install -y -q apt-utils
       - name: Package
         run: packaging/debian/build-deb.sh dist
+      - name: Release (updates of installed computers)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: packaging/release/publish.sh dist
       - name: Repository
         if: steps.key.outputs.signed == 'true'
         env:

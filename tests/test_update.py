@@ -393,3 +393,109 @@ def test_update_command(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result = runner.invoke(cli.app, ["version"])
     assert "(aaaaaaa, main)" in result.output
+
+
+# --- The Debian package: updates from GitHub Releases -----------------------------------------
+
+PKG_OLD = "0.1.0~dev0+git20261123.104000.f7c0e44"
+PKG_NEW = "0.1.0~dev0+git20261126.071424.6bb26d9"
+DEB = f"kreafinity_{PKG_NEW}_amd64.deb"
+DOWNLOAD = "https://github.com/LAWD-CREATION/kreafinity-OS/releases/download/v1"
+LATEST = "/repos/LAWD-CREATION/kreafinity-OS/releases/latest"
+
+
+def release_answer(assets: list[str] | None = None) -> dict[str, Any]:
+    names = [DEB, f"{DEB}.sha256"] if assets is None else assets
+    return {
+        "tag_name": "v1",
+        "assets": [{"name": n, "browser_download_url": f"{DOWNLOAD}/{n}"} for n in names],
+    }
+
+
+@pytest.fixture
+def packaged(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(update, "package_info", lambda: {"format": "deb", "version": PKG_OLD})
+
+
+def test_package_installation(packaged: None) -> None:
+    record = update.installation()
+    assert record == update.Installation(REPOSITORY, "main", "f7c0e44", package=True)
+    assert record is not None and record.api_url() == API
+
+
+async def test_package_check(packaged: None) -> None:
+    record = update.installation()
+    assert record is not None
+    compare = "/repos/LAWD-CREATION/kreafinity-OS/compare/f7c0e44...6bb26d9"
+    async with github({LATEST: release_answer(), compare: compare_answer()}) as client:
+        result = await update.check(record, client)
+    assert result.available and result.latest == "6bb26d9"
+    assert [c.title for c in result.changes] == ["feat: memory that improves", "fix: faster search"]
+    # Without the list of changes (compare refused), still available.
+    async with github({LATEST: release_answer()}) as client:
+        result = await update.check(record, client)
+    assert result.available and result.changes == []
+    # A release without the checksum is not used.
+    async with github({LATEST: release_answer([DEB])}) as client:
+        with pytest.raises(update.UpdateError, match="no Kreafinity package"):
+            await update.check(record, client)
+
+
+async def test_package_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(update, "package_info", lambda: {"format": "deb", "version": PKG_NEW})
+    record = update.installation()
+    assert record is not None
+    async with github({LATEST: release_answer()}) as client:
+        result = await update.check(record, client)
+    assert not result.available
+
+
+def downloads(content: bytes, checksum: str) -> httpx.Client:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == LATEST:
+            return httpx.Response(200, json=release_answer())
+        if request.url.path.endswith(".deb"):
+            return httpx.Response(200, content=content)
+        if request.url.path.endswith(".sha256"):
+            return httpx.Response(200, text=f"{checksum}  {DEB}\n")
+        return httpx.Response(404)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_apply_package(packaged: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    import hashlib
+
+    content = b"!<arch>\nfake package"
+    restarted: list[bool] = []
+    monkeypatch.setattr(update, "restart", lambda **_: restarted.append(True))
+    commands, run = fake_runner()
+    record = update.installation()
+    assert record is not None
+    client = downloads(content, hashlib.sha256(content).hexdigest())
+    update.apply_package(record, "6bb26d9", run=run, client=client)
+    (command,) = commands
+    assert command[:3] == ["pkexec", "apt-get", "install"]
+    assert command[-1].endswith(DEB) and "--allow-downgrades" in command
+    assert update.read_status().state == "done" and restarted == [True]
+    assert not list((update.data_dir() / "updates").glob("*.deb"))  # cleaned after install
+
+    # A package that does not match its checksum is never installed.
+    commands.clear()
+    with pytest.raises(update.UpdateError, match="checksum"):
+        update.apply_package(record, "6bb26d9", run=run, client=downloads(content, "0" * 64))
+    assert commands == [] and update.read_status().state == "failed"
+
+    # The password dialog cancelled.
+    def refused(command: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 126, "", "")
+
+    client = downloads(content, hashlib.sha256(content).hexdigest())
+    with pytest.raises(update.UpdateError, match="not granted"):
+        update.apply_package(record, "6bb26d9", run=refused, client=client)
+
+
+def test_restart_of_the_package(packaged: None) -> None:
+    commands, run = fake_runner()
+    update.restart(run=run)
+    assert commands[0] == ["systemctl", "--user", "try-restart", "kreafinity.service"]

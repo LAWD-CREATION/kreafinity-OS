@@ -131,10 +131,10 @@ def version() -> None:
     record = installation()
     package = package_info()
     detail = ""
-    if record is not None and record.commit:
-        detail = f" ({record.commit[:7]}, {record.ref})"
-    elif package is not None:
+    if package is not None:
         detail = f" ({t('version.package', version=package.get('version', '?'))})"
+    elif record is not None and record.commit:
+        detail = f" ({record.commit[:7]}, {record.ref})"
     console.print(f"Kreafinity OS [bold]{__version__}[/bold]{detail}")
 
 
