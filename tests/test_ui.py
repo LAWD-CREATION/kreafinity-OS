@@ -222,6 +222,48 @@ def test_always_allow_in_the_browser(page: Any, tmp_path: Path) -> None:
     assert "echo bonjour" not in config_file.read_text()
 
 
+@pytest.fixture
+def fake_desktop(tmp_path: Path, home: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """kdialog and gio stand-ins for the daemon (before it starts): a chosen file, an opened URL."""
+    bin_dir = tmp_path / "fake-bin"
+    bin_dir.mkdir()
+    chosen = home / "Documents" / "liste.txt"
+    chosen.parent.mkdir(parents=True, exist_ok=True)
+    chosen.write_text("pain, lait, café", encoding="utf-8")
+    opened = tmp_path / "opened.txt"
+    (bin_dir / "kdialog").write_text(f"#!/bin/sh\necho '{chosen}'\n")
+    (bin_dir / "gio").write_text(f'#!/bin/sh\necho "$2" >> "{opened}"\n')
+    for tool in bin_dir.iterdir():
+        tool.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    return opened
+
+
+def test_paperclip_and_expand_in_the_kde_panel(
+    fake_desktop: Path, browser: Any, daemon: str
+) -> None:
+    """In the KDE panel (compact, no bubble bridge), the daemon shows the dialogs."""
+    context = browser.new_context(viewport={"width": 420, "height": 640}, locale="fr-FR")
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.goto(f"{daemon}/?compact=1")
+    page.wait_for_selector("#connection.online")
+    page.click("#attach")
+    page.wait_for_selector("#attachments .attachment >> text=liste.txt")
+    page.fill("#prompt", "Que contient ce fichier ?")
+    page.press("#prompt", "Enter")
+    page.wait_for_selector(".message.user .message-attachments >> text=liste.txt")
+    page.click("#expand")
+    deadline = time.monotonic() + 10
+    while not fake_desktop.exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    url = fake_desktop.read_text().strip()
+    assert url.startswith(daemon + "/?conversation=")
+    assert errors == []
+    context.close()
+
+
 def test_ai_text_is_never_html(page: Any) -> None:
     page.fill("#prompt", "Test XSS")
     page.press("#prompt", "Enter")

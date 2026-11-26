@@ -327,3 +327,58 @@ def test_config_and_tools(client: TestClient) -> None:
     assert tools["open_url"]["risk"] == "confirm"
     assert tools["move_to_trash"]["risk"] == "danger"
     assert all(t["enabled"] for t in tools.values())
+
+
+# --- The KDE panel: the desktop's file dialog, the full interface in the browser ---------------
+
+
+def test_files_picked_in_the_desktop_dialog(
+    client: TestClient, home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kreafinity import attachments
+    from kreafinity.system import file_picker
+
+    note = home / "note.txt"
+    note.write_text("pain, lait")
+    big = home / "big.bin"
+    big.write_bytes(b"x" * (attachments.MAX_SIZE + 1))
+    asked: list[str] = []
+
+    def pick(title: str, **_: Any) -> list[Path]:
+        asked.append(title)
+        return [note, big, home / "gone.txt"]
+
+    monkeypatch.setattr(file_picker, "pick_files", pick)
+    last = client.get("/api/ui/requests?wait=0", headers=AUTH).json()["last"]
+    answer = client.post("/api/uploads/pick", headers=AUTH)
+    assert answer.status_code == 200, answer.text
+    data = answer.json()
+    (saved,) = data["files"]
+    assert saved["name"] == "note.txt" and saved["media_type"] == "text/plain"
+    assert data["refused"] == ["big.bin", "gone.txt"]
+    assert asked == ["Joindre des fichiers"]
+    assert attachments.load(saved["id"])[1] == b"pain, lait"
+    # The panel closed when the dialog took the focus: it is asked to come back.
+    later = client.get(f"/api/ui/requests?after={last}&wait=0", headers=AUTH).json()
+    requests = later["requests"]
+    assert [(r["type"], r["conversation_id"]) for r in requests] == [("show_conversation", "")]
+
+    def unavailable(title: str, **_: Any) -> list[Path]:
+        raise file_picker.PickerError("no file dialog available (install kdialog or zenity)")
+
+    monkeypatch.setattr(file_picker, "pick_files", unavailable)
+    assert client.post("/api/uploads/pick", headers=AUTH).status_code == 503
+    assert client.post("/api/uploads/pick").status_code == 401  # never without the token
+
+
+def test_open_the_full_interface(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from kreafinity.system import desktop
+
+    opened: list[str] = []
+    monkeypatch.setattr(desktop, "open_with_default_app", opened.append)
+    assert client.post("/api/ui/open-full", headers=AUTH, json={}).status_code == 200
+    body = {"conversation_id": "abc123"}
+    assert client.post("/api/ui/open-full", headers=AUTH, json=body).status_code == 200
+    assert opened == [f"http://127.0.0.1:{PORT}/", f"http://127.0.0.1:{PORT}/?conversation=abc123"]
+    bad = {"conversation_id": "x&url=evil"}
+    assert client.post("/api/ui/open-full", headers=AUTH, json=bad).status_code in (400, 422)

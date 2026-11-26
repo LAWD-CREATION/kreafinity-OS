@@ -266,5 +266,6 @@
   "mcp.status.starting": "démarrage",
   "mcp.status.stopped": "arrêtée",
   "mcp.status.disabled": "désactivée",
-  "mcp.status.needs_secret": "secret à renseigner"
+  "mcp.status.needs_secret": "secret à renseigner",
+  "attach.pick_title": "Joindre des fichiers"
 }

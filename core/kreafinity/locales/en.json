@@ -266,5 +266,6 @@
   "mcp.status.starting": "starting",
   "mcp.status.stopped": "stopped",
   "mcp.status.disabled": "disabled",
-  "mcp.status.needs_secret": "secret needed"
+  "mcp.status.needs_secret": "secret needed",
+  "attach.pick_title": "Attach files"
 }

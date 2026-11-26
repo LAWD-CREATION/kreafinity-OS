@@ -61,6 +61,7 @@ STATUS_BY_CODE: dict[ErrorCode, int] = {
     "keyring_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "update_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "voice_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "desktop_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 PeerLookup = Callable[[Address | None, Address | None], int | None]
@@ -100,6 +101,10 @@ class SpeechText(BaseModel):
 
 class ShowRequest(BaseModel):
     conversation_id: str = Field(min_length=1, max_length=100)
+
+
+class OpenFullRequest(BaseModel):
+    conversation_id: str | None = Field(default=None, max_length=100, pattern=r"^[A-Za-z0-9_-]*$")
 
 
 class ApprovalDecision(BaseModel):
@@ -288,6 +293,34 @@ def create_app(
             raise ServiceError(str(exc), code="invalid") from exc
         return saved.to_dict()
 
+    @api.post("/uploads/pick")
+    async def pick_uploads(service: Service) -> dict[str, Any]:
+        """The desktop's file dialog (for the KDE panel, which cannot show one)."""
+        import mimetypes
+
+        from kreafinity import attachments
+        from kreafinity.i18n import t
+        from kreafinity.system.file_picker import PickerError, pick_files
+
+        try:
+            paths = await asyncio.to_thread(pick_files, t("attach.pick_title"))
+        except PickerError as exc:
+            raise ServiceError(str(exc), code="desktop_unavailable") from exc
+        saved, refused = [], []
+        for path in paths[: attachments.MAX_FILES]:
+            try:
+                size = path.stat().st_size
+                if size > attachments.MAX_SIZE:
+                    raise attachments.AttachmentError("too large")
+                data = await asyncio.to_thread(path.read_bytes)
+                media_type = mimetypes.guess_type(path.name)[0] or ""
+                upload = await asyncio.to_thread(attachments.save, path.name, media_type, data)
+                saved.append(upload.to_dict())
+            except (OSError, attachments.AttachmentError):
+                refused.append(path.name)
+        await service.show_panels()  # the panel closed when the dialog took the focus
+        return {"files": saved, "refused": refused}
+
     @api.post("/conversations/{conversation_id}/cancel")
     async def cancel(service: Service, conversation_id: str) -> dict[str, str]:
         await service.cancel_run(conversation_id)
@@ -370,6 +403,20 @@ def create_app(
     async def show_conversation(service: Service, body: ShowRequest) -> dict[str, Any]:
         """Ask the panels to show a conversation; ``delivered`` says if one listens."""
         return await service.show_conversation(body.conversation_id)
+
+    @api.post("/ui/open-full")
+    async def open_full(service: Service, body: OpenFullRequest) -> dict[str, Any]:
+        """Open the full interface in the browser (from the KDE panel)."""
+        from kreafinity.system.desktop import LaunchError, open_with_default_app
+
+        url = f"http://127.0.0.1:{port}/"
+        if body.conversation_id:
+            url += f"?conversation={body.conversation_id}"
+        try:
+            await asyncio.to_thread(open_with_default_app, url)
+        except LaunchError as exc:
+            raise ServiceError(str(exc), code="desktop_unavailable") from exc
+        return {"opened": url}
 
     @api.get("/ui/requests")
     async def ui_requests(
