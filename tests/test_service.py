@@ -239,7 +239,7 @@ async def test_config_providers_and_tools(home: Path) -> None:
     assert (updated["language"], updated["max_iterations"]) == ("en", 4)
     assert load_settings().max_iterations == 4
     with pytest.raises(ServiceError) as info:
-        service.update_config({"max_iterations": 0})
+        service.update_config({"max_iterations": -1})
     assert info.value.code == "invalid"
     with pytest.raises(ServiceError):
         service.update_config({"providers": {"openai": {"api_key": "sk-x"}}})
