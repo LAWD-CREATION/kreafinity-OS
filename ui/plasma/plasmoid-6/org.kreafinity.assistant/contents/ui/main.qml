@@ -19,6 +19,8 @@ PlasmoidItem {
     readonly property bool english: Qt.locale().name.indexOf("en") === 0
     property string pendingConversation: ""
     property int lastRequest: -1
+    // The web page's file request (paperclip), answered by KDE's own file dialog.
+    property var fileRequest: null
 
     function tr(french, englishText) {
         return english ? englishText : french
@@ -86,6 +88,47 @@ PlasmoidItem {
         onNewData: (sourceName, data) => disconnectSource(sourceName)
     }
 
+    // The paperclip: in a panel, the web engine's own file dialog does not show
+    // (the panel closes when it loses the focus). KDE's dialog is asked instead,
+    // and the panel stays open meanwhile. The commands are fixed: no page data.
+    function pickFiles(request) {
+        if (request.mode === FileDialogRequest.FileModeSave)
+            return  // not used by Kreafinity: the engine's default
+        request.accepted = true
+        if (root.fileRequest !== null)
+            root.fileRequest.dialogReject()
+        root.fileRequest = request
+        root.hideOnWindowDeactivate = false
+        const title = tr("Joindre des fichiers", "Attach files")
+        if (request.mode === FileDialogRequest.FileModeUploadFolder)
+            picker.connectSource("kdialog --title '" + title + "' --getexistingdirectory ~")
+        else if (request.mode === FileDialogRequest.FileModeOpenMultiple)
+            picker.connectSource("kdialog --title '" + title + "' --multiple --separate-output --getopenfilename ~")
+        else
+            picker.connectSource("kdialog --title '" + title + "' --getopenfilename ~")
+    }
+
+    P5Support.DataSource {
+        id: picker
+        engine: "executable"
+        connectedSources: []
+        onNewData: (sourceName, data) => {
+            disconnectSource(sourceName)
+            const request = root.fileRequest
+            root.fileRequest = null
+            root.hideOnWindowDeactivate = true
+            root.expanded = true
+            if (request === null)
+                return
+            const files = data["exit code"] === 0
+                ? data.stdout.split("\n").filter(line => line.length > 0) : []
+            if (files.length > 0)
+                request.dialogAccept(files)
+            else
+                request.dialogReject()
+        }
+    }
+
     fullRepresentation: Item {
         id: panel
 
@@ -124,6 +167,7 @@ PlasmoidItem {
                 }
             }
             onNewWindowRequested: request => Qt.openUrlExternally(request.requestedUrl)
+            onFileDialogRequested: request => root.pickFiles(request)
 
             // The microphone, to talk to Kreafinity: for our interface only.
             Connections {

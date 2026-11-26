@@ -295,3 +295,19 @@ def test_update_gives_the_shortcut_without_adding_the_widget(
     report = plasma.install(6, port=27494, add_widget=False)  # what an update runs
     assert "var mayAdd = false;" in scripts[0]  # a widget the user removed stays removed
     assert [key for key, _ in report.done][4:] == keys
+
+
+def test_widget_answers_the_paperclip_with_kdialog() -> None:
+    """In a panel, the web engine's own file dialog does not show: KDE's is used."""
+    import re
+
+    root = Path(__file__).resolve().parent.parent / "ui" / "plasma"
+    for version in ("plasmoid-5", "plasmoid-6"):
+        qml = (
+            root / version / "org.kreafinity.assistant" / "contents" / "ui" / "main.qml"
+        ).read_text()
+        assert "onFileDialogRequested" in qml and "dialogAccept(files)" in qml
+        commands = re.findall(r"picker\.connectSource\((.+)\)", qml)
+        assert len(commands) == 3
+        # Fixed commands: nothing from the page (names, types) reaches the shell.
+        assert all("request." not in command for command in commands)

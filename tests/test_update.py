@@ -441,6 +441,17 @@ async def test_package_check(packaged: None) -> None:
             await update.check(record, client)
 
 
+async def test_package_newer_than_the_release(packaged: None) -> None:
+    """A package newer than the latest release (built from a later commit) stays."""
+    record = update.installation()
+    assert record is not None
+    compare = "/repos/LAWD-CREATION/kreafinity-OS/compare/f7c0e44...6bb26d9"
+    routes = {LATEST: release_answer(), compare: compare_answer("behind")}
+    async with github(routes) as client:
+        result = await update.check(record, client)
+    assert not result.available and result.latest == "f7c0e44"
+
+
 async def test_package_up_to_date(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(update, "package_info", lambda: {"format": "deb", "version": PKG_NEW})
     record = update.installation()

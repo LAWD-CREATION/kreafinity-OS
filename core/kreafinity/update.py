@@ -341,12 +341,16 @@ async def check(record: Installation, client: httpx.AsyncClient | None = None) -
             if release.commit == record.commit:
                 return UpdateCheck(available=False, latest=record.commit, checked_at=_now())
             entries: Any = []
+            status = None
             if record.commit:
-                with contextlib.suppress(UpdateError):  # the list is a bonus
+                with contextlib.suppress(UpdateError):  # unknown: the release is offered
                     data = await _get(
                         client, f"{api}/compare/{record.commit}...{release.commit}", headers
                     )
+                    status = data.get("status")
                     entries = data.get("commits") or []
+            if status in ("behind", "identical"):  # installed is newer: never go back
+                return UpdateCheck(available=False, latest=record.commit, checked_at=_now())
             changes = [_change(entry) for entry in entries if isinstance(entry, dict)]
             shown = [c for c in changes if c.title and not c.title.startswith("Merge ")]
             return UpdateCheck(

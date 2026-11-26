@@ -77,6 +77,50 @@ Item {
 
     Component.onCompleted: pollTimer.start()
 
+    // The web page's file request (paperclip), answered by KDE's own file dialog.
+    property var fileRequest: null
+
+    // The paperclip: in a panel, the web engine's own file dialog does not show
+    // (the panel closes when it loses the focus). KDE's dialog is asked instead,
+    // and the panel stays open meanwhile. The commands are fixed: no page data.
+    function pickFiles(request) {
+        if (request.mode === FileDialogRequest.FileModeSave)
+            return
+        request.accepted = true
+        if (root.fileRequest !== null)
+            root.fileRequest.dialogReject()
+        root.fileRequest = request
+        Plasmoid.hideOnWindowDeactivate = false
+        var title = tr("Joindre des fichiers", "Attach files")
+        if (request.mode === FileDialogRequest.FileModeUploadFolder)
+            picker.connectSource("kdialog --title '" + title + "' --getexistingdirectory ~")
+        else if (request.mode === FileDialogRequest.FileModeOpenMultiple)
+            picker.connectSource("kdialog --title '" + title + "' --multiple --separate-output --getopenfilename ~")
+        else
+            picker.connectSource("kdialog --title '" + title + "' --getopenfilename ~")
+    }
+
+    PlasmaCore.DataSource {
+        id: picker
+        engine: "executable"
+        connectedSources: []
+        onNewData: {
+            disconnectSource(sourceName)
+            var request = root.fileRequest
+            root.fileRequest = null
+            Plasmoid.hideOnWindowDeactivate = true
+            Plasmoid.expanded = true
+            if (request === null)
+                return
+            var files = data["exit code"] === 0
+                ? data.stdout.split("\n").filter(function (line) { return line.length > 0 }) : []
+            if (files.length > 0)
+                request.dialogAccept(files)
+            else
+                request.dialogReject()
+        }
+    }
+
     // Starts the daemon's systemd user service when it is not running.
     PlasmaCore.DataSource {
         id: executable
@@ -124,6 +168,9 @@ Item {
             }
             onNewViewRequested: function (request) {
                 Qt.openUrlExternally(request.requestedUrl)
+            }
+            onFileDialogRequested: function (request) {
+                root.pickFiles(request)
             }
             // The microphone, to talk to Kreafinity: for our interface only.
             onFeaturePermissionRequested: function (securityOrigin, feature) {

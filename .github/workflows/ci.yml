@@ -60,7 +60,10 @@ jobs:
       - name: Try it
         run: |
           kreafinity version | grep -q "paquet"
-          if kreafinity update --check; then exit 1; fi  # updates come from APT
+          # Updates come from GitHub Releases: this build is newer than any, so none is offered
+          # (or GitHub cannot be asked from here, which is fine too).
+          out="$(kreafinity update --check 2>&1 || true)"; echo "$out"
+          if grep -q "disponible" <<<"$out"; then exit 1; fi
           test -L /etc/systemd/user/graphical-session.target.wants/kreafinity.service
           test -L /usr/share/plasma/plasmoids/org.kreafinity.assistant
           kreafinity-core --port 27911 &
